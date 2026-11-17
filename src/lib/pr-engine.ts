@@ -5,6 +5,7 @@ import { FORMAT_MAP, CATEGORY_LABELS, type ContentCategory } from "@/lib/formats
 import { LANGUAGE_MAP, languageLabel } from "@/lib/languages";
 import { OBJECTIVE_MAP, TONE_MAP } from "@/lib/formats";
 import type { ProfileDTO } from "@/lib/types";
+import { generateEngineMeme, memeBackend } from "@/lib/engine";
 
 // ─── Text generation backend (Starimg) ──────────────────────────────
 // Slice 1 of the P&R rewire (REWIRE-DESIGN.md): every text call in this
@@ -379,6 +380,53 @@ export async function regenerateAsset(assetId: string, variation?: string, langu
 
   try {
     if (asset.type === "MEMES") {
+      if (memeBackend() === "engine") {
+        // Engine path (slice 2): a regenerate is a fresh engine call —
+        // same language or natively in the target language, with the
+        // variation directive folded into the brief.
+        const campaign = asset.campaignId
+          ? await db.campaign.findUnique({ where: { id: asset.campaignId } })
+          : null;
+        const profile = campaign
+          ? (JSON.parse(campaign.profileJson) as ProfileDTO)
+          : ({
+              name: asset.title,
+              description: asset.body,
+              products: [],
+              sellingPoints: [],
+              differentiators: [],
+              primaryLanguage: asset.language,
+              suggestedLanguages: [],
+              suggestedTones: [],
+            } as ProfileDTO);
+        if (!(await bridgeSlotAvailable(asset.userId))) {
+          throw new Error("Daily bridge limit reached for engine memes — try again tomorrow, or connect your own P&R key.");
+        }
+        const made = await generateEngineMeme({
+          brief:
+            engineMemeBrief({
+              profile,
+              businessName: campaign?.businessName ?? asset.title,
+              objective: campaign ? objectiveLabel(campaign.objective, campaign.customObjective) : "Promote the business",
+              tone: campaign ? toneLabel(campaign.tone, campaign.customTone) : "Funny",
+              formatInstruction: spec.instruction,
+            }) + (variationDirective ? `\nVariation: ${variationDirective}` : ""),
+          languageName: languageLabel(targetLanguage),
+        });
+        await db.asset.update({
+          where: { id: assetId },
+          data: {
+            imageUrl: made.imageUrl,
+            pageUrl: made.pageUrl,
+            engineRef: made.pageId,
+            language: targetLanguage,
+            languageLabel: languageLabel(targetLanguage),
+            status: "DONE",
+          },
+        });
+        await recordUsage(asset.userId, "IMAGE", 1, "engine-meme-regen");
+        return;
+      }
       const concept: MemeConcept = {
         title: asset.title,
         imagePrompt: "",
@@ -481,6 +529,45 @@ export async function regenerateAsset(assetId: string, variation?: string, langu
 }
 
 // ─── Usage recording (successes only are billable events) ───────────
+// ─── Bridge guard + engine brief (slice 2) ──────────────────────────
+// Engine memes spend the bridge house key at 1 credit per call, so a
+// per-member daily cap stands in front of them. PR_BRIDGE_DAILY_CAP
+// overrides the default of 50.
+function bridgeDailyCap(): number {
+  const n = Number(process.env.PR_BRIDGE_DAILY_CAP ?? "50");
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 50;
+}
+
+async function bridgeSlotAvailable(userId: string): Promise<boolean> {
+  const start = new Date();
+  start.setUTCHours(0, 0, 0, 0);
+  const used = await db.usageRecord.aggregate({
+    where: { userId, kind: "IMAGE", createdAt: { gte: start } },
+    _sum: { count: true },
+  });
+  return (used._sum.count ?? 0) < bridgeDailyCap();
+}
+
+function engineMemeBrief(opts: {
+  profile: ProfileDTO;
+  businessName: string;
+  objective: string;
+  tone: string;
+  formatInstruction: string;
+}): string {
+  const p = opts.profile;
+  const parts = [
+    `A meme for ${p.name || opts.businessName} — ${p.description}`,
+    p.products.length ? `Products and services: ${p.products.join(", ")}.` : "",
+    p.sellingPoints.length ? `Selling points: ${p.sellingPoints.join("; ")}.` : "",
+    p.audience ? `Audience: ${p.audience}.` : "",
+    `Campaign objective: ${opts.objective}. Tone: ${opts.tone}.`,
+    `Format direction: ${opts.formatInstruction}`,
+    "The meme must be about this business specifically — funny, punchy, and shareable.",
+  ];
+  return parts.filter(Boolean).join("\n");
+}
+
 export async function recordUsage(userId: string, kind: "TEXT" | "IMAGE" | "FAILED", count: number, meta?: string) {
   if (count <= 0) return;
   try {
@@ -547,6 +634,54 @@ export async function runGenerationJob(jobId: string): Promise<void> {
         }))
         .filter((g) => g.assets.length > 0);
       if (langGroups.length === 0) continue;
+
+      if (memeBackend() === "engine") {
+        // Engine path (slice 2): one engine call per asset, generated
+        // natively in the asset's own language. The concept → image →
+        // localize chain does not exist here — the engine bakes the
+        // text into the render and returns a shareable page.
+        for (const g of langGroups) {
+          for (const asset of g.assets) {
+            await bump(`Generating ${FORMAT_MAP[f.format]?.label ?? f.format} on the P&R engine — ${languageLabel(g.lang)}`);
+            await db.asset.update({ where: { id: asset.id }, data: { status: "GENERATING" } });
+            try {
+              if (!(await bridgeSlotAvailable(campaign.userId))) {
+                throw new Error("Daily bridge limit reached for engine memes — try again tomorrow, or connect your own P&R key.");
+              }
+              const made = await generateEngineMeme({
+                brief: engineMemeBrief({
+                  profile,
+                  businessName: campaign.businessName,
+                  objective: objectiveLabel(campaign.objective, campaign.customObjective),
+                  tone: toneLabel(campaign.tone, campaign.customTone),
+                  formatInstruction: FORMAT_MAP[f.format]?.instruction ?? "A shareable meme",
+                }),
+                languageName: languageLabel(g.lang),
+              });
+              await db.asset.update({
+                where: { id: asset.id },
+                data: {
+                  title: `${FORMAT_MAP[f.format]?.label ?? "Meme"} — ${campaign.businessName}`,
+                  imageUrl: made.imageUrl,
+                  pageUrl: made.pageUrl,
+                  engineRef: made.pageId,
+                  status: "DONE",
+                },
+              });
+              done++;
+              await recordUsage(campaign.userId, "IMAGE", 1, "engine-meme");
+            } catch (err) {
+              await db.asset.update({
+                where: { id: asset.id },
+                data: { status: "FAILED", error: err instanceof Error ? err.message : "Engine meme failed" },
+              });
+              failed++;
+              await recordUsage(campaign.userId, "FAILED", 1, "engine-meme");
+            }
+          }
+        }
+        continue;
+      }
 
       await bump(`Designing ${FORMAT_MAP[f.format]?.label ?? f.format} concepts`);
       // concepts in primary language (or first available)
