@@ -38,6 +38,18 @@ export interface AnalyzeResponse {
   research?: ResearchSummary; // present when the P&R deep-research bridge answered
 }
 
+/** Background brand-research job, as served by /api/research*. */
+export interface ResearchJobDTO {
+  id: string;
+  brandName: string;
+  website: string;
+  status: "running" | "done" | "failed";
+  result?: AnalyzeResponse;
+  error?: string;
+  createdAt: number;
+  elapsedSec: number;
+}
+
 export interface LanguageRef {
   code: string;
   label: string;
@@ -80,6 +92,7 @@ export interface AssetDTO {
   topText?: string | null;
   bottomText?: string | null;
   imageUrl?: string | null;
+  pageUrl?: string | null; // engine share page (/m/…) for engine-generated memes
   status: string;
   error?: string | null;
   createdAt: string;

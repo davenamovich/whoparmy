@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -25,7 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { FORMAT_CATALOG, FORMAT_MAP, OBJECTIVES, TONES, CATEGORY_LABELS, type ContentCategory } from "@/lib/formats";
 import { LANGUAGES, LANGUAGE_MAP } from "@/lib/languages";
-import type { AnalyzeResponse, JobDTO, ProfileDTO } from "@/lib/types";
+import type { AnalyzeResponse, JobDTO, ProfileDTO, ResearchJobDTO } from "@/lib/types";
 import { LangChip } from "./shared";
 
 const STEPS = ["Source", "Objective", "Formats", "Languages", "Tone", "Generate"] as const;
@@ -59,7 +59,16 @@ export function CreateWizard({
   const [sourceValue, setSourceValue] = useState("");
   const [brandName, setBrandName] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeElapsed, setAnalyzeElapsed] = useState(0);
+  const researchPollRef = useRef<number | null>(null);
   const [analyzeMeta, setAnalyzeMeta] = useState<AnalyzeResponse | null>(null);
+
+  useEffect(
+    () => () => {
+      if (researchPollRef.current !== null) window.clearInterval(researchPollRef.current);
+    },
+    [],
+  );
   const [profile, setProfile] = useState<Partial<ProfileDTO>>(initialProfile ?? {});
 
   const [objective, setObjective] = useState<string>("");
@@ -98,18 +107,31 @@ export function CreateWizard({
     }
     setAnalyzing(true);
     setAnalyzeMeta(null);
+    setAnalyzeElapsed(0);
     try {
-      const res = await fetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          useBrandMode
-            ? { source: "brand", brandName: brandName.trim(), value: sourceValue.trim() }
-            : { source: sourceTab, value: sourceValue.trim() },
-        ),
-      });
-      const json = (await res.json()) as AnalyzeResponse & { error?: string };
-      if (!res.ok) throw new Error(json.error ?? "Analysis failed");
+      let json: AnalyzeResponse;
+      if (useBrandMode) {
+        // Deep research runs as a background job (~2 min) — start it,
+        // then poll. The wizard needs the profile to proceed, so this
+        // waits, but no single request hangs for minutes anymore.
+        const startRes = await fetch("/api/research", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ brandName: brandName.trim(), website: sourceValue.trim() }),
+        });
+        const startJson = (await startRes.json()) as { job?: ResearchJobDTO; error?: string };
+        if (!startRes.ok || !startJson.job) throw new Error(startJson.error ?? "Could not start research");
+        json = startJson.job.result ?? (await waitForResearchJob(startJson.job.id));
+      } else {
+        const res = await fetch("/api/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ source: sourceTab, value: sourceValue.trim() }),
+        });
+        const body = (await res.json()) as AnalyzeResponse & { error?: string };
+        if (!res.ok) throw new Error(body.error ?? "Analysis failed");
+        json = body;
+      }
       setProfile(json.profile);
       setAnalyzeMeta(json);
       setCampaignName(`${json.profile.name} Campaign`);
@@ -122,6 +144,32 @@ export function CreateWizard({
     } finally {
       setAnalyzing(false);
     }
+  }
+
+  function waitForResearchJob(jobId: string): Promise<AnalyzeResponse> {
+    return new Promise((resolve, reject) => {
+      const timer = window.setInterval(async () => {
+        try {
+          const res = await fetch(`/api/research/${jobId}`);
+          const json = (await res.json()) as { job?: ResearchJobDTO; error?: string };
+          if (!res.ok || !json.job) throw new Error(json.error ?? "Could not read the research job");
+          setAnalyzeElapsed(json.job.elapsedSec);
+          if (json.job.status === "done" && json.job.result) {
+            window.clearInterval(timer);
+            if (researchPollRef.current === timer) researchPollRef.current = null;
+            resolve(json.job.result);
+          } else if (json.job.status === "failed") {
+            window.clearInterval(timer);
+            if (researchPollRef.current === timer) researchPollRef.current = null;
+            reject(new Error(json.job.error ?? "Deep research failed. Please try again."));
+          }
+        } catch {
+          // Transient poll failure — keep waiting; the server-side
+          // sweep fails anything genuinely stuck.
+        }
+      }, 4000);
+      researchPollRef.current = timer;
+    });
   }
 
   function toggleFormat(category: ContentCategory, key: string) {
@@ -349,7 +397,7 @@ export function CreateWizard({
             )}
             <Button size="lg" className="h-12 sm:w-44 shrink-0" onClick={analyze} disabled={analyzing}>
               {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-              {analyzing ? "Researching…" : "Analyze business"}
+              {analyzing ? `Researching…${analyzeElapsed ? ` ${analyzeElapsed}s` : ""}` : "Analyze business"}
             </Button>
           </div>
 

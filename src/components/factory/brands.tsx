@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Building2, Globe, Loader2, Megaphone, Plus, Sparkles, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { LANGUAGES } from "@/lib/languages";
-import type { AnalyzeResponse, BrandDTO, ProfileDTO, ResearchSummary } from "@/lib/types";
+import type { AnalyzeResponse, BrandDTO, ProfileDTO, ResearchJobDTO, ResearchSummary } from "@/lib/types";
 import { EmptyState, LangChip, SectionHeader } from "./shared";
 
 interface BrandForm {
@@ -96,6 +96,8 @@ export function BrandsView({
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [research, setResearch] = useState<ResearchSummary | null>(null);
   const [researching, setResearching] = useState(false);
+  const [researchElapsed, setResearchElapsed] = useState(0);
+  const pollRef = useRef<number | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -117,10 +119,68 @@ export function BrandsView({
   }, [load]);
 
   function openCreate() {
+    stopPolling();
+    setResearching(false);
     setEditing(null);
     setForm(EMPTY_FORM);
     setResearch(null);
     setDialogOpen(true);
+  }
+
+  function stopPolling() {
+    if (pollRef.current !== null) {
+      window.clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }
+
+  useEffect(() => stopPolling, []);
+
+  function applyResearchResult(json: AnalyzeResponse) {
+    const p = json.profile;
+    setForm((f) => ({
+      ...f,
+      name: p.name || f.name,
+      industry: p.industry ?? f.industry,
+      description: p.description || f.description,
+      products: p.products.length ? p.products.join(", ") : f.products,
+      audience: p.audience ?? f.audience,
+      voice: json.research?.voice ? json.research.voice.slice(0, 400) : f.voice,
+      languages: p.suggestedLanguages?.length ? p.suggestedLanguages : f.languages,
+    }));
+    setResearch(json.research ?? null);
+    toast({
+      title: json.research ? "Deep research complete" : "Profile built from a standard scan",
+      description: json.research ? "Here's what P&R knows about your brand — review and save." : json.note,
+    });
+  }
+
+  function pollJob(jobId: string) {
+    stopPolling();
+    pollRef.current = window.setInterval(async () => {
+      try {
+        const res = await fetch(`/api/research/${jobId}`);
+        const json = (await res.json()) as { job?: ResearchJobDTO; error?: string };
+        if (!res.ok || !json.job) throw new Error(json.error ?? "Could not read the research job");
+        setResearchElapsed(json.job.elapsedSec);
+        if (json.job.status === "done" && json.job.result) {
+          stopPolling();
+          setResearching(false);
+          applyResearchResult(json.job.result);
+        } else if (json.job.status === "failed") {
+          stopPolling();
+          setResearching(false);
+          toast({
+            title: "Deep research failed",
+            description: json.job.error ?? "Please try again.",
+            variant: "destructive",
+          });
+        }
+      } catch {
+        // Transient poll failure — keep polling; the job server-side
+        // sweep fails anything genuinely stuck.
+      }
+    }, 4000);
   }
 
   async function runResearch() {
@@ -129,38 +189,30 @@ export function BrandsView({
       return;
     }
     setResearching(true);
+    setResearchElapsed(0);
     try {
-      const res = await fetch("/api/analyze", {
+      // Research runs as a background job (~2 min) — the dialog stays
+      // usable and the job survives the dialog closing.
+      const res = await fetch("/api/research", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source: "brand", brandName: form.name.trim(), value: form.website.trim() }),
+        body: JSON.stringify({ brandName: form.name.trim(), website: form.website.trim() }),
       });
-      const json = (await res.json()) as AnalyzeResponse & { error?: string };
-      if (!res.ok) throw new Error(json.error ?? "Research failed");
-      const p = json.profile;
-      setForm((f) => ({
-        ...f,
-        name: p.name || f.name,
-        industry: p.industry ?? f.industry,
-        description: p.description || f.description,
-        products: p.products.length ? p.products.join(", ") : f.products,
-        audience: p.audience ?? f.audience,
-        voice: json.research?.voice ? json.research.voice.slice(0, 400) : f.voice,
-        languages: p.suggestedLanguages?.length ? p.suggestedLanguages : f.languages,
-      }));
-      setResearch(json.research ?? null);
-      toast({
-        title: json.research ? "Deep research complete" : "Profile built from a standard scan",
-        description: json.research ? "Here's what P&R knows about your brand — review and save." : json.note,
-      });
+      const json = (await res.json()) as { job?: ResearchJobDTO; error?: string };
+      if (!res.ok || !json.job) throw new Error(json.error ?? "Could not start research");
+      if (json.job.status === "done" && json.job.result) {
+        setResearching(false);
+        applyResearchResult(json.job.result);
+        return;
+      }
+      pollJob(json.job.id);
     } catch (err) {
+      setResearching(false);
       toast({
         title: "Deep research failed",
         description: err instanceof Error ? err.message : undefined,
         variant: "destructive",
       });
-    } finally {
-      setResearching(false);
     }
   }
 
@@ -169,6 +221,23 @@ export function BrandsView({
     setForm(formFromBrand(b));
     setResearch(b.research ?? null);
     setDialogOpen(true);
+    // If research for this brand's site is already running in the
+    // background, reattach to it instead of leaving the member blind.
+    if (b.website) {
+      void (async () => {
+        try {
+          const res = await fetch(`/api/research/latest?website=${encodeURIComponent(b.website)}`);
+          const json = (await res.json()) as { job?: ResearchJobDTO | null };
+          if (json.job?.status === "running") {
+            setResearching(true);
+            setResearchElapsed(json.job.elapsedSec);
+            pollJob(json.job.id);
+          }
+        } catch {
+          // Resume is best-effort; the Research button always works.
+        }
+      })();
+    }
   }
 
   function toggleLanguage(code: string) {
@@ -410,7 +479,7 @@ export function BrandsView({
                 <Button type="button" onClick={runResearch} disabled={researching} className="font-semibold">
                   {researching ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin" /> Researching… (a minute or two)
+                      <Loader2 className="h-4 w-4 animate-spin" /> Researching… {researchElapsed}s
                     </>
                   ) : research ? (
                     "Re-run research"
@@ -419,6 +488,12 @@ export function BrandsView({
                   )}
                 </Button>
               </div>
+              {researching ? (
+                <p className="text-sm text-muted-foreground">
+                  Deep research takes a minute or two and runs in the background — you can close this
+                  dialog and keep working. Come back to this brand and the results will be waiting.
+                </p>
+              ) : null}
               {research ? (
                 <div className="grid gap-2 text-sm">
                   <p className="font-medium">What we know about your brand</p>

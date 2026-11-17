@@ -54,6 +54,7 @@ export function serializeAsset(a: Asset): AssetDTO {
     topText: a.topText,
     bottomText: a.bottomText,
     imageUrl: a.imageUrl,
+    pageUrl: a.pageUrl,
     status: a.status,
     error: a.error,
     createdAt: a.createdAt.toISOString(),

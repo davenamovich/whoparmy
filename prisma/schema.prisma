@@ -28,6 +28,7 @@ model User {
   brands       BrandProfile[]
   campaigns    Campaign[]
   usageRecords UsageRecord[]
+  researchJobs ResearchJob[]
   assets       Asset[]
   jobs         GenerationJob[]
   army         ArmyBot?
@@ -387,4 +388,27 @@ model Submission {
 
   @@index([botId])
   @@index([missionId])
+}
+
+// ─── Brand deep-research background jobs ─────────────────────────────
+// research_brand takes ~2 minutes — far too long for one blocking
+// request. A job row is created instantly, the work runs detached in
+// the server process, and clients poll. Result holds the full
+// AnalyzeResponse JSON so consumers use it exactly like the old
+// synchronous analyze payload.
+model ResearchJob {
+  id         String   @id @default(cuid())
+  userId     String
+  brandName  String
+  website    String
+  status     String   @default("running") // running | done | failed
+  resultJson String?
+  error      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, website])
+  @@index([userId, createdAt])
 }

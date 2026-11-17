@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, Download, Pencil, RefreshCw, Trash2, Wand2, Loader2 } from "lucide-react";
+import { Check, Copy, Download, ExternalLink, Pencil, RefreshCw, Trash2, Wand2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -211,9 +211,15 @@ export function AssetCard({
       {isMeme ? (
         <div className="relative">
           {asset.imageUrl ? (
-            <img src={asset.imageUrl} alt={asset.title || "Generated meme"} className="w-full aspect-square object-cover" />
+            asset.pageUrl ? (
+              <a href={asset.pageUrl} target="_blank" rel="noreferrer" title="Open the share page">
+                <img src={asset.imageUrl} alt={asset.title || "Generated meme"} className="w-full aspect-[9/16] object-cover" />
+              </a>
+            ) : (
+              <img src={asset.imageUrl} alt={asset.title || "Generated meme"} className="w-full aspect-[9/16] object-cover" />
+            )
           ) : (
-            <div className="w-full aspect-square bg-muted/50 flex items-center justify-center text-muted-foreground text-sm">
+            <div className="w-full aspect-[9/16] bg-muted/50 flex items-center justify-center text-muted-foreground text-sm">
               {asset.status === "GENERATING" || asset.status === "PENDING" ? (
                 <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Generating image…</span>
               ) : asset.status === "FAILED" ? (
@@ -318,6 +324,13 @@ export function AssetCard({
               }
             >
               <Download className="h-4 w-4" /> <span>PNG</span>
+            </Button>
+          ) : null}
+          {isMeme && asset.pageUrl ? (
+            <Button variant="outline" size="sm" asChild>
+              <a href={asset.pageUrl} target="_blank" rel="noreferrer">
+                <ExternalLink className="h-4 w-4" /> <span>Share page</span>
+              </a>
             </Button>
           ) : null}
           {!isMeme && asset.status === "DONE" ? (
