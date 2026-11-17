@@ -58,30 +58,105 @@ const HOUSE_POOL = BRIDGE_PARTNERS.filter((p) => p.example.startsWith("http")).m
   url: p.example,
 }));
 
+export interface RotatorPoolEntry {
+  url: string;
+  partner: string;
+  partnerName: string;
+  source: "auction" | "free";
+  userId: string | null;
+}
+
 export interface RotatorDestination {
   date: string;
   url: string;
   partner: string;
   partnerName: string;
-  source: "auction" | "house";
+  source: "auction" | "free" | "mixed" | "house";
   winnerUserId: string | null;
+  poolSize: number;
+  pool: RotatorPoolEntry[];
 }
 
-export async function getRotatorDestination(date = etDateString()): Promise<RotatorDestination> {
+function etHour(d = new Date()): number {
+  return Number(
+    new Intl.DateTimeFormat("en-US", { timeZone: ET, hour: "numeric", hourCycle: "h23" }).format(d),
+  );
+}
+
+/**
+ * The day's featured pool: the confirmed auction winner (if any)
+ * PLUS every free placement earned for that day (Dave, 2026-11-17:
+ * signing up for an offer earns 24 hours free in the rotator for
+ * that offer — see RotatorPlacement in lib/bridge.ts). A placement
+ * features the member's CURRENT saved link for the partner; a
+ * deleted link drops out of the pool on its own.
+ */
+export async function getRotatorPool(date = etDateString()): Promise<RotatorPoolEntry[]> {
+  const pool: RotatorPoolEntry[] = [];
   const day = await db.rotatorDay.findUnique({ where: { date } });
   if (day?.status === "CONFIRMED" && day.winnerUrl) {
     const partner = BRIDGE_PARTNERS.find((p) => p.key === day.winnerPartner);
-    return {
-      date,
+    pool.push({
       url: day.winnerUrl,
       partner: day.winnerPartner ?? "",
       partnerName: partner?.name ?? day.winnerPartner ?? "",
       source: "auction",
-      winnerUserId: day.winnerUserId,
+      userId: day.winnerUserId,
+    });
+  }
+  const placements = await db.rotatorPlacement.findMany({
+    where: { date },
+    orderBy: { createdAt: "asc" },
+  });
+  for (const pl of placements) {
+    const link = await db.engineLink.findUnique({
+      where: { userId_partner: { userId: pl.userId, partner: pl.partner } },
+      select: { url: true },
+    });
+    if (!link) continue;
+    const partner = BRIDGE_PARTNERS.find((p) => p.key === pl.partner);
+    pool.push({
+      url: link.url,
+      partner: pl.partner,
+      partnerName: partner?.name ?? pl.partner,
+      source: "free",
+      userId: pl.userId,
+    });
+  }
+  return pool;
+}
+
+export async function getRotatorDestination(date = etDateString()): Promise<RotatorDestination> {
+  const pool = await getRotatorPool(date);
+  if (pool.length) {
+    // The rotator ROTATES: today's featured link changes hourly, so
+    // every entry in the pool gets its share of the day's 24 hours.
+    // (Other dates report the pool head — only today has a "now".)
+    const pick = date === etDateString() ? pool[etHour() % pool.length] : pool[0];
+    const hasAuction = pool.some((e) => e.source === "auction");
+    const hasFree = pool.some((e) => e.source === "free");
+    return {
+      date,
+      url: pick.url,
+      partner: pick.partner,
+      partnerName: pick.partnerName,
+      source: hasAuction && hasFree ? "mixed" : hasAuction ? "auction" : "free",
+      winnerUserId: pool.find((e) => e.source === "auction")?.userId ?? null,
+      poolSize: pool.length,
+      pool,
     };
   }
   const pick = HOUSE_POOL[(dayOfYearET(date) - 1) % HOUSE_POOL.length];
-  return { date, url: pick.url, partner: pick.partner, partnerName: pick.name, source: "house", winnerUserId: null };
+  return {
+    date,
+    url: pick.url,
+    partner: pick.partner,
+    partnerName: pick.name,
+    source: "house",
+    winnerUserId: null,
+    poolSize: 0,
+    pool: [],
+  };
 }
 
 export interface RotatorDayState {

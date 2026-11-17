@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getWhopUserWithMode } from "@/lib/auth";
 import { adminCancelDay, adminConfirmWinner, listRotatorDaysForAdmin } from "@/lib/rotator";
+import { getAffiliateOverview } from "@/lib/bridge";
 
 /**
  * The daily rotator auction — ADMIN surface (operators only).
@@ -20,7 +21,10 @@ async function requireOperator() {
 export async function GET() {
   try {
     await requireOperator();
-    return NextResponse.json({ days: await listRotatorDaysForAdmin() });
+    return NextResponse.json({
+      days: await listRotatorDaysForAdmin(),
+      affiliate: await getAffiliateOverview(),
+    });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Could not load auctions" },

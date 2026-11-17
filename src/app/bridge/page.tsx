@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowRight, CheckCircle2, Gavel, Link2, Loader2, Lock, Trophy } from "lucide-react";
-import type { BridgePartner, BridgeState } from "@/lib/bridge";
+import { ArrowRight, Briefcase, CheckCircle2, Gavel, Link2, Loader2, Lock, Trophy } from "lucide-react";
+import type { AffiliateOverview, AffiliateState, BridgePartner, BridgeState } from "@/lib/bridge";
 import type { AdminDayView, RotatorState } from "@/lib/rotator";
 import { clearStashedRef, readStashedRef, stashRefFromUrl } from "@/lib/ref-stash";
 
@@ -22,7 +22,13 @@ export default function BridgePage() {
   const [bridge, setBridge] = useState<BridgeState | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
-  const [justSaved, setJustSaved] = useState<null | { firstSave: boolean; referrerPaid: boolean; saverPaid: boolean }>(null);
+  const [justSaved, setJustSaved] = useState<null | {
+    firstSave: boolean;
+    referrerPaid: boolean;
+    saverPaid: boolean;
+    placementsGranted: string[];
+  }>(null);
+  const [affiliateRefresh, setAffiliateRefresh] = useState(0);
   // The Whop-connection gate (Dave, 2026-11-17): the bridge's working
   // parts (your links, the rewards, the rotator) unlock only after
   // Connect with Whop. Anonymous visitors get the teaser.
@@ -102,7 +108,9 @@ export default function BridgePage() {
         firstSave: Boolean(data.firstSave),
         referrerPaid: Boolean(data.referrerPaid),
         saverPaid: Boolean(data.saverPaid),
+        placementsGranted: Array.isArray(data.placementsGranted) ? (data.placementsGranted as string[]) : [],
       });
+      setAffiliateRefresh((n) => n + 1);
       toast({ title: data.firstSave ? "Your stack is live" : "Links saved" });
     } catch (err) {
       toast({
@@ -211,19 +219,26 @@ export default function BridgePage() {
           </p>
         </header>
 
-        {justSaved?.firstSave ? (
+        {justSaved && (justSaved.firstSave || justSaved.placementsGranted.length > 0) ? (
           <Card className="border-primary/50">
             <CardContent className="py-5 flex items-start gap-3">
               <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 shrink-0" />
               <div className="space-y-1">
-                <p className="font-bold">Your stack is live.</p>
+                <p className="font-bold">{justSaved.firstSave ? "Your stack is live." : "Links saved."}</p>
                 <p className="text-sm text-muted-foreground">
                   {justSaved.saverPaid
                     ? "You just earned 25 free generations for saving your links. "
                     : ""}
                   {justSaved.referrerPaid
                     ? "The member who sent you just earned 25 free generations for bringing you in. When you invite your own people and they save their links, you earn them too."
-                    : "When you invite your own people and they save their links here, you earn 25 free generations for each one."}{" "}
+                    : justSaved.firstSave
+                      ? "When you invite your own people and they save their links here, you earn 25 free generations for each one."
+                      : ""}{" "}
+                  {justSaved.placementsGranted.length > 0
+                    ? `You also earned a free day in the rotator tomorrow for: ${justSaved.placementsGranted
+                        .map((k) => bridge?.partners.find((p) => p.key === k)?.name ?? k)
+                        .join(", ")}. Your link for each one rotates into the day's featured traffic for 24 hours. `
+                    : ""}
                   Next: give your engine a brand and let it start creating.
                 </p>
                 <a
@@ -286,6 +301,7 @@ export default function BridgePage() {
           )}
         </section>
 
+        <AffiliateManagerSection refreshKey={affiliateRefresh} />
         <RotatorSection />
         <RotatorAdmin />
 
@@ -297,6 +313,77 @@ export default function BridgePage() {
         </footer>
       </div>
     </main>
+  );
+}
+
+/**
+ * The Affiliate Manager (Dave, 2026-11-17): tracks ALL offers for the
+ * member — which ones they signed up for (link saved), and the free
+ * 24-hour rotator placement each signup earned for that offer.
+ */
+function AffiliateManagerSection({ refreshKey }: { refreshKey: number }) {
+  const [affiliate, setAffiliate] = useState<AffiliateState | null>(null);
+
+  useEffect(() => {
+    void fetch("/api/affiliate-manager")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.affiliate) setAffiliate(data.affiliate as AffiliateState);
+      })
+      .catch(() => undefined);
+  }, [refreshKey]);
+
+  if (!affiliate) return null;
+  return (
+    <section className="space-y-4">
+      <h2 className="text-sm font-bold flex items-center gap-2">
+        <Briefcase className="h-4 w-4 text-primary" /> Affiliate Manager
+      </h2>
+      <Card>
+        <CardContent className="py-5 space-y-4">
+          <p className="text-sm text-muted-foreground">
+            You&apos;ve joined{" "}
+            <b className="text-foreground">
+              {affiliate.joinedCount} of {affiliate.offerCount} offers
+            </b>{" "}
+            and earned{" "}
+            <b className="text-foreground">
+              {affiliate.freeDaysEarned} free rotator day{affiliate.freeDaysEarned === 1 ? "" : "s"}
+            </b>
+            {affiliate.liveToday > 0 ? (
+              <>
+                {" "}
+                — <b className="text-foreground">{affiliate.liveToday} of your links are live in today&apos;s rotator.</b>
+              </>
+            ) : (
+              "."
+            )}{" "}
+            Every offer you sign up for — save your link above — earns 24 hours free in the rotator for that offer.
+          </p>
+          <div className="divide-y divide-border/60">
+            {affiliate.offers.map((o) => (
+              <div key={o.key} className="py-2.5 flex items-center gap-3 flex-wrap text-sm">
+                <span className="font-medium w-32 shrink-0">{o.name}</span>
+                {o.joined ? (
+                  <span className="text-[11px] font-semibold rounded-full border border-primary/40 text-primary px-2 py-0.5">
+                    Link saved
+                  </span>
+                ) : (
+                  <span className="text-[11px] rounded-full border border-border text-muted-foreground px-2 py-0.5">
+                    Not joined
+                  </span>
+                )}
+                {o.placement ? (
+                  <span className="text-[11px] rounded-full border border-border px-2 py-0.5 text-muted-foreground">
+                    {o.placement.live ? "Live in today's rotator" : `Free rotator day: ${o.placement.date}`}
+                  </span>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </section>
   );
 }
 
@@ -360,12 +447,34 @@ function RotatorSection() {
         <CardContent className="py-5 space-y-4">
           <p className="text-sm text-muted-foreground">
             Every day, visitors who arrive <b className="text-foreground">without anyone&apos;s sign-up link</b>{" "}
-            are sent to one destination. Today that&apos;s{" "}
-            <a href={rotator.today.url} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2">
-              {rotator.today.partnerName}
-            </a>{" "}
-            — {rotator.today.source === "auction" ? "won at auction by a member" : "the house rotation"}. Bid your
-            free generations to make a day yours: your saved link gets that day&apos;s unattributed traffic.
+            are sent to the day&apos;s featured links.{" "}
+            {rotator.today.poolSize > 1 ? (
+              <>
+                Today the rotator rotates hourly among{" "}
+                <b className="text-foreground">{rotator.today.poolSize} featured links</b> — right now it&apos;s
+                showing{" "}
+                <a href={rotator.today.url} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2">
+                  {rotator.today.partnerName}
+                </a>
+                .
+              </>
+            ) : (
+              <>
+                Today that&apos;s{" "}
+                <a href={rotator.today.url} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2">
+                  {rotator.today.partnerName}
+                </a>{" "}
+                —{" "}
+                {rotator.today.source === "auction"
+                  ? "won at auction by a member"
+                  : rotator.today.source === "free"
+                    ? "a member's free day, earned by signing up for the offer"
+                    : "the house rotation"}
+                .
+              </>
+            )}{" "}
+            Bid your free generations to join a day&apos;s pool: your saved link shares that day&apos;s
+            unattributed traffic.
           </p>
           <p className="text-xs text-muted-foreground">
             Your balance: <b className="text-foreground">{rotator.myFreeGenBalance} free generations</b>. Bids are
@@ -421,6 +530,7 @@ function RotatorSection() {
 function RotatorAdmin() {
   const { toast } = useToast();
   const [days, setDays] = useState<AdminDayView[] | null>(null);
+  const [overview, setOverview] = useState<AffiliateOverview | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
   useEffect(() => {
@@ -428,6 +538,7 @@ function RotatorAdmin() {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.days) setDays(data.days as AdminDayView[]);
+        if (data?.affiliate) setOverview(data.affiliate as AffiliateOverview);
       })
       .catch(() => undefined);
   }, []);
@@ -504,6 +615,44 @@ function RotatorAdmin() {
           )}
         </CardContent>
       </Card>
+      {overview ? (
+        <Card>
+          <CardContent className="py-5 space-y-4">
+            <p className="text-sm font-bold flex items-center gap-2">
+              <Briefcase className="h-4 w-4 text-primary" /> Affiliate overview
+              <span className="text-xs font-normal text-muted-foreground">
+                {overview.membersWithLinks} member{overview.membersWithLinks === 1 ? "" : "s"} with saved links
+              </span>
+            </p>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              {overview.offerSignups.map((o) => (
+                <span key={o.partner}>
+                  {o.name}: <b className="text-foreground">{o.signups}</b>
+                </span>
+              ))}
+            </div>
+            {overview.placements.length ? (
+              <div className="space-y-1.5">
+                <p className="text-xs font-semibold text-muted-foreground">Free rotator days (earned by signups)</p>
+                {overview.placements.map((pl) => (
+                  <p key={`${pl.date}-${pl.userId}-${pl.partner}`} className="text-xs text-muted-foreground">
+                    {pl.date} · {pl.partnerName} · {pl.userLabel} ·{" "}
+                    {pl.url ? (
+                      <a href={pl.url} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2">
+                        link
+                      </a>
+                    ) : (
+                      <span className="text-amber-500">link deleted — sits out</span>
+                    )}
+                  </p>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">No free rotator days scheduled yet.</p>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
     </section>
   );
 }

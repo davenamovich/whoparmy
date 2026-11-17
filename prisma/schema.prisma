@@ -32,6 +32,7 @@ model User {
   engineLinks  EngineLink[]
   rotatorBids  RotatorBid[]
   rotatorWins  RotatorDay[] @relation("RotatorWins")
+  rotatorPlacements RotatorPlacement[]
   linksSavedAt DateTime? // first bridge link save — pays the referrer's free generations (lib/bridge.ts)
   assets       Asset[]
   jobs         GenerationJob[]
@@ -492,4 +493,24 @@ model RotatorBid {
   user User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([dayId, userId])
+}
+
+// ─── Affiliate Manager: free rotator placements ─────────────────────
+// Dave's rule (2026-11-17): signing up for an offer earns 24 hours
+// free in the rotator for THAT offer. A "signup" the app can observe
+// is the member saving their own link for the partner (the bridge).
+// One placement per offer per member, EVER (the unique row is the
+// grant record), scheduled for the next ET day, featuring the
+// member's CURRENT saved link for that partner (re-read at serve
+// time; a deleted link simply drops out of that day's pool).
+model RotatorPlacement {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  partner   String // BRIDGE_PARTNERS key
+  date      String // ET yyyy-mm-dd the placement runs (24h, that day)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, partner])
+  @@index([date])
 }

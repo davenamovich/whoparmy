@@ -37,6 +37,7 @@ export async function PUT(req: NextRequest) {
       firstSave: result.firstSave,
       referrerPaid: result.referrerPaid,
       saverPaid: result.saverPaid,
+      placementsGranted: result.placementsGranted,
     });
   } catch (err) {
     return NextResponse.json(

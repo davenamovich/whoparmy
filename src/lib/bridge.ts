@@ -73,6 +73,42 @@ export const BRIDGE_PARTNERS: BridgePartner[] = [
     blurb: "Media tools and workflow for creators who publish every day.",
     example: "https://dh.media/?affid=Vesselprotocol",
   },
+  {
+    key: "upload-post",
+    name: "Upload Post",
+    blurb: "Post everywhere from one place — the distributor for your content.",
+    example: "https://upload-post.com/?ref=VESSEL",
+  },
+  {
+    key: "temu",
+    name: "Temu",
+    blurb: "Products your audience already buys — meme them, link them.",
+    example: "https://temu.to/k/pgxcro0opym",
+  },
+  {
+    key: "bankr",
+    name: "Bankr",
+    blurb: "The agent wallet layer — crypto rails for your engine.",
+    example: "https://bankr.bot/terminal?refCode=7FBFB6T6-BNKR",
+  },
+  {
+    key: "railway",
+    name: "Railway",
+    blurb: "Where apps deploy — host your own stack the way this one runs.",
+    example: "Your Railway referral link",
+  },
+  {
+    key: "polyshares",
+    name: "Polyshares",
+    blurb: "Prediction-market shares your audience can trade on.",
+    example: "Your Polyshares referral link",
+  },
+  {
+    key: "amelia",
+    name: "Amelia",
+    blurb: "Booking and scheduling for service businesses.",
+    example: "Your Amelia referral link",
+  },
 ];
 
 const PARTNER_KEYS = new Set(BRIDGE_PARTNERS.map((p) => p.key));
@@ -98,8 +134,150 @@ export async function getBridgeState(userId: string): Promise<BridgeState> {
   };
 }
 
+// ─── Affiliate Manager: free rotator placements ─────────────────────
+// Dave's rule (2026-11-17): signing up for an offer earns 24 hours
+// free in the rotator for THAT offer. The observable signup is the
+// link save. One placement per offer per member, ever — the
+// RotatorPlacement row's unique (userId, partner) is the grant
+// record — scheduled for the NEXT ET day. The Affiliate Manager
+// (getAffiliateState below) tracks every offer's state per member.
+
+function etDateString(d = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+function etTomorrowString(): string {
+  return etDateString(new Date(Date.now() + 24 * 60 * 60 * 1000));
+}
+
+/** Grant the free rotator day for one offer; returns true if new. */
+async function grantFreePlacement(userId: string, partner: string): Promise<boolean> {
+  try {
+    await db.rotatorPlacement.create({
+      data: { userId, partner, date: etTomorrowString() },
+    });
+    return true;
+  } catch {
+    // Unique violation — already granted (once per offer, ever).
+    return false;
+  }
+}
+
+export interface AffiliateOfferState extends BridgePartner {
+  url: string;
+  joined: boolean;
+  placement: { date: string; live: boolean } | null;
+}
+
+export interface AffiliateState {
+  offers: AffiliateOfferState[];
+  joinedCount: number;
+  offerCount: number;
+  freeDaysEarned: number;
+  liveToday: number;
+}
+
+/**
+ * The Affiliate Manager's per-member view: every offer, whether the
+ * member joined it (link saved), and the free rotator day it earned.
+ * Reading the state backfills placements for links saved before the
+ * feature existed, so early members are not shorted their days.
+ */
+export async function getAffiliateState(userId: string): Promise<AffiliateState> {
+  const links = await db.engineLink.findMany({ where: { userId }, select: { partner: true, url: true } });
+  for (const l of links) {
+    await grantFreePlacement(userId, l.partner);
+  }
+  const placements = await db.rotatorPlacement.findMany({ where: { userId } });
+  const byPartner = new Map(links.map((l) => [l.partner, l.url]));
+  const placementByPartner = new Map(placements.map((p) => [p.partner, p]));
+  const today = etDateString();
+  const offers = BRIDGE_PARTNERS.map((p) => {
+    const placement = placementByPartner.get(p.key);
+    return {
+      ...p,
+      url: byPartner.get(p.key) ?? "",
+      joined: byPartner.has(p.key),
+      placement: placement ? { date: placement.date, live: placement.date === today } : null,
+    };
+  });
+  return {
+    offers,
+    joinedCount: offers.filter((o) => o.joined).length,
+    offerCount: offers.length,
+    freeDaysEarned: placements.length,
+    liveToday: offers.filter((o) => o.placement?.live && o.joined).length,
+  };
+}
+
+export interface AffiliateOverview {
+  offerSignups: Array<{ partner: string; name: string; signups: number }>;
+  placements: Array<{
+    date: string;
+    partner: string;
+    partnerName: string;
+    userId: string;
+    userLabel: string;
+    url: string | null; // null = the member deleted the link; the placement sits out
+  }>;
+  membersWithLinks: number;
+}
+
+/** Operator view for the Affiliate Manager: who signed up for what,
+ *  and whose free rotator days are coming up. */
+export async function getAffiliateOverview(): Promise<AffiliateOverview> {
+  const [grouped, placements, members] = await Promise.all([
+    db.engineLink.groupBy({ by: ["partner"], _count: { _all: true } }),
+    db.rotatorPlacement.findMany({
+      where: { date: { gte: etDateString() } },
+      orderBy: [{ date: "asc" }, { createdAt: "asc" }],
+      take: 60,
+      include: { user: { select: { name: true, email: true, whopUsername: true } } },
+    }),
+    db.engineLink.findMany({ select: { userId: true }, distinct: ["userId"] }),
+  ]);
+  const counts = new Map(grouped.map((g) => [g.partner, g._count._all]));
+  const resolved = await Promise.all(
+    placements.map(async (pl) => {
+      const link = await db.engineLink.findUnique({
+        where: { userId_partner: { userId: pl.userId, partner: pl.partner } },
+        select: { url: true },
+      });
+      return {
+        date: pl.date,
+        partner: pl.partner,
+        partnerName: BRIDGE_PARTNERS.find((p) => p.key === pl.partner)?.name ?? pl.partner,
+        userId: pl.userId,
+        userLabel: pl.user.whopUsername ?? pl.user.name ?? pl.user.email,
+        url: link?.url ?? null,
+      };
+    }),
+  );
+  return {
+    offerSignups: BRIDGE_PARTNERS.map((p) => ({
+      partner: p.key,
+      name: p.name,
+      signups: counts.get(p.key) ?? 0,
+    })),
+    placements: resolved,
+    membersWithLinks: members.length,
+  };
+}
+
 export type SaveBridgeResult =
-  | { ok: true; firstSave: boolean; referrerPaid: boolean; saverPaid: boolean; state: BridgeState }
+  | {
+      ok: true;
+      firstSave: boolean;
+      referrerPaid: boolean;
+      saverPaid: boolean;
+      placementsGranted: string[];
+      state: BridgeState;
+    }
   | { ok: false; error: string };
 
 /**
@@ -132,6 +310,7 @@ export async function saveBridgeLinks(
     clean.set(key, url);
   }
 
+  const placementsGranted: string[] = [];
   for (const [partner, url] of clean) {
     if (url) {
       await db.engineLink.upsert({
@@ -139,6 +318,8 @@ export async function saveBridgeLinks(
         create: { userId, partner, url },
         update: { url },
       });
+      // Signing up for an offer earns its free rotator day.
+      if (await grantFreePlacement(userId, partner)) placementsGranted.push(partner);
     } else {
       await db.engineLink.deleteMany({ where: { userId, partner } });
     }
@@ -170,5 +351,12 @@ export async function saveBridgeLinks(
     }
   }
 
-  return { ok: true, firstSave, referrerPaid, saverPaid, state: await getBridgeState(userId) };
+  return {
+    ok: true,
+    firstSave,
+    referrerPaid,
+    saverPaid,
+    placementsGranted,
+    state: await getBridgeState(userId),
+  };
 }

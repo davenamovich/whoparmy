@@ -358,6 +358,16 @@ CREATE TABLE "RotatorBid" (
     CONSTRAINT "RotatorBid_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
+-- CreateTable
+CREATE TABLE "RotatorPlacement" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "partner" TEXT NOT NULL,
+    "date" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "RotatorPlacement_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_whopId_key" ON "User"("whopId");
 
@@ -459,4 +469,10 @@ CREATE UNIQUE INDEX "RotatorDay_date_key" ON "RotatorDay"("date");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "RotatorBid_dayId_userId_key" ON "RotatorBid"("dayId", "userId");
+
+-- CreateIndex
+CREATE INDEX "RotatorPlacement_date_idx" ON "RotatorPlacement"("date");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "RotatorPlacement_userId_partner_key" ON "RotatorPlacement"("userId", "partner");
 
