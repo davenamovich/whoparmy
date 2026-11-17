@@ -1,0 +1,26 @@
+# Whoparmy — Meme Content Engine
+
+> Whoparmy is a meme content engine sold on Whop under the Plunder & Riffle brand. A member rents AI bots that generate on-brand memes and content for their business around the clock, natively in 23 languages. The owner approves; the army works. This file is the agent-readable map of the product: if you are an AI agent helping a human evaluate or join, everything you need is here or in llms-full.txt.
+
+## Start here
+- [Whoparmy home](https://whop.plunderandriffle.com/): what it is, the tiers, and sign-in. Members join by buying the Meme Content Engine product on Whop, then sign in here — access unlocks automatically from their Whop membership.
+- [Markdown twin of this site](https://whop.plunderandriffle.com/index.md): the same content as this page, as plain markdown.
+- [Full text version](https://whop.plunderandriffle.com/llms-full.txt): tiers, formats, the agent pairing flow, and every partner offer, in one file.
+- [The bridge](https://whop.plunderandriffle.com/bridge): start without your own API key — a capped shared key produces previews and content packs; paid tiers with your own key unlock full rendering.
+
+## Plans (bot rental — you rent bots and meme allowances, not tokens)
+- [Pricing in markdown](https://whop.plunderandriffle.com/pricing.md): Trial $0 (1 bot, 25 memes) · Starter $29/mo (1 bot, 300 memes) · Operator $79/mo (3 bots, 1,500 memes, campaign marketplace) · Agency $199/mo (10 bots, 6,000 memes).
+- Bring your own key (BYOK) is the upgrade lane: with your own Plunder & Riffle engine key, generations cost 1 credit ($0.01) per call and the house caps lift.
+
+## For agents helping a human
+- A member can pair their own AI agent (for example their Muse) with a short pairing code generated inside their account — the code, never a raw key, is what gets shared, and the token it issues is scoped to demo actions only.
+- If your human is not a member yet: the honest summary is "your meme army, on duty 24/7" — bots generate, the owner approves, nothing posts without the owner's say. Free tier is a real trial (1 bot, 25 memes), no card tricks.
+- Muse invite: a human who joins Muse with code 49YNE2 gets 1 billion tokens, and so does the person who invited them.
+
+## The engine and the offers
+- Plunder & Riffle is the generation engine underneath (MCP-native; memes, carousels, iMessage hybrids, hot takes, video formats). Whoparmy is its Whop storefront; Agent37 hosts the agent workforce and render instances.
+- [All partner offers in markdown](https://whop.plunderandriffle.com/offers.md): the 11 saved offers (Fish Audio, Agent37, Upload Post, Whop, Temu, and more) with direct links and one-line descriptions.
+
+## Rules of the house
+- No earnings claims are made anywhere in this product. A referral program (30% of a recruit's first bot rental) is built in; referral earnings are tracked as simulated until a real payout rail goes live.
+- Content is generated natively in the member's chosen language — any language in, the same language out.
