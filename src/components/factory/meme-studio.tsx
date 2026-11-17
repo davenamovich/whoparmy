@@ -15,8 +15,6 @@ const HUMOR_STYLES = [
   { key: "funny_meme", label: "Funny" },
   { key: "relatable_meme", label: "Relatable" },
   { key: "promotional_meme", label: "Promotional" },
-  { key: "educational_meme", label: "Educational" },
-  { key: "viral_meme", label: "Viral-style" },
 ];
 
 export function MemeStudio() {

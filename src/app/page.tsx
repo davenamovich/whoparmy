@@ -3,14 +3,12 @@
 import { useEffect, useState } from "react";
 import {
   Sparkles,
-  Wand2,
   LayoutGrid,
   Library,
   Fingerprint,
   Swords,
   UserRound,
   Flame,
-  Trophy,
   Bot,
   Cpu,
   TrendingUp,
@@ -40,36 +38,36 @@ import { LocaleSwitcher } from "@/components/factory/locale-switcher";
 type View =
   | "create"
   | "results"
-  | "studio"
   | "campaigns"
   | "library"
   | "brands"
   | "publishing"
   | "army"
-  | "warroom"
   | "agents"
   | "trending"
   | "llm"
   | "account";
 
-type NavKey = "create" | "studio" | "campaigns" | "library" | "brands" | "publishing" | "army" | "warRoom" | "agents" | "trending" | "llm" | "account";
+type NavKey = "create" | "campaigns" | "library" | "brands" | "publishing" | "army" | "agents" | "trending" | "llm" | "account";
 
+// Consolidated menu (Dave, 2026-11-17): fewer doors, same rooms.
+// Meme Studio folded into Create; the War Room folded into Meme
+// Army. The "studio" / "warroom" view keys no longer exist — the
+// components render inside their parent views below.
 const NAV: { key: View; labelKey: NavKey; icon: React.ComponentType<{ className?: string }>; badge?: string }[] = [
   { key: "create", labelKey: "create", icon: Sparkles },
-  { key: "studio", labelKey: "studio", icon: Wand2 },
   { key: "campaigns", labelKey: "campaigns", icon: LayoutGrid },
   { key: "library", labelKey: "library", icon: Library },
   { key: "brands", labelKey: "brands", icon: Fingerprint },
   { key: "publishing", labelKey: "publishing", icon: Flame },
   { key: "army", labelKey: "army", icon: Swords, badge: "PRO" },
-  { key: "warroom", labelKey: "warRoom", icon: Trophy, badge: "NEW" },
   { key: "agents", labelKey: "agents", icon: Bot, badge: "NEW" },
   { key: "trending", labelKey: "trending", icon: TrendingUp, badge: "LIVE" },
   { key: "llm", labelKey: "llm", icon: Cpu, badge: "OPS" },
   { key: "account", labelKey: "account", icon: UserRound },
 ];
 
-const MOBILE_NAV: View[] = ["create", "agents", "campaigns", "library", "army", "warroom", "account"];
+const MOBILE_NAV: View[] = ["create", "agents", "campaigns", "library", "army", "account"];
 
 export default function Home() {
   const [view, setView] = useState<View>("create");
@@ -228,18 +226,24 @@ export default function Home() {
         {/* main content */}
         <main className="flex-1 min-w-0 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pb-24 lg:pb-12">
           {view === "create" ? (
-            <CreateWizard onCompleted={onWizardCompleted} initialProfile={brandPrefill} initialProfileName={brandPrefillName} />
+            <div className="space-y-12">
+              <CreateWizard onCompleted={onWizardCompleted} initialProfile={brandPrefill} initialProfileName={brandPrefillName} />
+              <MemeStudio />
+            </div>
           ) : null}
           {view === "results" && resultsCampaignId ? (
             <ResultsWorkspace campaignId={resultsCampaignId} onBack={() => setView("campaigns")} />
           ) : null}
-          {view === "studio" ? <MemeStudio /> : null}
           {view === "campaigns" ? <CampaignsView onOpen={openResults} onNewCampaign={() => { clearBrandPrefill(); setView("create"); }} /> : null}
           {view === "library" ? <LibraryView /> : null}
           {view === "brands" ? <BrandsView onUseInCampaign={startWizardWithBrand} /> : null}
           {view === "publishing" ? <PublishingView /> : null}
-          {view === "army" ? <MemeArmy /> : null}
-          {view === "warroom" ? <WarRoom /> : null}
+          {view === "army" ? (
+            <div className="space-y-12">
+              <MemeArmy />
+              <WarRoom />
+            </div>
+          ) : null}
           {view === "agents" ? <AgentsView /> : null}
           {view === "trending" ? <TrendingView onGoAgents={() => setView("agents")} /> : null}
           {view === "llm" && session?.admin ? <LlmConsole /> : null}

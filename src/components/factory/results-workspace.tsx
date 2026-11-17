@@ -157,7 +157,7 @@ export function ResultsWorkspace({
           <TabsTrigger value="ALL" className="gap-1.5">
             <Layers className="h-3.5 w-3.5" /> All <Badge variant="secondary" className="ml-1 text-[10px]">{assets.length}</Badge>
           </TabsTrigger>
-          {(["MEMES", "SOCIAL", "VIDEO", "AUDIO", "MARKETING"] as ContentCategory[])
+           {(["MEMES", "SOCIAL", "MARKETING"] as ContentCategory[])
             .filter((c) => counts.get(c))
             .map((c) => (
               <TabsTrigger key={c} value={c} className="gap-1.5">
@@ -169,7 +169,7 @@ export function ResultsWorkspace({
         <TabsContent value="ALL">
           <AssetGrid assets={assets} languagesForMenu={languagesForMenu} setAssets={setAssets} />
         </TabsContent>
-        {(["MEMES", "SOCIAL", "VIDEO", "AUDIO", "MARKETING"] as ContentCategory[])
+         {(["MEMES", "SOCIAL", "MARKETING"] as ContentCategory[])
           .filter((c) => counts.get(c))
           .map((c) => (
             <TabsContent key={c} value={c}>
