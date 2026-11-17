@@ -29,6 +29,7 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 COPY --from=builder /app/node_modules/.bin ./node_modules/.bin
 # SQLite lives on a Railway volume mounted at /data (DATABASE_URL=file:/data/custom.db).
-# First boot creates the schema; later boots are no-ops. The push is time-boxed and
-# uses the local Prisma binary so a slow registry can never block the server start.
-CMD ["sh", "-c", "mkdir -p /data && (timeout 60 ./node_modules/.bin/prisma db push --skip-generate || true) && bun server.js"]
+# Boot: create the schema with the LOCAL Prisma entry point (no .bin symlink, no bunx
+# registry fetch), print the output to the deploy log, time-box it, then start the
+# server regardless. First boot creates the tables; later boots are no-ops.
+CMD ["sh", "-c", "mkdir -p /data; echo '[boot] prisma db push:'; timeout 120 bun ./node_modules/prisma/build/index.js db push --skip-generate; echo '[boot] push finished (or timed out) — starting server'; bun server.js"]
