@@ -204,8 +204,19 @@ export function AccountView() {
   const { toast } = useToast();
   const tPlans = useTranslations("plans");
   const tCommon = useTranslations("common");
-  const planName = (key: string) =>
-    tPlans(key.toLowerCase() as "trial" | "starter" | "operator" | "agency");
+  // Entitlement tiers still arrive in the legacy Whop vocabulary
+  // (FREE / CREATOR / PRO / AGENCY) until the billing pass migrates them;
+  // map them onto the bot-rental plan names for display.
+  const TIER_TO_PLAN: Record<string, "trial" | "starter" | "operator" | "agency"> = {
+    free: "trial",
+    trial: "trial",
+    creator: "starter",
+    starter: "starter",
+    pro: "operator",
+    operator: "operator",
+    agency: "agency",
+  };
+  const planName = (key: string) => tPlans(TIER_TO_PLAN[key.toLowerCase()] ?? "trial");
   const featureText = (f: string): string => {
     const memes = f.match(/^([\d,]+) memes \/ month$/);
     if (memes) return tPlans("memesPerMonth", { count: Number(memes[1].replace(/,/g, "")) });
