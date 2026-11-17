@@ -31,6 +31,9 @@ const ADDITIVE_COLUMNS: Array<{ table: string; column: string; ddl: string }> = 
   { table: "Asset", column: "pageUrl", ddl: 'ALTER TABLE "Asset" ADD COLUMN "pageUrl" TEXT' },
   { table: "Asset", column: "engineRef", ddl: 'ALTER TABLE "Asset" ADD COLUMN "engineRef" TEXT' },
   { table: "BrandProfile", column: "researchJson", ddl: 'ALTER TABLE "BrandProfile" ADD COLUMN "researchJson" TEXT' },
+  { table: "User", column: "freeGenBalance", ddl: 'ALTER TABLE "User" ADD COLUMN "freeGenBalance" INTEGER NOT NULL DEFAULT 0' },
+  { table: "User", column: "freeGenMonth", ddl: 'ALTER TABLE "User" ADD COLUMN "freeGenMonth" TEXT' },
+  { table: "User", column: "freeGenApplied", ddl: 'ALTER TABLE "User" ADD COLUMN "freeGenApplied" INTEGER NOT NULL DEFAULT 0' },
 ];
 for (const { table, column, ddl } of ADDITIVE_COLUMNS) {
   const cols = db.query(`PRAGMA table_info("${table}")`).all() as Array<{ name: string }>;

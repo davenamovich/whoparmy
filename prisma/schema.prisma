@@ -42,6 +42,12 @@ model User {
   // set once, never overwritten. Earnings accrue in ReferralEarning.
   refCode      String?  @unique
   referredById String?
+  // Free generations earned from referrals (lib/referrals.ts): granted
+  // on a referral's conversion, spent automatically once the plan's
+  // monthly allowance is used up (lib/usage-server.ts applyFreeGens).
+  freeGenBalance Int     @default(0)
+  freeGenMonth   String? // YYYY-MM the applied counter belongs to
+  freeGenApplied Int     @default(0)
   referredBy   User?    @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
   referrals    User[]   @relation("Referrals")
   earnings     ReferralEarning[] @relation("Earner")

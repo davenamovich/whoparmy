@@ -81,6 +81,8 @@
     "copied": "Copiado",
     "copyLink": "Copiar enlace",
     "earned": "Ganado (30%)",
+    "freeGens": "Generaciones gratis",
+    "freeGensNote": "Además, recibes {count} generaciones gratis por cada conversión: se usan automáticamente cuando se agotan los memes mensuales de tu plan.",
     "empty": "Aún no hay reclutados: tu enlace es tu arma más ruidosa. Compártelo donde se reúnen los dueños de negocios.",
     "joined": "Se unió",
     "member": "Miembro",

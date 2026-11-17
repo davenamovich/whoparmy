@@ -19,6 +19,16 @@ import { awardXp } from "@/lib/game";
 
 export const REFERRAL_RATE = 0.3;
 
+/**
+ * Free generations per conversion (Dave, 2026-11-17): when a referral
+ * rents their first bot, the referrer also earns this many free
+ * generations, stacked on top of their plan's monthly allowance and
+ * spent automatically once the allowance runs out (see
+ * lib/usage-server.ts). Granted at conversion only — join-only grants
+ * would be farmable with free accounts.
+ */
+export const REFERRAL_FREE_GENS = 25;
+
 function codeFrom(user: { id: string; whopUsername: string | null; name: string | null }): string {
   const slug = (user.whopUsername || user.name || "MEMBER")
     .toUpperCase()
@@ -44,13 +54,14 @@ export function referralLink(code: string): string {
 
 export async function getReferralState(userId: string) {
   const code = await ensureRefCode(userId);
-  const [recruits, earnings] = await Promise.all([
+  const [recruits, earnings, me] = await Promise.all([
     db.user.findMany({
       where: { referredById: userId },
       orderBy: { createdAt: "desc" },
       select: { id: true, name: true, whopUsername: true, plan: true, createdAt: true },
     }),
     db.referralEarning.findMany({ where: { referrerId: userId }, select: { recruitId: true, amountCents: true, status: true } }),
+    db.user.findUnique({ where: { id: userId }, select: { freeGenBalance: true } }),
   ]);
   const convertedIds = new Set(earnings.map((e) => e.recruitId));
   return {
@@ -62,6 +73,8 @@ export async function getReferralState(userId: string) {
     conversions: earnings.length,
     earnedCents: earnings.reduce((n, e) => n + e.amountCents, 0),
     earningsStatus: earnings[0]?.status ?? "SIMULATED",
+    freeGenBalance: me?.freeGenBalance ?? 0,
+    freeGensPerConversion: REFERRAL_FREE_GENS,
   };
 }
 
@@ -98,7 +111,7 @@ export async function recordConversion(recruitId: string) {
   await awardXp(recruit.referredById, "REFERRAL_CONVERTED", recruit.plan).catch(() => {});
   const priceCents = getPlan(recruit.plan).priceCents;
   if (priceCents <= 0) return null;
-  return db.referralEarning.create({
+  const earning = await db.referralEarning.create({
     data: {
       referrerId: recruit.referredById,
       recruitId,
@@ -106,4 +119,12 @@ export async function recordConversion(recruitId: string) {
       amountCents: Math.round(priceCents * REFERRAL_RATE),
     },
   });
+  // Free generations land with the conversion — the idempotency guard
+  // above (one earning row per recruit, ever) makes this grant
+  // exactly-once as well.
+  await db.user.update({
+    where: { id: recruit.referredById },
+    data: { freeGenBalance: { increment: REFERRAL_FREE_GENS } },
+  });
+  return earning;
 }

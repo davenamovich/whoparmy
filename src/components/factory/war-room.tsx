@@ -190,6 +190,7 @@ export function WarRoom() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-xs text-muted-foreground">{tr("bodyFull")}</p>
+            <p className="text-xs text-muted-foreground">{tr("freeGensNote", { count: referrals.freeGensPerConversion })}</p>
             <div className="flex gap-2">
               <Input readOnly value={referrals.link} className="text-xs" />
               <Button
@@ -204,7 +205,7 @@ export function WarRoom() {
                 <Copy className="h-3.5 w-3.5 mr-1" /> {copied ? tr("copied") : tr("copyLink")}
               </Button>
             </div>
-            <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
               <div className="rounded-lg border border-border/60 p-3">
                 <div className="text-lg font-black">{referrals.recruitsCount}</div>
                 <div className="text-[11px] text-muted-foreground">{tr("recruits")}</div>
@@ -216,6 +217,10 @@ export function WarRoom() {
               <div className="rounded-lg border border-border/60 p-3">
                 <div className="text-lg font-black">${(referrals.earnedCents / 100).toFixed(2)}</div>
                 <div className="text-[11px] text-muted-foreground">{tr("earned")}</div>
+              </div>
+              <div className="rounded-lg border border-border/60 p-3">
+                <div className="text-lg font-black">{referrals.freeGenBalance}</div>
+                <div className="text-[11px] text-muted-foreground">{tr("freeGens")}</div>
               </div>
             </div>
             {referrals.recruits.length > 0 ? (

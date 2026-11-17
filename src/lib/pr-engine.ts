@@ -6,6 +6,7 @@ import { LANGUAGE_MAP, languageLabel } from "@/lib/languages";
 import { OBJECTIVE_MAP, TONE_MAP } from "@/lib/formats";
 import type { ProfileDTO } from "@/lib/types";
 import { generateEngineMeme, memeBackend, researchBrand, type EngineResearch } from "@/lib/engine";
+import { applyFreeGens } from "@/lib/usage-server";
 
 // ─── Text generation backend (Starimg) ──────────────────────────────
 // Slice 1 of the P&R rewire (REWIRE-DESIGN.md): every text call in this
@@ -602,6 +603,12 @@ export async function recordUsage(userId: string, kind: "TEXT" | "IMAGE" | "FAIL
   if (count <= 0) return;
   try {
     await db.usageRecord.create({ data: { userId, kind, count, meta } });
+    // Successful generations past the plan cap draw down the member's
+    // free-generation pool (referral rewards). FAILED rows skip this —
+    // failures never spend.
+    if (kind !== "FAILED") {
+      await applyFreeGens(userId).catch(() => undefined);
+    }
   } catch {
     // usage logging must never break generation
   }

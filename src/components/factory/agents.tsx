@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Bot, Wallet, Pause, Play, Store, Briefcase, ListOrdered, Zap } from "lucide-react";
+import { Bot, Wallet, Pause, Play, Store, Briefcase, ListOrdered, Zap, Send } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -210,6 +210,14 @@ export function AgentsView() {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">{tO("byokBody")}</p>
+          <a
+            href="https://t.me/thewhoppbot"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 inline-flex items-center gap-1.5 text-sm text-primary underline underline-offset-2"
+          >
+            <Send className="h-3.5 w-3.5" /> Questions first? Ask our Whop bot on Telegram
+          </a>
         </CardContent>
       </Card>
 

@@ -14,6 +14,9 @@ CREATE TABLE "User" (
     "updatedAt" DATETIME NOT NULL,
     "refCode" TEXT,
     "referredById" TEXT,
+    "freeGenBalance" INTEGER NOT NULL DEFAULT 0,
+    "freeGenMonth" TEXT,
+    "freeGenApplied" INTEGER NOT NULL DEFAULT 0,
     CONSTRAINT "User_referredById_fkey" FOREIGN KEY ("referredById") REFERENCES "User" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
@@ -203,6 +206,14 @@ CREATE TABLE "ReferralEarning" (
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "ReferralEarning_referrerId_fkey" FOREIGN KEY ("referrerId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "ReferralEarning_recruitId_fkey" FOREIGN KEY ("recruitId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "RoutingPolicy" (
+    "tier" TEXT NOT NULL PRIMARY KEY,
+    "model" TEXT NOT NULL,
+    "updatedAt" DATETIME NOT NULL,
+    "updatedBy" TEXT
 );
 
 -- CreateTable
@@ -396,11 +407,3 @@ CREATE INDEX "ResearchJob_userId_website_idx" ON "ResearchJob"("userId", "websit
 -- CreateIndex
 CREATE INDEX "ResearchJob_userId_createdAt_idx" ON "ResearchJob"("userId", "createdAt");
 
-
--- CreateTable
-CREATE TABLE "RoutingPolicy" (
-    "tier" TEXT NOT NULL PRIMARY KEY,
-    "model" TEXT NOT NULL,
-    "updatedAt" DATETIME NOT NULL,
-    "updatedBy" TEXT
-);
