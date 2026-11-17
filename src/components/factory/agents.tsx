@@ -28,6 +28,7 @@ interface Job {
   pieces: number;
   tokenCost: number;
   status: string;
+  result: string | null;
   createdAt: string;
 }
 
@@ -47,8 +48,9 @@ const fmt = (n: number) => n.toLocaleString();
  * HIRE AGENTS — the agent economy.
  * Members allocate weighted tokens from their plan wallet to an agent;
  * the agent works a job queue against that budget at real model costs.
- * Jobs queue honestly: they execute when the agent's Agent37 slot is
- * live. Campaign bounties are token reservations between members —
+ * Jobs execute through Starimg the moment they're ordered (agent
+ * runner, src/lib/agent-runner.ts); failed runs are refunded in full.
+ * Campaign bounties are token reservations between members —
  * SIMULATED value until real payments exist.
  */
 export function AgentsView() {
@@ -84,6 +86,14 @@ export function AgentsView() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // While any job is queued or running, keep the queue live.
+  const inFlight = jobs.some((j) => j.status === "QUEUED" || j.status === "RUNNING");
+  useEffect(() => {
+    if (!inFlight) return;
+    const t = window.setInterval(() => void load(), 4000);
+    return () => window.clearInterval(t);
+  }, [inFlight, load]);
 
   async function act(fn: () => Promise<Response>, okMsg: string) {
     setBusy(true);
@@ -216,7 +226,7 @@ export function AgentsView() {
                     <Progress value={pct} className="h-2" />
                     <div className="text-[11px] text-muted-foreground mt-1">
                       {fmt(h.tokensUsed)} / {fmt(h.tokenBudget)} tokens used · {fmt(h.tokenBudget - h.tokensUsed)} left
-                      {h.agent37Ref ? ` · Agent37: ${h.agent37Ref}` : " · Agent37 slot: pending provisioning"}
+                      {h.agent37Ref ? ` · Agent37: ${h.agent37Ref}` : " · runs on the in-app Starimg runner"}
                     </div>
                   </div>
                   {h.status === "ACTIVE" ? (
@@ -274,21 +284,57 @@ export function AgentsView() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <ListOrdered className="h-4 w-4 text-primary" /> Job queue
+              {jobs.some((j) => j.status === "QUEUED") ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="ml-auto"
+                  disabled={busy}
+                  onClick={() =>
+                    void act(() => fetch("/api/agents/runner", { method: "POST" }), "Runner started")
+                  }
+                >
+                  Run queued jobs
+                </Button>
+              ) : null}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {jobs.map((j) => (
-              <div key={j.id} className="flex items-center gap-3 rounded-lg border border-border/60 p-3">
-                <Badge variant="outline" className="text-[10px] shrink-0">{j.status}</Badge>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{j.kind} — {j.brief}</div>
-                  <div className="text-[11px] text-muted-foreground">
-                    {j.pieces} piece{j.pieces === 1 ? "" : "s"} · {fmt(j.tokenCost)} tokens
-                    {j.status === "QUEUED" ? " · executes when the agent's Agent37 slot is live" : ""}
+            {jobs.map((j) => {
+              let parsed: { text?: string; model?: string; error?: string } | null = null;
+              if (j.result) {
+                try {
+                  parsed = JSON.parse(j.result) as { text?: string; model?: string; error?: string };
+                } catch {
+                  parsed = null;
+                }
+              }
+              return (
+                <div key={j.id} className="rounded-lg border border-border/60 p-3 space-y-1.5">
+                  <div className="flex items-center gap-3">
+                    <Badge variant="outline" className="text-[10px] shrink-0">{j.status}</Badge>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">{j.kind} — {j.brief}</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {j.pieces} piece{j.pieces === 1 ? "" : "s"} · {fmt(j.tokenCost)} tokens
+                        {j.status === "QUEUED" ? " · runs automatically through Starimg" : ""}
+                        {j.status === "DONE" && parsed?.model ? ` · ran on ${parsed.model}` : ""}
+                        {j.status === "FAILED" ? " · charge refunded" : ""}
+                      </div>
+                    </div>
                   </div>
+                  {j.status === "DONE" && parsed?.text ? (
+                    <details className="rounded-md bg-secondary/40 p-2.5">
+                      <summary className="text-xs font-semibold cursor-pointer">View result</summary>
+                      <pre className="text-xs whitespace-pre-wrap mt-2 max-h-64 overflow-auto">{parsed.text}</pre>
+                    </details>
+                  ) : null}
+                  {j.status === "FAILED" && parsed?.error ? (
+                    <p className="text-xs text-destructive">{parsed.error}</p>
+                  ) : null}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </CardContent>
         </Card>
       ) : null}

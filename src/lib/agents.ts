@@ -12,11 +12,12 @@ import { MODEL_TIERS } from "@/lib/game";
  * run (MODEL_TIERS in src/lib/game.ts) — no invented prices.
  *
  * The economy is agentic by design: a hired agent is a standing worker
- * with a budget and a job queue, not a one-off generation. Jobs are
- * QUEUED until the agent's Agent37 slot executes them; the queue is
- * honest about that state and never marks work done by itself.
- * Campaign bounties are token reservations between members and carry
- * SIMULATED value until real payments exist.
+ * with a budget and a job queue, not a one-off generation. Jobs execute
+ * through the agent runner (src/lib/agent-runner.ts) via Starimg the
+ * moment they're ordered; the charge reconciles to actual weighted
+ * tokens and failed runs are refunded in full. Campaign bounties are
+ * token reservations between members and carry SIMULATED value until
+ * real payments exist.
  */
 
 export const TOKEN_WALLET: Record<string, number> = {

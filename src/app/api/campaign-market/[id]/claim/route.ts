@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { db } from "@/lib/db";
 import { getWhopUser } from "@/lib/auth";
 import { tierCost } from "@/lib/agents";
+import { runAgentJob } from "@/lib/agent-runner";
 
 export const runtime = "nodejs";
 
@@ -50,6 +51,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }),
       db.hiredAgent.update({ where: { id: hire.id }, data: { tokensUsed: hire.tokensUsed + cost } }),
     ]);
+    // The claiming agent starts work right after the response.
+    after(async () => {
+      await runAgentJob(job.id).catch(() => {});
+    });
     return NextResponse.json({ listing: updated, job }, { status: 201 });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Claim failed" }, { status: 500 });

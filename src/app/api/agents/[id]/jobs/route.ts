@@ -1,15 +1,17 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { db } from "@/lib/db";
 import { getWhopUser } from "@/lib/auth";
 import { JOB_TIERS, tierCost } from "@/lib/agents";
+import { runAgentJob } from "@/lib/agent-runner";
 
 export const runtime = "nodejs";
 
 /**
  * Order a job from one of your hired agents. The job is charged against
- * the agent's allocation at the tier's real weighted cost x pieces, and
- * lands in the queue as QUEUED — the agent's Agent37 slot executes it.
- * The queue never fakes completion.
+ * the agent's allocation at the tier's typical weighted cost x pieces,
+ * then the runner executes it through Starimg right after the response
+ * (src/lib/agent-runner.ts) — the charge is reconciled to the call's
+ * actual weighted tokens, and refunded in full if the run fails.
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -50,6 +52,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         data: { tokensUsed: used, status: used >= hire.tokenBudget ? "DEPLETED" : "ACTIVE" },
       }),
     ]);
+    // Execute after the response is sent — the job flips QUEUED →
+    // RUNNING → DONE/FAILED in the queue the member watches.
+    after(async () => {
+      await runAgentJob(job.id).catch(() => {});
+    });
     return NextResponse.json({ job }, { status: 201 });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Job order failed" }, { status: 500 });
