@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+db/*.db
+dev.log
+server.log
+dev.pid
+.env
+.env.*
+!.env.example
+tool-results
+.freebuff
+.zscripts
