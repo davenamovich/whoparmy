@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getWhopUserWithMode } from "@/lib/auth";
-import { getWhopConfig, whopCheckAccess } from "@/lib/whop";
+import { getWhopConfig, whopCheckAccess, whopListMemberships } from "@/lib/whop";
 import { getPlan } from "@/lib/plans";
 
 export const runtime = "nodejs";
@@ -10,13 +10,18 @@ export const runtime = "nodejs";
  * POST /api/whop/sync-entitlements — pull the signed-in user's live access
  * from Whop and set the plan tier accordingly.
  *
- * Uses the documented access check:
- *   GET {API_BASE}/api/v1/users/{id}/access/{resource_id}
- *     → { has_access, access_level: customer | admin | no_access }
- *
- * Checks each configured product (prod_xxx) from the highest tier down and
- * stops at the first tier with access (AGENCY > PRO > CREATOR), defaulting
- * to FREE. This is the authoritative fallback when webhooks are missed.
+ * Tier resolution, in order:
+ *   1. Plan level — the tiers live on PLANS of one product, and Whop's
+ *      access check cannot address a plan (verified 2026-11-17: resource
+ *      must be biz_/prod_/exp_). So the user's active memberships are
+ *      matched against WHOP_PLAN_ID_* (the same env the webhook's
+ *      resolveTier uses), highest tier first.
+ *   2. Product level — the documented access check:
+ *      GET {API_BASE}/api/v1/users/{id}/access/{resource_id}
+ *        → { has_access, access_level: customer | admin | no_access }
+ *      over each configured product (prod_xxx), highest tier first.
+ * Defaults to FREE. This is the authoritative fallback when webhooks
+ * are missed.
  */
 export async function POST(_req: NextRequest) {
   try {
@@ -39,16 +44,48 @@ export async function POST(_req: NextRequest) {
       );
     }
 
+    const checks: { tier: string; resourceId: string; has_access: boolean; access_level: string; error?: string }[] = [];
+    let resolvedTier: string | null = null;
+
+    // 1) Plan level via memberships.
+    const planTiers: { tier: string; planId: string | null }[] = [
+      { tier: "AGENCY", planId: process.env.WHOP_PLAN_ID_AGENCY?.trim() || null },
+      { tier: "PRO", planId: process.env.WHOP_PLAN_ID_PRO?.trim() || null },
+      { tier: "CREATOR", planId: process.env.WHOP_PLAN_ID_CREATOR?.trim() || null },
+    ];
+    if (planTiers.some((p) => p.planId)) {
+      try {
+        const ACTIVE = new Set(["trialing", "active", "past_due", "completed"]);
+        const mine = (await whopListMemberships()).filter(
+          (m) => m.userId === user.whopId && ACTIVE.has(m.status),
+        );
+        for (const p of planTiers) {
+          if (!p.planId) continue;
+          const hit = mine.some((m) => m.planId === p.planId);
+          checks.push({ tier: p.tier, resourceId: p.planId, has_access: hit, access_level: hit ? "customer" : "no_access" });
+          if (hit && !resolvedTier) resolvedTier = p.tier;
+        }
+      } catch (err) {
+        checks.push({
+          tier: "PLAN_LOOKUP",
+          resourceId: "memberships",
+          has_access: false,
+          access_level: "error",
+          error: err instanceof Error ? err.message : "membership lookup failed",
+        });
+      }
+    }
+
+    // 2) Product level via access checks (fallback; skipped once a
+    // plan-level tier resolved).
     const tiers: { tier: string; resourceId: string | null }[] = [
       { tier: "AGENCY", resourceId: cfg.productIds.AGENCY },
       { tier: "PRO", resourceId: cfg.productIds.PRO },
       { tier: "CREATOR", resourceId: cfg.productIds.CREATOR },
     ];
 
-    const checks: { tier: string; resourceId: string; has_access: boolean; access_level: string; error?: string }[] = [];
-    let resolvedTier: string | null = null;
-
     for (const t of tiers) {
+      if (resolvedTier) break;
       if (!t.resourceId) continue;
       try {
         const access = await whopCheckAccess(user.whopId, t.resourceId);

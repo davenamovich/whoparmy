@@ -30,6 +30,7 @@ export type WhopApiEnv = "sandbox" | "production";
 
 export interface WhopConfig {
   appId: string | null; // app_xxx — OAuth client_id
+  companyId: string | null; // biz_xxx — the company that owns the products
   apiEnv: WhopApiEnv;
   apiBase: string; // https://api.whop.com | https://sandbox-api.whop.com
   apiKey: string | null; // server-side Whop API key (Bearer)
@@ -49,6 +50,7 @@ export function getWhopConfig(): WhopConfig {
   const apiEnv: WhopApiEnv = rawEnv === "sandbox" ? "sandbox" : "production";
   return {
     appId: process.env.WHOP_APP_ID?.trim() || null,
+    companyId: process.env.WHOP_COMPANY_ID?.trim() || null,
     apiEnv,
     apiBase: apiEnv === "sandbox" ? "https://sandbox-api.whop.com" : "https://api.whop.com",
     apiKey: process.env.WHOP_API_KEY?.trim() || null,
@@ -183,6 +185,49 @@ export async function whopCheckAccess(userId: string, resourceId: string): Promi
     throw new Error(`Whop access check failed (${res.status}): ${body.slice(0, 200)}`);
   }
   return (await res.json()) as WhopAccessResult;
+}
+
+export interface WhopMembershipLite {
+  id: string;
+  status: string;
+  userId: string | null;
+  productId: string | null;
+  planId: string | null;
+}
+
+/**
+ * GET {API_BASE}/api/v1/memberships?company_id={biz}
+ * The Current API ignores user filters on this endpoint (verified
+ * 2026-11-17: a bogus user_id returns the same rows) and has no
+ * per-user memberships subresource, so callers filter by userId
+ * client-side. First page only — fine at current member counts;
+ * revisit if the roster outgrows one page.
+ */
+export async function whopListMemberships(): Promise<WhopMembershipLite[]> {
+  const cfg = getWhopConfig();
+  if (!cfg.apiKey) throw new Error("WHOP_API_KEY is not configured");
+  if (!cfg.companyId) throw new Error("WHOP_COMPANY_ID is not configured");
+  const res = await fetch(
+    `${cfg.apiBase}/api/v1/memberships?company_id=${encodeURIComponent(cfg.companyId)}&first=50`,
+    {
+      headers: {
+        Authorization: ["Bearer", cfg.apiKey].join(" "),
+        "Api-Version-Date": API_VERSION_DATE,
+      },
+    },
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Whop memberships list failed (${res.status}): ${body.slice(0, 200)}`);
+  }
+  const body = (await res.json()) as { data?: Array<Record<string, unknown>> };
+  return (body.data ?? []).map((m) => ({
+    id: String(m.id ?? ""),
+    status: String(m.status ?? ""),
+    userId: (m.user as { id?: string } | null)?.id ?? null,
+    productId: (m.product as { id?: string } | null)?.id ?? null,
+    planId: (m.plan as { id?: string } | null)?.id ?? null,
+  }));
 }
 
 // ─── Webhook verification (Standard Webhooks spec via @whop/sdk) ─────
