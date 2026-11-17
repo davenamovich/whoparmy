@@ -16,7 +16,8 @@ export async function GET() {
     const effective = await getEffectiveTiers().catch(() => null);
     if (effective) {
       const byKey = new Map(effective.map((t) => [t.key, t.model]));
-      state.tiers = state.tiers.map((t) => ({ ...t, model: byKey.get(t.key) ?? t.model }));
+      const patched = { ...state, tiers: state.tiers.map((t) => ({ ...t, model: byKey.get(t.key) ?? t.model })) };
+      return NextResponse.json({ game: patched });
     }
     return NextResponse.json({ game: state });
   } catch (err) {

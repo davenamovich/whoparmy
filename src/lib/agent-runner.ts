@@ -27,6 +27,8 @@ import { getLadder, starimgConfig } from "@/lib/llm-policy";
  * refunded to the agent's allocation — failed work is never charged.
  */
 
+const COEF: Record<string, number> = Object.fromEntries(MODEL_TIERS.map((t) => [t.model, t.coefficient]));
+
 const KIND_INSTRUCTIONS: Record<string, string> = {
   SCOUT:
     "You are a Trend Scout agent. From the brief, produce a scouting report: 5 trend angles or hooks the business can use this week, each one line, plus the single strongest pick and why. Concrete and specific — no generic filler.",
