@@ -6,6 +6,7 @@ export interface PlanDef {
   key: string;
   name: string;
   price: string;
+  priceCents: number; // monthly price in cents (referral basis)
   botSeats: number; // rented bots (agents) included in the plan
   monthlyItems: number; // max successful generated items (memes) / month on the house lane
   maxFormatsPerCampaign: number;
@@ -20,6 +21,7 @@ export const PLANS: PlanDef[] = [
     key: "FREE",
     name: "Trial",
     price: "$0",
+    priceCents: 0,
     botSeats: 1,
     monthlyItems: 25,
     maxFormatsPerCampaign: 2,
@@ -31,6 +33,7 @@ export const PLANS: PlanDef[] = [
     key: "CREATOR",
     name: "Starter",
     price: "$29/mo",
+    priceCents: 2900,
     botSeats: 1,
     monthlyItems: 300,
     maxFormatsPerCampaign: 6,
@@ -43,6 +46,7 @@ export const PLANS: PlanDef[] = [
     key: "PRO",
     name: "Operator",
     price: "$79/mo",
+    priceCents: 7900,
     botSeats: 3,
     monthlyItems: 1500,
     maxFormatsPerCampaign: 12,
@@ -54,6 +58,7 @@ export const PLANS: PlanDef[] = [
     key: "AGENCY",
     name: "Agency",
     price: "$199/mo",
+    priceCents: 19900,
     botSeats: 10,
     monthlyItems: 6000,
     maxFormatsPerCampaign: 25,

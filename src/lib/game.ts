@@ -47,6 +47,9 @@ export const XP_VALUES = {
   PACK_GENERATED: 100,
   CAMPAIGN_CREATED: 50,
   SMART_ROUTE: 25,
+  BOT_RENTED: 75,
+  REFERRAL_JOINED: 50,
+  REFERRAL_CONVERTED: 150,
 } as const;
 
 export type XpKind = keyof typeof XP_VALUES;
@@ -139,6 +142,13 @@ export async function getGameState(userId: string, planKey: string) {
     where: { userId, kind: "PACK_GENERATED", createdAt: { gte: todayStart } },
   });
 
+  const [bots, jobsDone, recruits, conversions] = await Promise.all([
+    db.hiredAgent.count({ where: { userId } }),
+    db.agentJob.count({ where: { userId, status: "DONE" } }),
+    db.user.count({ where: { referredById: userId } }),
+    db.referralEarning.count({ where: { referrerId: userId } }),
+  ]);
+
   const plan = getPlan(planKey);
   const energyUsed = await countMonthlyUsage(userId);
 
@@ -150,6 +160,11 @@ export async function getGameState(userId: string, planKey: string) {
     { key: "pack-5", title: "Squad Output", description: "Generate 5 content packs.", rewardXp: XP_VALUES.PACK_GENERATED, progress: Math.min(packs, 5), target: 5, done: packs >= 5 },
     { key: "campaign-3", title: "Campaign Planner", description: "Create 3 content campaigns.", rewardXp: XP_VALUES.CAMPAIGN_CREATED, progress: Math.min(campaigns, 3), target: 3, done: campaigns >= 3 },
     { key: "streak-7", title: "Week at War", description: "Earn XP on 7 straight days.", rewardXp: 0, progress: Math.min(profile.streakDays, 7), target: 7, done: profile.streakDays >= 7 },
+    { key: "first-bot", title: "Bot Commander", description: "Rent your first bot.", rewardXp: XP_VALUES.BOT_RENTED, progress: Math.min(bots, 1), target: 1, done: bots >= 1 },
+    { key: "jobs-10", title: "Production Line", description: "Your bots finish 10 jobs.", rewardXp: 0, progress: Math.min(jobsDone, 10), target: 10, done: jobsDone >= 10 },
+    { key: "first-recruit", title: "First Recruit", description: "A new member joins with your referral link.", rewardXp: XP_VALUES.REFERRAL_JOINED, progress: Math.min(recruits, 1), target: 1, done: recruits >= 1 },
+    { key: "recruits-3", title: "Squad Builder", description: "3 members join with your referral link.", rewardXp: XP_VALUES.REFERRAL_JOINED, progress: Math.min(recruits, 3), target: 3, done: recruits >= 3 },
+    { key: "first-conversion", title: "First Commission", description: "A recruit rents their first bot — you earn 30% of their plan.", rewardXp: XP_VALUES.REFERRAL_CONVERTED, progress: Math.min(conversions, 1), target: 1, done: conversions >= 1 },
     { key: "three-tier-trial", title: "Three-Tier Trial", description: "Run one brief on Scout, Balanced and Flagship, pick the winner, mint it in P&R.", rewardXp: 150, progress: 0, target: 1, done: false, locked: "Arrives with the Bridge (Bifrost) — Phase 2" },
   ];
 
@@ -159,6 +174,10 @@ export async function getGameState(userId: string, planKey: string) {
     { key: "campaign-3", name: "Campaign Planner", description: "Created 3 campaigns", earned: campaigns >= 3 },
     { key: "streak-7", name: "Streak 7", description: "7-day XP streak", earned: profile.streakDays >= 7 },
     { key: "route-master", name: "Route Master", description: "10 smart routes (cheap tier, QA passed)", earned: smartRoutes >= 10 },
+    { key: "bot-owner", name: "Bot Commander", description: "Rented a first bot", earned: bots >= 1 },
+    { key: "crew-10", name: "Production Line", description: "Bots finished 10 jobs", earned: jobsDone >= 10 },
+    { key: "first-recruit", name: "Recruiter", description: "First member joined via your link", earned: recruits >= 1 },
+    { key: "recruiter-5", name: "Army Builder", description: "5 members joined via your link", earned: recruits >= 5 },
   ];
 
   return {
@@ -169,7 +188,7 @@ export async function getGameState(userId: string, planKey: string) {
     xpIntoRank,
     xpToNext,
     energy: { used: energyUsed, limit: plan.monthlyItems, planName: plan.name },
-    counts: { packs, campaigns, smartRoutes, packsToday },
+    counts: { packs, campaigns, smartRoutes, packsToday, bots, jobsDone, recruits, conversions },
     missions,
     badges,
     tiers: MODEL_TIERS,

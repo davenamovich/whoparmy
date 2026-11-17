@@ -74,7 +74,17 @@ export default function Home() {
     const params = new URLSearchParams(window.location.search);
     const welcome = params.get("welcome");
     const authError = params.get("auth_error");
-    if (welcome || authError) {
+    // Referral program: stash the inviter's code; attribution happens
+    // once a session exists (see the effect below).
+    const ref = params.get("ref");
+    if (ref) {
+      try {
+        window.localStorage.setItem("pr_ref", ref);
+      } catch {
+        // storage unavailable — attribution is a bonus, never a blocker
+      }
+    }
+    if (welcome || authError || ref) {
       window.setTimeout(() => {
         if (welcome === "whop") {
           toast({
@@ -90,6 +100,29 @@ export default function Home() {
       void reloadSession();
     }
   }, []);
+
+  // One-shot referral attribution: if this browser arrived via a
+  // member's link and the visitor is signed in, credit the inviter.
+  useEffect(() => {
+    if (sessionLoading || !session) return;
+    let code: string | null = null;
+    try {
+      code = window.localStorage.getItem("pr_ref");
+    } catch {
+      code = null;
+    }
+    if (!code) return;
+    try {
+      window.localStorage.removeItem("pr_ref");
+    } catch {
+      // ignore
+    }
+    void fetch("/api/referrals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    }).catch(() => {});
+  }, [session, sessionLoading]);
 
   function openResults(campaignId: string) {
     setResultsCampaignId(campaignId);

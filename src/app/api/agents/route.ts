@@ -4,6 +4,8 @@ import { getWhopUser } from "@/lib/auth";
 import { AGENT_CATALOG, getWalletState, internalBotBudget, templateByKey } from "@/lib/agents";
 import { getPlan } from "@/lib/plans";
 import { countMonthlyUsage } from "@/lib/usage-server";
+import { awardXp } from "@/lib/game";
+import { recordConversion } from "@/lib/referrals";
 
 export const runtime = "nodejs";
 
@@ -70,6 +72,12 @@ export async function POST(req: NextRequest) {
         tokenBudget: internalBotBudget(user.plan),
       },
     });
+    // Gamification + referral program: renting earns XP; a FIRST rental
+    // converts the member — their referrer earns 30% (see referrals.ts).
+    void awardXp(user.id, "BOT_RENTED", template.key).catch(() => {});
+    if (rented === 0) {
+      void recordConversion(user.id).catch(() => {});
+    }
     return NextResponse.json({ hire }, { status: 201 });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Rental failed" }, { status: 500 });

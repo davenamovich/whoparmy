@@ -36,6 +36,15 @@ model User {
   hiredAgents  HiredAgent[]
   agentJobs    AgentJob[]
   listings     CampaignListing[]
+
+  // Referral program (30%): every member gets a code; attribution is
+  // set once, never overwritten. Earnings accrue in ReferralEarning.
+  refCode      String?  @unique
+  referredById String?
+  referredBy   User?    @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals    User[]   @relation("Referrals")
+  earnings     ReferralEarning[] @relation("Earner")
+  earnedFrom   ReferralEarning[] @relation("Recruit")
 }
 
 // ─── Brand profiles (multiple allowed for agencies) ─────────────────
@@ -251,6 +260,26 @@ model CampaignListing {
 
   @@index([posterId])
   @@index([status])
+}
+
+// ─── REFERRAL PROGRAM — 30% ─────────────────────────────────────────
+// One row per conversion: a referred member's first bot rental earns
+// their referrer 30% of the recruit's plan price. Status stays
+// SIMULATED until payouts run on a real rail (Whop affiliate payouts
+// are the operator's dashboard step) — never present these as paid.
+model ReferralEarning {
+  id          String   @id @default(cuid())
+  referrerId  String
+  recruitId   String   @unique // one conversion per recruit, ever
+  basisPlan   String // recruit's plan key at conversion
+  amountCents Int // 30% of the plan price, in cents
+  status      String   @default("SIMULATED") // SIMULATED | PAYABLE | PAID
+  createdAt   DateTime @default(now())
+
+  referrer User @relation("Earner", fields: [referrerId], references: [id], onDelete: Cascade)
+  recruit  User @relation("Recruit", fields: [recruitId], references: [id], onDelete: Cascade)
+
+  @@index([referrerId])
 }
 
 // ─── P&R MEME ARMY — multi-tenant Telegram bot engine ───────────────

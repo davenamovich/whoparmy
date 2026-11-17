@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Trophy, Flame, Zap, Target, Award, Lock, Check, Swords } from "lucide-react";
+import { Trophy, Flame, Zap, Target, Award, Lock, Check, Swords, Users, Copy } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import type { GameState } from "@/lib/game";
+import type { ReferralState } from "@/lib/referrals";
 
 /**
  * WAR ROOM — the gamified Bifrost layer (HQ screen).
@@ -17,6 +20,8 @@ import type { GameState } from "@/lib/game";
 export function WarRoom() {
   const [game, setGame] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [referrals, setReferrals] = useState<ReferralState | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -29,6 +34,20 @@ export function WarRoom() {
       .catch((err: unknown) => {
         if (alive) setError(err instanceof Error ? err.message : "Failed to load War Room");
       });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/referrals")
+      .then(async (res) => {
+        if (!res.ok) return;
+        const data = await res.json();
+        if (alive) setReferrals(data.referrals as ReferralState);
+      })
+      .catch(() => {});
     return () => {
       alive = false;
     };
@@ -159,6 +178,65 @@ export function WarRoom() {
           ))}
         </CardContent>
       </Card>
+
+      {referrals ? (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Users className="h-4 w-4 text-primary" /> Refer &amp; earn 30%
+              <Badge variant="outline" className="text-[10px] ml-auto">Earnings SIMULATED until payouts go live</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Every member who joins with your link and rents their first bot earns you{" "}
+              <span className="text-foreground font-semibold">30% of their plan</span> — plus XP: +50 when they join,
+              +150 when they convert.
+            </p>
+            <div className="flex gap-2">
+              <Input readOnly value={referrals.link} className="text-xs" />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(referrals.link).catch(() => {});
+                  setCopied(true);
+                  window.setTimeout(() => setCopied(false), 1500);
+                }}
+              >
+                <Copy className="h-3.5 w-3.5 mr-1" /> {copied ? "Copied" : "Copy link"}
+              </Button>
+            </div>
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="rounded-lg border border-border/60 p-3">
+                <div className="text-lg font-black">{referrals.recruitsCount}</div>
+                <div className="text-[11px] text-muted-foreground">Recruits</div>
+              </div>
+              <div className="rounded-lg border border-border/60 p-3">
+                <div className="text-lg font-black">{referrals.conversions}</div>
+                <div className="text-[11px] text-muted-foreground">Converted</div>
+              </div>
+              <div className="rounded-lg border border-border/60 p-3">
+                <div className="text-lg font-black">${(referrals.earnedCents / 100).toFixed(2)}</div>
+                <div className="text-[11px] text-muted-foreground">Earned (30%)</div>
+              </div>
+            </div>
+            {referrals.recruits.length > 0 ? (
+              <div className="space-y-1">
+                {referrals.recruits.slice(0, 5).map((r) => (
+                  <div key={r.id} className="flex items-center gap-2 text-xs">
+                    <span className="font-medium">{r.whopUsername ?? r.name ?? "Member"}</span>
+                    <Badge variant="outline" className="text-[10px]">{r.plan}</Badge>
+                    <span className="text-muted-foreground ml-auto">{r.converted ? "Rented a bot ✓" : "Joined"}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">No recruits yet — your link is your loudest weapon. Share it where business owners hang out.</p>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
