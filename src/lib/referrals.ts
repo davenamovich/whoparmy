@@ -29,6 +29,26 @@ export const REFERRAL_RATE = 0.3;
  */
 export const REFERRAL_FREE_GENS = 25;
 
+/**
+ * Commission unlock gates (Dave, 2026-11-17 — "both gates"):
+ * referral commissions accrue as LOCKED from the first conversion and
+ * release in a lump when the referrer reaches this many converted
+ * referrals. A second gate — a connected P&R key — joins this check
+ * when Connect-with-P&R lands (Slice A): commissionGateOpen is the
+ * single seam both gates flow through. Free generations are NOT
+ * gated: they land instantly per conversion (cheap, capped, and
+ * they're the visible hook of the program).
+ */
+export const COMMISSION_UNLOCK_CONVERSIONS = 3;
+
+async function commissionGateOpen(referrerId: string): Promise<boolean> {
+  const conversions = await db.referralEarning.count({ where: { referrerId } });
+  // Slice A hook: also require a live PrConnection for this referrer
+  // once Connect-with-P&R ships (Dave's key gate). Until then the
+  // threshold alone governs.
+  return conversions >= COMMISSION_UNLOCK_CONVERSIONS;
+}
+
 function codeFrom(user: { id: string; whopUsername: string | null; name: string | null }): string {
   const slug = (user.whopUsername || user.name || "MEMBER")
     .toUpperCase()
@@ -64,6 +84,7 @@ export async function getReferralState(userId: string) {
     db.user.findUnique({ where: { id: userId }, select: { freeGenBalance: true } }),
   ]);
   const convertedIds = new Set(earnings.map((e) => e.recruitId));
+  const lockedCents = earnings.filter((e) => e.status === "LOCKED").reduce((n, e) => n + e.amountCents, 0);
   return {
     code,
     link: referralLink(code),
@@ -71,7 +92,10 @@ export async function getReferralState(userId: string) {
     recruits: recruits.map((r) => ({ ...r, converted: convertedIds.has(r.id) })),
     recruitsCount: recruits.length,
     conversions: earnings.length,
-    earnedCents: earnings.reduce((n, e) => n + e.amountCents, 0),
+    earnedCents: earnings.filter((e) => e.status !== "LOCKED").reduce((n, e) => n + e.amountCents, 0),
+    lockedCents,
+    commissionsUnlocked: lockedCents === 0 && earnings.length >= COMMISSION_UNLOCK_CONVERSIONS,
+    commissionUnlockAt: COMMISSION_UNLOCK_CONVERSIONS,
     earningsStatus: earnings[0]?.status ?? "SIMULATED",
     freeGenBalance: me?.freeGenBalance ?? 0,
     freeGensPerConversion: REFERRAL_FREE_GENS,
@@ -111,20 +135,32 @@ export async function recordConversion(recruitId: string) {
   await awardXp(recruit.referredById, "REFERRAL_CONVERTED", recruit.plan).catch(() => {});
   const priceCents = getPlan(recruit.plan).priceCents;
   if (priceCents <= 0) return null;
-  const earning = await db.referralEarning.create({
+  // Commissions accrue LOCKED until the referrer's unlock gates open
+  // (see COMMISSION_UNLOCK_CONVERSIONS) — anti-farming: an alt-account
+  // ring has to produce real paid conversions before a cent releases.
+  await db.referralEarning.create({
     data: {
       referrerId: recruit.referredById,
       recruitId,
       basisPlan: recruit.plan,
       amountCents: Math.round(priceCents * REFERRAL_RATE),
+      status: "LOCKED",
     },
   });
   // Free generations land with the conversion — the idempotency guard
   // above (one earning row per recruit, ever) makes this grant
-  // exactly-once as well.
+  // exactly-once as well. They are not commission-gated.
   await db.user.update({
     where: { id: recruit.referredById },
     data: { freeGenBalance: { increment: REFERRAL_FREE_GENS } },
   });
-  return earning;
+  // The conversion that opens the gate releases everything accrued,
+  // in a lump.
+  if (await commissionGateOpen(recruit.referredById)) {
+    await db.referralEarning.updateMany({
+      where: { referrerId: recruit.referredById, status: "LOCKED" },
+      data: { status: "SIMULATED" },
+    });
+  }
+  return db.referralEarning.findUnique({ where: { recruitId } });
 }

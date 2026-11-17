@@ -191,6 +191,15 @@ export function WarRoom() {
           <CardContent className="space-y-3">
             <p className="text-xs text-muted-foreground">{tr("bodyFull")}</p>
             <p className="text-xs text-muted-foreground">{tr("freeGensNote", { count: referrals.freeGensPerConversion })}</p>
+            {!referrals.commissionsUnlocked ? (
+              <p className="text-xs text-muted-foreground">
+                {tr("unlockNote", {
+                  need: referrals.commissionUnlockAt,
+                  have: referrals.conversions,
+                  locked: `$${(referrals.lockedCents / 100).toFixed(2)}`,
+                })}
+              </p>
+            ) : null}
             <div className="flex gap-2">
               <Input readOnly value={referrals.link} className="text-xs" />
               <Button
