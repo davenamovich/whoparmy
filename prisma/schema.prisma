@@ -111,6 +111,8 @@ model Asset {
   topText       String?
   bottomText    String?
   imageUrl      String?
+  pageUrl       String? // engine temp page for engine-generated memes (slice 2)
+  engineRef     String? // engine page id, for status / render follow-ups
   objective     String?
   tone          String?
   status        String   @default("PENDING") // PENDING | GENERATING | DONE | FAILED

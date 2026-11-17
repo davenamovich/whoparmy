@@ -22,6 +22,23 @@ const sql = readFileSync(new URL("../prisma/schema.sql", import.meta.url), "utf8
 
 const db = new Database(path, { create: true });
 db.exec(sql);
+
+// Additive columns for tables that already exist (schema.sql only
+// creates missing tables). Keep this list in step with schema.prisma:
+// each entry is applied only when the column is absent, so it is safe
+// on every boot and never touches existing data.
+const ADDITIVE_COLUMNS: Array<{ table: string; column: string; ddl: string }> = [
+  { table: "Asset", column: "pageUrl", ddl: 'ALTER TABLE "Asset" ADD COLUMN "pageUrl" TEXT' },
+  { table: "Asset", column: "engineRef", ddl: 'ALTER TABLE "Asset" ADD COLUMN "engineRef" TEXT' },
+];
+for (const { table, column, ddl } of ADDITIVE_COLUMNS) {
+  const cols = db.query(`PRAGMA table_info("${table}")`).all() as Array<{ name: string }>;
+  if (cols.length > 0 && !cols.some((c) => c.name === column)) {
+    db.exec(ddl);
+    console.log(`[boot] added column ${table}.${column}`);
+  }
+}
+
 const tables = db.query("SELECT count(*) AS n FROM sqlite_master WHERE type='table'").get() as { n: number };
 console.log(`[boot] schema applied to ${path} — ${tables.n} tables present`);
 db.close();

@@ -73,6 +73,8 @@ CREATE TABLE "Asset" (
     "topText" TEXT,
     "bottomText" TEXT,
     "imageUrl" TEXT,
+    "pageUrl" TEXT,
+    "engineRef" TEXT,
     "objective" TEXT,
     "tone" TEXT,
     "status" TEXT NOT NULL DEFAULT 'PENDING',
