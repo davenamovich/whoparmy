@@ -12,6 +12,7 @@ CREATE TABLE "User" (
     "memeArmyPlan" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
+    "linksSavedAt" DATETIME,
     "refCode" TEXT,
     "referredById" TEXT,
     "freeGenBalance" INTEGER NOT NULL DEFAULT 0,
@@ -317,6 +318,17 @@ CREATE TABLE "ResearchJob" (
     CONSTRAINT "ResearchJob_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
+-- CreateTable
+CREATE TABLE "EngineLink" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "partner" TEXT NOT NULL,
+    "url" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "EngineLink_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_whopId_key" ON "User"("whopId");
 
@@ -406,4 +418,10 @@ CREATE INDEX "ResearchJob_userId_website_idx" ON "ResearchJob"("userId", "websit
 
 -- CreateIndex
 CREATE INDEX "ResearchJob_userId_createdAt_idx" ON "ResearchJob"("userId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "EngineLink_userId_idx" ON "EngineLink"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "EngineLink_userId_partner_key" ON "EngineLink"("userId", "partner");
 

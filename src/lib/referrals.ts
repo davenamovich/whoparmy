@@ -2,6 +2,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { getPlan } from "@/lib/plans";
 import { awardXp } from "@/lib/game";
+import { LINK_SAVE_FREE_GENS } from "@/lib/bridge";
 
 /**
  * ─── REFERRAL PROGRAM — 30% ─────────────────────────────────────────
@@ -10,7 +11,9 @@ import { awardXp } from "@/lib/game";
  * earns 30% of that recruit's plan price when the recruit converts
  * (rents their first bot) — once the referrer is commission-unlocked
  * (see COMMISSION_UNLOCK_CONVERSIONS; qualifying conversions before
- * the unlock earn free generations only, never a held commission).
+ * the unlock earn no commission, never a held one). Free generations
+ * pay on a separate trigger: when a recruit saves their bridge links
+ * (lib/bridge.ts).
  * Attribution is set once and never overwritten; self-referrals don't
  * count. Earnings are recorded in ReferralEarning with status
  * SIMULATED until payouts run on a real rail — the UI must always
@@ -23,14 +26,12 @@ import { awardXp } from "@/lib/game";
 export const REFERRAL_RATE = 0.3;
 
 /**
- * Free generations per conversion (Dave, 2026-11-17): when a referral
- * rents their first bot, the referrer also earns this many free
- * generations, stacked on top of their plan's monthly allowance and
- * spent automatically once the allowance runs out (see
- * lib/usage-server.ts). Granted at conversion only — join-only grants
- * would be farmable with free accounts.
+ * Free generations in the referral program now pay on the bridge
+ * link-save trigger — see LINK_SAVE_FREE_GENS in lib/bridge.ts
+ * (Dave moved the trigger there, 2026-11-17). They stack on top of
+ * the plan's monthly allowance and are spent automatically once the
+ * allowance runs out (lib/usage-server.ts).
  */
-export const REFERRAL_FREE_GENS = 25;
 
 /**
  * Commission unlock gates (Dave, 2026-11-17 — "both gates", corrected
@@ -105,7 +106,7 @@ export async function getReferralState(userId: string) {
     commissionUnlockAt: COMMISSION_UNLOCK_CONVERSIONS,
     earningsStatus: earnings[0]?.status ?? "SIMULATED",
     freeGenBalance: me?.freeGenBalance ?? 0,
-    freeGensPerConversion: REFERRAL_FREE_GENS,
+    freeGensPerLinkSave: LINK_SAVE_FREE_GENS,
   };
 }
 
@@ -128,10 +129,11 @@ export async function attributeReferral(userId: string, rawCode: string) {
 
 /**
  * Record a conversion: the recruit rented their first bot. Awards the
- * referrer conversion XP and an instant free-generation grant; the
- * commission itself is recorded as a 30% earning row only when the
- * referrer's unlock gates are open (otherwise the row stays
- * QUALIFYING at $0 and counts toward the gate).
+ * referrer conversion XP; the commission itself is recorded as a 30%
+ * earning row only when the referrer's unlock gates are open
+ * (otherwise the row stays QUALIFYING at $0 and counts toward the
+ * gate). Free generations are NOT granted here — they pay when the
+ * recruit saves their bridge links (lib/bridge.ts).
  * Idempotent — one conversion per recruit, ever (unique recruitId).
  */
 export async function recordConversion(recruitId: string) {
@@ -158,13 +160,6 @@ export async function recordConversion(recruitId: string) {
       amountCents: 0,
       status: "QUALIFYING",
     },
-  });
-  // Free generations land with the conversion — the idempotency guard
-  // above (one earning row per recruit, ever) makes this grant
-  // exactly-once as well. They pay instantly, gate or no gate.
-  await db.user.update({
-    where: { id: recruit.referredById },
-    data: { freeGenBalance: { increment: REFERRAL_FREE_GENS } },
   });
   // If this conversion opens the referrer's gates, THIS conversion
   // earns — commissions flow from the unlocking sign-up onward.

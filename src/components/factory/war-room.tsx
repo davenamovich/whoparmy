@@ -190,7 +190,7 @@ export function WarRoom() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-xs text-muted-foreground">{tr("bodyFull")}</p>
-            <p className="text-xs text-muted-foreground">{tr("freeGensNote", { count: referrals.freeGensPerConversion })}</p>
+            <p className="text-xs text-muted-foreground">{tr("freeGensNote", { count: referrals.freeGensPerLinkSave })}</p>
             {!referrals.commissionsUnlocked ? (
               <p className="text-xs text-muted-foreground">
                 {tr("unlockNote", {

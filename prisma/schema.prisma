@@ -29,6 +29,8 @@ model User {
   campaigns    Campaign[]
   usageRecords UsageRecord[]
   researchJobs ResearchJob[]
+  engineLinks  EngineLink[]
+  linksSavedAt DateTime? // first bridge link save — pays the referrer's free generations (lib/bridge.ts)
   assets       Asset[]
   jobs         GenerationJob[]
   army         ArmyBot?
@@ -429,4 +431,23 @@ model ResearchJob {
 
   @@index([userId, website])
   @@index([userId, createdAt])
+}
+
+// ─── Bridge links ────────────────────────────────────────────────────
+// The member's own referral links for the ecosystem partners, saved
+// on the /bridge landing page (the start of building their own
+// engine). The FIRST save is an onboarding event: it pays the
+// member's referrer free generations (see lib/bridge.ts).
+model EngineLink {
+  id        String   @id @default(cuid())
+  userId    String
+  partner   String // key from BRIDGE_PARTNERS (lib/bridge.ts)
+  url       String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, partner])
+  @@index([userId])
 }
