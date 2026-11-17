@@ -196,7 +196,6 @@ export function WarRoom() {
                 {tr("unlockNote", {
                   need: referrals.commissionUnlockAt,
                   have: referrals.conversions,
-                  locked: `$${(referrals.lockedCents / 100).toFixed(2)}`,
                 })}
               </p>
             ) : null}

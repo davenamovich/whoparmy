@@ -84,7 +84,7 @@
     "earned": "Ganado (30%)",
     "freeGens": "Generaciones gratis",
     "freeGensNote": "Además, recibes {count} generaciones gratis por cada conversión: se usan automáticamente cuando se agotan los memes mensuales de tu plan.",
-    "unlockNote": "Las comisiones se desbloquean con {need} referidos convertidos ({have}/{need}). Llevas {locked} acumulado y bloqueado: se libera por completo al desbloquear, y también se requerirá una clave de P&R conectada cuando llegue Connect.",
+    "unlockNote": "Las comisiones se desbloquean con {need} registros confirmados ({have}/{need}). Hasta entonces, cada conversión sigue pagando sus generaciones gratis al instante: las comisiones empiezan con el registro que te desbloquea, y también se requerirá una clave de P&R conectada cuando llegue Connect.",
     "empty": "Aún no hay reclutados: tu enlace es tu arma más ruidosa. Compártelo donde se reúnen los dueños de negocios.",
     "joined": "Se unió",
     "member": "Miembro",

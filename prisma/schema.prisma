@@ -284,7 +284,7 @@ model ReferralEarning {
   recruitId   String   @unique // one conversion per recruit, ever
   basisPlan   String // recruit's plan key at conversion
   amountCents Int // 30% of the plan price, in cents
-  status      String   @default("SIMULATED") // LOCKED | SIMULATED | PAYABLE | PAID
+  status      String   @default("SIMULATED") // QUALIFYING | SIMULATED | PAYABLE | PAID
   createdAt   DateTime @default(now())
 
   referrer User @relation("Earner", fields: [referrerId], references: [id], onDelete: Cascade)
