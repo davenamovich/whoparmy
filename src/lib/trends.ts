@@ -1,6 +1,7 @@
 import "server-only";
 import { starimgConfig, getLadder } from "@/lib/llm-policy";
 import { languageLabel } from "@/lib/languages";
+import { narrativePromptBlock } from "@/lib/narrative-hooks";
 
 /**
  * ─── TRENDING — the live wire ───────────────────────────────────────
@@ -147,7 +148,9 @@ async function generateHeadlines(topics: RawTopic[], lang: string): Promise<Map<
               role: "system",
               content:
                 "You are a viral headline writer for small-business social content. For each trending topic, write ONE scroll-stopping headline a local business could ride (curiosity, contrast, or a bold claim — never clickbait lies, never advice about the news itself) and a one-line hook angle. " +
-                `Write ALL output in ${languageLabel(lang)} (${lang}). Reply with ONLY a JSON array: [{"i":0,"headline":"...","hook":"..."}] — no markdown, no extra text.`,
+                "When a narrative frame fits the topic, write the headline AS that first-person story opener — it outperforms a clever headline.\n\n" +
+                narrativePromptBlock(8) +
+                `\n\nWrite ALL output in ${languageLabel(lang)} (${lang}). Reply with ONLY a JSON array: [{"i":0,"headline":"...","hook":"..."}] — no markdown, no extra text.`,
             },
             { role: "user", content: `Trending now:\n${list}` },
           ],

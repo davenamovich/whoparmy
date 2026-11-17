@@ -5,6 +5,7 @@ import { MODEL_TIERS, awardXp } from "@/lib/game";
 import { recordUsage } from "@/lib/pr-engine";
 import { languageLabel } from "@/lib/languages";
 import { getLadder, starimgConfig } from "@/lib/llm-policy";
+import { narrativePromptBlock } from "@/lib/narrative-hooks";
 
 /**
  * ─── AGENT RUNNER — executes the job queue for real ─────────────────
@@ -33,9 +34,11 @@ const KIND_INSTRUCTIONS: Record<string, string> = {
   SCOUT:
     "You are a Trend Scout agent. From the brief, produce a scouting report: 5 trend angles or hooks the business can use this week, each one line, plus the single strongest pick and why. Concrete and specific — no generic filler.",
   MEME:
-    "You are a Meme Smith agent. From the brief, produce the requested number of meme concepts. For each: a concept title, TOP text (max 60 chars), BOTTOM text (max 60 chars), and a one-line image scene description (no text in the image). Punchy, native, shareable.",
+    "You are a Meme Smith agent. From the brief, produce the requested number of meme concepts. For each: a concept title, TOP text (max 60 chars), BOTTOM text (max 60 chars), and a one-line image scene description (no text in the image). Punchy, native, shareable. The TOP text is the meme's hook: when the brief allows it, open it as a first-person narrative line in one of the proven frames below.\n\n" +
+    narrativePromptBlock(10),
   HOOK:
-    "You are a Hook Smith agent. From the brief, produce the requested number of scroll-stopping hooks/headlines, each under 15 words, varied angles, then mark the one you would ship with ★ and say why in one line.",
+    "You are a Hook Smith agent. From the brief, produce the requested number of scroll-stopping hooks/headlines, each under 15 words, varied angles, then mark the one you would ship with ★ and say why in one line.\n\n" +
+    narrativePromptBlock(16),
   QA:
     "You are a QA Editor agent. Review the material in the brief: flag anything weak, confusing, off-brand or legally risky, then return a tightened final version. Be specific; do not rewrite what already works.",
   CAMPAIGN:
