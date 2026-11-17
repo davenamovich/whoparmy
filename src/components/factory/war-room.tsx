@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import type { GameState } from "@/lib/game";
 import type { ReferralState } from "@/lib/referrals";
+import { useTranslations } from "next-intl";
 
 /**
  * WAR ROOM — the gamified Bifrost layer (HQ screen).
@@ -18,6 +19,8 @@ import type { ReferralState } from "@/lib/referrals";
  * Scout is ~10x cheaper than Flagship and ~200x cheaper than Claude QA.
  */
 export function WarRoom() {
+  const t = useTranslations("warRoom");
+  const tr = useTranslations("referral");
   const [game, setGame] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [referrals, setReferrals] = useState<ReferralState | null>(null);
@@ -56,12 +59,12 @@ export function WarRoom() {
   if (error) {
     return (
       <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
-        War Room failed to load: {error}
+        {t("failed")}: {error}
       </div>
     );
   }
   if (!game) {
-    return <div className="text-sm text-muted-foreground py-10 text-center">Loading your War Room…</div>;
+    return <div className="text-sm text-muted-foreground py-10 text-center">{t("loading")}</div>;
   }
 
   const xpPct = game.nextRank
@@ -73,32 +76,30 @@ export function WarRoom() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
-          <Swords className="h-6 w-6 text-primary" /> War Room
+          <Swords className="h-6 w-6 text-primary" /> {t("title")}
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Your rank in the Meme Army. XP is earned by shipping real content — never by clicking around.
-        </p>
+        <p className="text-sm text-muted-foreground mt-1">{t("subtitle")}</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Trophy className="h-3.5 w-3.5 text-primary" /> Rank
+              <Trophy className="h-3.5 w-3.5 text-primary" /> {t("rank")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-black">{game.rank.name}</div>
-            <div className="text-xs text-muted-foreground mt-0.5">{game.xp} XP lifetime</div>
+            <div className="text-xs text-muted-foreground mt-0.5">{t("xpLifetime", { xp: game.xp })}</div>
             {game.nextRank ? (
               <div className="mt-3">
                 <Progress value={xpPct} className="h-2" />
                 <div className="text-[11px] text-muted-foreground mt-1.5">
-                  {game.xpToNext} XP to {game.nextRank.name}
+                  {t("xpToNext", { xp: game.xpToNext, rank: game.nextRank.name })}
                 </div>
               </div>
             ) : (
-              <div className="text-[11px] text-primary mt-3 font-semibold">Top rank. The army salutes you.</div>
+              <div className="text-[11px] text-primary mt-3 font-semibold">{t("topRank")}</div>
             )}
           </CardContent>
         </Card>
@@ -106,19 +107,17 @@ export function WarRoom() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Zap className="h-3.5 w-3.5 text-primary" /> Energy — {game.energy.planName} plan
+              <Zap className="h-3.5 w-3.5 text-primary" /> {t("energyPlan", { plan: game.energy.planName })}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-black">
-              {game.energy.used} <span className="text-sm font-medium text-muted-foreground">/ {game.energy.limit} items</span>
+              {game.energy.used} <span className="text-sm font-medium text-muted-foreground">/ {game.energy.limit} {t("items")}</span>
             </div>
-            <div className="text-xs text-muted-foreground mt-0.5">Generations used this month. Failed runs never count.</div>
+            <div className="text-xs text-muted-foreground mt-0.5">{t("generationsNote")}</div>
             <div className="mt-3">
               <Progress value={energyPct} className="h-2" />
-              <div className="text-[11px] text-muted-foreground mt-1.5">
-                With the Bridge (Phase 2), Energy becomes your live model-token budget.
-              </div>
+              <div className="text-[11px] text-muted-foreground mt-1.5">{t("bridgeNote")}</div>
             </div>
           </CardContent>
         </Card>
@@ -126,17 +125,19 @@ export function WarRoom() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Flame className="h-3.5 w-3.5 text-primary" /> Streak
+              <Flame className="h-3.5 w-3.5 text-primary" /> {t("streakTitle")}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-black">
-              {game.streakDays} <span className="text-sm font-medium text-muted-foreground">day{game.streakDays === 1 ? "" : "s"}</span>
-            </div>
+            <div className="text-2xl font-black">{t("days", { count: game.streakDays })}</div>
             <div className="text-xs text-muted-foreground mt-0.5">
-              {game.counts.packs} packs · {game.counts.campaigns} campaigns · {game.counts.packsToday} pack{game.counts.packsToday === 1 ? "" : "s"} today
+              {t("countsLine", {
+                packs: game.counts.packs,
+                campaigns: game.counts.campaigns,
+                packsToday: game.counts.packsToday,
+              })}
             </div>
-            <div className="text-[11px] text-muted-foreground mt-3">Earn XP on consecutive days to grow the streak.</div>
+            <div className="text-[11px] text-muted-foreground mt-3">{t("streakHint")}</div>
           </CardContent>
         </Card>
       </div>
@@ -144,7 +145,7 @@ export function WarRoom() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-2">
-            <Target className="h-4 w-4 text-primary" /> Missions
+            <Target className="h-4 w-4 text-primary" /> {t("missions")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -183,16 +184,12 @@ export function WarRoom() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <Users className="h-4 w-4 text-primary" /> Refer &amp; earn 30%
-              <Badge variant="outline" className="text-[10px] ml-auto">Earnings SIMULATED until payouts go live</Badge>
+              <Users className="h-4 w-4 text-primary" /> {tr("titleWithRate")}
+              <Badge variant="outline" className="text-[10px] ml-auto">{tr("simulated")}</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <p className="text-xs text-muted-foreground">
-              Every member who joins with your link and rents their first bot earns you{" "}
-              <span className="text-foreground font-semibold">30% of their plan</span> — plus XP: +50 when they join,
-              +150 when they convert.
-            </p>
+            <p className="text-xs text-muted-foreground">{tr("bodyFull")}</p>
             <div className="flex gap-2">
               <Input readOnly value={referrals.link} className="text-xs" />
               <Button
@@ -204,35 +201,35 @@ export function WarRoom() {
                   window.setTimeout(() => setCopied(false), 1500);
                 }}
               >
-                <Copy className="h-3.5 w-3.5 mr-1" /> {copied ? "Copied" : "Copy link"}
+                <Copy className="h-3.5 w-3.5 mr-1" /> {copied ? tr("copied") : tr("copyLink")}
               </Button>
             </div>
             <div className="grid grid-cols-3 gap-3 text-center">
               <div className="rounded-lg border border-border/60 p-3">
                 <div className="text-lg font-black">{referrals.recruitsCount}</div>
-                <div className="text-[11px] text-muted-foreground">Recruits</div>
+                <div className="text-[11px] text-muted-foreground">{tr("recruits")}</div>
               </div>
               <div className="rounded-lg border border-border/60 p-3">
                 <div className="text-lg font-black">{referrals.conversions}</div>
-                <div className="text-[11px] text-muted-foreground">Converted</div>
+                <div className="text-[11px] text-muted-foreground">{tr("converted")}</div>
               </div>
               <div className="rounded-lg border border-border/60 p-3">
                 <div className="text-lg font-black">${(referrals.earnedCents / 100).toFixed(2)}</div>
-                <div className="text-[11px] text-muted-foreground">Earned (30%)</div>
+                <div className="text-[11px] text-muted-foreground">{tr("earned")}</div>
               </div>
             </div>
             {referrals.recruits.length > 0 ? (
               <div className="space-y-1">
                 {referrals.recruits.slice(0, 5).map((r) => (
                   <div key={r.id} className="flex items-center gap-2 text-xs">
-                    <span className="font-medium">{r.whopUsername ?? r.name ?? "Member"}</span>
+                    <span className="font-medium">{r.whopUsername ?? r.name ?? tr("member")}</span>
                     <Badge variant="outline" className="text-[10px]">{r.plan}</Badge>
-                    <span className="text-muted-foreground ml-auto">{r.converted ? "Rented a bot ✓" : "Joined"}</span>
+                    <span className="text-muted-foreground ml-auto">{r.converted ? tr("rentedBot") : tr("joined")}</span>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-[11px] text-muted-foreground">No recruits yet — your link is your loudest weapon. Share it where business owners hang out.</p>
+              <p className="text-[11px] text-muted-foreground">{tr("empty")}</p>
             )}
           </CardContent>
         </Card>
@@ -242,7 +239,7 @@ export function WarRoom() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <Award className="h-4 w-4 text-primary" /> Badges
+              <Award className="h-4 w-4 text-primary" /> {t("badges")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -258,7 +255,7 @@ export function WarRoom() {
                   <div className="text-sm font-semibold">{b.name}</div>
                   <div className="text-[11px] text-muted-foreground mt-0.5">{b.description}</div>
                   <div className="text-[10px] font-bold uppercase tracking-wider mt-1.5 text-primary">
-                    {b.earned ? "Earned" : "Locked"}
+                    {b.earned ? t("earned") : t("locked")}
                   </div>
                 </div>
               ))}
@@ -269,25 +266,22 @@ export function WarRoom() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <Zap className="h-4 w-4 text-primary" /> Model tiers — pick your weapon
+              <Zap className="h-4 w-4 text-primary" /> {t("modelTiers")}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2.5">
-            {game.tiers.map((t) => (
-              <div key={t.key} className="rounded-lg border border-border/60 p-3">
+            {game.tiers.map((tier) => (
+              <div key={tier.key} className="rounded-lg border border-border/60 p-3">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <span className="text-sm font-semibold">{t.label}</span>
+                  <span className="text-sm font-semibold">{tier.label}</span>
                   <span className="text-[11px] text-muted-foreground">
-                    {t.model} · fuel: {t.fuel}
+                    {tier.model} · {t("fuel")}: {tier.fuel}
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">{t.blurb}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{tier.blurb}</p>
               </div>
             ))}
-            <p className="text-[11px] text-muted-foreground">
-              Routing rule: volume on Scout, everyday work on Balanced, the line that ships on Flagship, Claude QA
-              only when it is worth it. Fuel use verified in a live run, 2026-11-16.
-            </p>
+            <p className="text-[11px] text-muted-foreground">{t("routingNote")}</p>
           </CardContent>
         </Card>
       </div>

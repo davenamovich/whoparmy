@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { ARMY_PLANS, PLANS, USAGE_NOTE } from "@/lib/plans";
 import type { UsageSummaryDTO } from "@/lib/types";
 import { useWhopSession, WhopCheckoutButton, type WhopCheckoutUrls } from "./whop-auth";
+import { useTranslations } from "next-intl";
 import { SectionHeader, StatCard } from "./shared";
 
 const KIND_LABELS: Record<string, string> = {
@@ -201,6 +202,27 @@ function WhopConnection() {
 
 export function AccountView() {
   const { toast } = useToast();
+  const tPlans = useTranslations("plans");
+  const tCommon = useTranslations("common");
+  const planName = (key: string) =>
+    tPlans(key.toLowerCase() as "trial" | "starter" | "operator" | "agency");
+  const featureText = (f: string): string => {
+    const memes = f.match(/^([\d,]+) memes \/ month$/);
+    if (memes) return tPlans("memesPerMonth", { count: Number(memes[1].replace(/,/g, "")) });
+    const bots = f.match(/^(\d+) rented bots$/);
+    if (bots) return tPlans("rentedBots", { count: Number(bots[1]) });
+    if (f === "1 trial bot") return tPlans("oneTrialBot");
+    if (f === "1 rented meme bot") return tPlans("rentedMemeBot");
+    if (f === "All 23 languages") return tPlans("allLanguages");
+    if (f === "Full format catalog") return tPlans("fullCatalog");
+    if (f === "Campaign marketplace — post and claim") return tPlans("marketplacePostClaim");
+    if (f === "Advanced variations") return tPlans("advancedVariations");
+    if (f === "Client brands and workspaces") return tPlans("clientBrands");
+    if (f === "Campaign marketplace priority") return tPlans("marketplacePriority");
+    if (f.startsWith("BYOK upgrade")) return tPlans("byokUpgrade");
+    if (f.startsWith("Previews only")) return tPlans("previewsOnly");
+    return f;
+  };
   const [usage, setUsage] = useState<UsageSummaryDTO | null>(null);
   const [switching, setSwitching] = useState<string | null>(null);
   const { session, reload: reloadSession } = useWhopSession();
@@ -347,10 +369,8 @@ export function AccountView() {
           <div className="mt-8">
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 mb-4">
               <div>
-                <h2 className="text-xl font-bold tracking-tight">Plans</h2>
-                <p className="text-sm text-muted-foreground">
-                  Preview plan entitlements — billing is handled by Whop subscriptions.
-                </p>
+                <h2 className="text-xl font-bold tracking-tight">{tPlans("title")}</h2>
+                <p className="text-sm text-muted-foreground">{tPlans("subtitle")}</p>
               </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -367,38 +387,38 @@ export function AccountView() {
                   >
                     {isCurrent ? (
                       <Badge className="absolute -top-2.5 left-4 bg-primary text-primary-foreground text-[11px]">
-                        Current plan
+                        {tCommon("currentPlan")}
                       </Badge>
                     ) : null}
                     <div>
                       <div className="flex items-center justify-between gap-2">
-                        <h3 className="font-semibold">{p.name}</h3>
+                        <h3 className="font-semibold">{planName(p.key)}</h3>
                         {p.highlight && !isCurrent ? (
                           <Badge variant="outline" className="bg-secondary/60 text-[11px]">
-                            Popular
+                            {tPlans("popular")}
                           </Badge>
                         ) : null}
                       </div>
                       <div className="text-2xl font-bold tracking-tight mt-1">{p.price}</div>
                       <div className="text-xs text-muted-foreground mt-0.5">
-                        {p.monthlyItems.toLocaleString()} items / month
+                        {tPlans("itemsPerMonth", { count: p.monthlyItems })}
                       </div>
                     </div>
                     <ul className="flex flex-col gap-1.5 text-sm text-muted-foreground grow">
                       {p.features.map((f) => (
                         <li key={f} className="flex items-start gap-2">
                           <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                          <span>{f}</span>
+                          <span>{featureText(f)}</span>
                         </li>
                       ))}
                     </ul>
                     <div className="flex flex-col gap-2">
                       {isCurrent ? (
                         <Button variant="outline" className="w-full font-semibold" disabled>
-                          Current plan
+                          {tCommon("currentPlan")}
                         </Button>
                       ) : checkoutUrl ? (
-                        <WhopCheckoutButton url={checkoutUrl} label={`Get ${p.name} on Whop`} />
+                        <WhopCheckoutButton url={checkoutUrl} label={tPlans("getOnWhop", { name: planName(p.key) })} />
                       ) : (
                         <Button
                           variant="default"
@@ -407,14 +427,14 @@ export function AccountView() {
                           onClick={() => void switchPlan(p.key, p.name)}
                         >
                           {switching === p.key ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                          Preview entitlements
+                          {tPlans("previewEntitlements")}
                         </Button>
                       )}
                       {!isCurrent && p.key !== "FREE" ? (
                         <p className="text-[11px] text-muted-foreground text-center">
                           {checkoutUrl
-                            ? "Opens the Whop-hosted checkout — plan updates arrive via signed webhooks."
-                            : `Live checkout not configured (env: WHOP_CHECKOUT_URL_${p.key})`}
+                            ? tPlans("checkoutNote")
+                            : tPlans("checkoutNotConfigured", { env: `WHOP_CHECKOUT_URL_${p.key}` })}
                         </p>
                       ) : null}
                     </div>
@@ -422,10 +442,7 @@ export function AccountView() {
                 );
               })}
             </div>
-            <p className="text-xs text-muted-foreground mt-4 max-w-3xl">
-              Plan entitlements are configurable — actual subscriptions and billing are managed by Whop. Do not
-              treat this as payment.
-            </p>
+            <p className="text-xs text-muted-foreground mt-4 max-w-3xl">{tPlans("entitlementsNote")}</p>
           </div>
 
           {/* Meme Army upsell strip */}

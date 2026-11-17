@@ -29,6 +29,8 @@ import { BrandsView } from "@/components/factory/brands";
 import { AccountView } from "@/components/factory/account";
 import { PublishingView } from "@/components/factory/publishing";
 import { WhopAccountBadge, useWhopSession } from "@/components/factory/whop-auth";
+import { useTranslations } from "next-intl";
+import { LocaleSwitcher } from "@/components/factory/locale-switcher";
 
 type View =
   | "create"
@@ -43,17 +45,19 @@ type View =
   | "agents"
   | "account";
 
-const NAV: { key: View; label: string; icon: React.ComponentType<{ className?: string }>; badge?: string }[] = [
-  { key: "create", label: "Create Content", icon: Sparkles },
-  { key: "studio", label: "Meme Studio", icon: Wand2 },
-  { key: "campaigns", label: "My Campaigns", icon: LayoutGrid },
-  { key: "library", label: "Content Library", icon: Library },
-  { key: "brands", label: "Brand Profiles", icon: Fingerprint },
-  { key: "publishing", label: "Publishing", icon: Flame },
-  { key: "army", label: "Meme Army", icon: Swords, badge: "PRO" },
-  { key: "warroom", label: "War Room", icon: Trophy, badge: "NEW" },
-  { key: "agents", label: "Rent a Bot", icon: Bot, badge: "NEW" },
-  { key: "account", label: "Account / Usage", icon: UserRound },
+type NavKey = "create" | "studio" | "campaigns" | "library" | "brands" | "publishing" | "army" | "warRoom" | "agents" | "account";
+
+const NAV: { key: View; labelKey: NavKey; icon: React.ComponentType<{ className?: string }>; badge?: string }[] = [
+  { key: "create", labelKey: "create", icon: Sparkles },
+  { key: "studio", labelKey: "studio", icon: Wand2 },
+  { key: "campaigns", labelKey: "campaigns", icon: LayoutGrid },
+  { key: "library", labelKey: "library", icon: Library },
+  { key: "brands", labelKey: "brands", icon: Fingerprint },
+  { key: "publishing", labelKey: "publishing", icon: Flame },
+  { key: "army", labelKey: "army", icon: Swords, badge: "PRO" },
+  { key: "warroom", labelKey: "warRoom", icon: Trophy, badge: "NEW" },
+  { key: "agents", labelKey: "agents", icon: Bot, badge: "NEW" },
+  { key: "account", labelKey: "account", icon: UserRound },
 ];
 
 const MOBILE_NAV: View[] = ["create", "agents", "campaigns", "library", "army", "warroom", "account"];
@@ -65,6 +69,7 @@ export default function Home() {
   const [brandPrefillName, setBrandPrefillName] = useState<string | null>(null);
   const { session, loading: sessionLoading, reload: reloadSession } = useWhopSession();
   const { toast } = useToast();
+  const tNav = useTranslations("nav");
 
   // OAuth return handling: ?welcome=whop | ?auth_error=...
   // Toasts are deferred to a post-commit timer: the Toaster (sibling rendered
@@ -145,14 +150,15 @@ export default function Home() {
     clearBrandPrefill();
   }
 
-  const activeLabel = view === "results" ? "Results Workspace" : NAV.find((n) => n.key === view)?.label ?? "";
+  const activeLabel =
+    view === "results" ? tNav("results") : tNav(NAV.find((n) => n.key === view)?.labelKey ?? "create");
 
   return (
     <div className="min-h-screen flex flex-col">
       {/* top header — mobile brand row + plan context */}
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/85 backdrop-blur-md">
         <div className="mx-auto max-w-7xl px-4 h-14 flex items-center justify-between gap-3">
-          <button className="flex items-center gap-2.5 min-w-0" onClick={() => setView("create")} aria-label="Go to Create Content">
+          <button className="flex items-center gap-2.5 min-w-0" onClick={() => setView("create")} aria-label={tNav("create")}>
             <span className="w-8 h-8 rounded-lg bg-primary grid place-items-center text-primary-foreground font-black text-sm tracking-tighter shrink-0">
               P&amp;R
             </span>
@@ -163,6 +169,7 @@ export default function Home() {
           </button>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground truncate max-w-28 sm:max-w-none">{activeLabel}</span>
+            <LocaleSwitcher />
             <WhopAccountBadge session={session} loading={sessionLoading} onSessionChanged={() => void reloadSession()} />
           </div>
         </div>
@@ -186,7 +193,7 @@ export default function Home() {
               )}
             >
               <item.icon className="h-4.5 w-4.5 shrink-0" />
-              <span className="truncate">{item.label}</span>
+              <span className="truncate">{tNav(item.labelKey)}</span>
               {item.badge ? (
                 <Badge className="ml-auto bg-primary/15 text-primary border-0 text-[9px] px-1.5 py-0">{item.badge}</Badge>
               ) : null}
@@ -194,10 +201,8 @@ export default function Home() {
           ))}
 
           <div className="mt-auto rounded-xl border bg-card p-3.5">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-primary mb-1">One idea. 23 languages.</div>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Every piece is culturally adapted by a native-voice engine — never word-for-word translation.
-            </p>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-primary mb-1">{tNav("taglineTitle")}</div>
+            <p className="text-xs text-muted-foreground leading-relaxed">{tNav("taglineBody")}</p>
           </div>
         </aside>
 
@@ -253,7 +258,7 @@ export default function Home() {
               )}
             >
               <item.icon className="h-5 w-5" />
-              {item.label.split(" ")[0]}
+              <span className="max-w-full truncate px-0.5">{tNav(item.labelKey)}</span>
               {item.badge ? <span className="absolute top-1.5 right-3 w-1.5 h-1.5 rounded-full bg-primary" /> : null}
             </button>
           ))}

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { useTranslations } from "next-intl";
 import type { AgentTemplate } from "@/lib/agents";
 
 interface Hire {
@@ -56,6 +57,8 @@ const fmt = (n: number) => n.toLocaleString();
  */
 export function AgentsView() {
   const { toast } = useToast();
+  const tA = useTranslations("agents");
+  const tO = useTranslations("onboarding");
   const [planInfo, setPlanInfo] = useState<{ name: string; price: string; botSeats: number; botsRented: number; memesUsed: number; memesLimit: number } | null>(null);
   const [catalog, setCatalog] = useState<AgentTemplate[]>([]);
   const [hires, setHires] = useState<Hire[]>([]);
@@ -139,19 +142,16 @@ export function AgentsView() {
               </div>
               <div className="rounded-lg border border-border/60 p-3">
                 <div className="text-lg font-black">{fmt(planInfo.memesUsed)} / {fmt(planInfo.memesLimit)}</div>
-                <div className="text-[11px] text-muted-foreground">Memes this month</div>
+                <div className="text-[11px] text-muted-foreground">{tA("memesThisMonth")}</div>
               </div>
               <div className="rounded-lg border border-border/60 p-3">
                 <div className="text-lg font-black">{fmt(Math.max(0, planInfo.memesLimit - planInfo.memesUsed))}</div>
-                <div className="text-[11px] text-muted-foreground">Memes left</div>
+                <div className="text-[11px] text-muted-foreground">{tA("memesLeft")}</div>
               </div>
             </div>
             <div className="mt-3">
               <Progress value={planInfo.memesLimit > 0 ? Math.min(100, Math.round((planInfo.memesUsed / planInfo.memesLimit) * 100)) : 0} className="h-2" />
-              <p className="text-[11px] text-muted-foreground mt-1.5">
-                On the house lane your memes come out of this monthly meter. Connect your own key (BYOK) and the
-                meter lifts — you pay a cent per call on your key, the bot never stops.
-              </p>
+              <p className="text-[11px] text-muted-foreground mt-1.5">{tA("meterNote")}</p>
             </div>
           </CardContent>
         </Card>
@@ -160,7 +160,7 @@ export function AgentsView() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-2">
-            <Store className="h-4 w-4 text-primary" /> Bot rental
+            <Store className="h-4 w-4 text-primary" /> {tA("botRental")}
           </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2">
@@ -168,7 +168,7 @@ export function AgentsView() {
             <div key={t.key} className="rounded-lg border border-border/60 p-4 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <span className="font-bold">{t.name}</span>
-                <Badge className="bg-primary/15 text-primary border-0 text-[10px]">{t.tierKey} tier</Badge>
+                <Badge className="bg-primary/15 text-primary border-0 text-[10px]">{tA("tierSuffix", { tier: t.tierKey })}</Badge>
               </div>
               <p className="text-xs text-muted-foreground">{t.role}</p>
               <div className="flex items-center gap-2">
@@ -186,10 +186,10 @@ export function AgentsView() {
                     )
                   }
                 >
-                  Rent this bot
+                  {tA("rentThisBot")}
                 </Button>
                 {planInfo && planInfo.botsRented >= planInfo.botSeats ? (
-                  <span className="text-[11px] text-muted-foreground">All your bot seats are rented — upgrade for more.</span>
+                  <span className="text-[11px] text-muted-foreground">{tA("seatsFull")}</span>
                 ) : null}
               </div>
             </div>
@@ -200,15 +200,11 @@ export function AgentsView() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-2">
-            <Zap className="h-4 w-4 text-primary" /> The upgrade: bring your own key
+            <Zap className="h-4 w-4 text-primary" /> {tO("byokTitle")}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Connect your own P&amp;R key and the house meter lifts. You pay a cent per call on your own key, your
-            bots run uncapped, and the rental is just for the bots and the platform. Guided key setup arrives with
-            the BYOK onboarding pass — until then, the house lane above is the way in.
-          </p>
+          <p className="text-sm text-muted-foreground">{tO("byokBody")}</p>
         </CardContent>
       </Card>
 
@@ -216,7 +212,7 @@ export function AgentsView() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <Bot className="h-4 w-4 text-primary" /> Your bots
+              <Bot className="h-4 w-4 text-primary" /> {tA("yourBots")}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
