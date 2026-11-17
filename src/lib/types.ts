@@ -16,10 +16,26 @@ export interface ProfileDTO {
   suggestedTones: string[];
 }
 
+/** What P&R deep research knows about a brand (research_brand, brief mode). */
+export interface ResearchSummary {
+  brandName?: string;
+  voice?: string;
+  hashtag?: string;
+  analysisSummary?: string;
+  offer?: string;
+  audience?: string;
+  pains: string[];
+  angles: string[];
+  competitors: string[];
+  sourceUrl?: string;
+  researchedAt?: number;
+}
+
 export interface AnalyzeResponse {
   profile: ProfileDTO;
   researched: boolean; // true when the website was actually fetched & parsed
   note?: string;
+  research?: ResearchSummary; // present when the P&R deep-research bridge answered
 }
 
 export interface LanguageRef {
@@ -92,6 +108,7 @@ export interface BrandDTO {
   languages: string[];
   cta?: string | null;
   links?: string | null;
+  research?: ResearchSummary | null;
   createdAt: string;
 }
 

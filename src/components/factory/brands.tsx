@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Building2, Globe, Loader2, Megaphone, Plus, Trash2, Users } from "lucide-react";
+import { Building2, Globe, Loader2, Megaphone, Plus, Sparkles, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,7 +18,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { LANGUAGES } from "@/lib/languages";
-import type { BrandDTO, ProfileDTO } from "@/lib/types";
+import type { AnalyzeResponse, BrandDTO, ProfileDTO, ResearchSummary } from "@/lib/types";
 import { EmptyState, LangChip, SectionHeader } from "./shared";
 
 interface BrandForm {
@@ -94,6 +94,8 @@ export function BrandsView({
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<BrandDTO | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [research, setResearch] = useState<ResearchSummary | null>(null);
+  const [researching, setResearching] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -117,12 +119,55 @@ export function BrandsView({
   function openCreate() {
     setEditing(null);
     setForm(EMPTY_FORM);
+    setResearch(null);
     setDialogOpen(true);
+  }
+
+  async function runResearch() {
+    if (!form.name.trim() || !form.website.trim()) {
+      toast({ title: "Brand name and website are both required for deep research", variant: "destructive" });
+      return;
+    }
+    setResearching(true);
+    try {
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: "brand", brandName: form.name.trim(), value: form.website.trim() }),
+      });
+      const json = (await res.json()) as AnalyzeResponse & { error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Research failed");
+      const p = json.profile;
+      setForm((f) => ({
+        ...f,
+        name: p.name || f.name,
+        industry: p.industry ?? f.industry,
+        description: p.description || f.description,
+        products: p.products.length ? p.products.join(", ") : f.products,
+        audience: p.audience ?? f.audience,
+        voice: json.research?.voice ? json.research.voice.slice(0, 400) : f.voice,
+        languages: p.suggestedLanguages?.length ? p.suggestedLanguages : f.languages,
+      }));
+      setResearch(json.research ?? null);
+      toast({
+        title: json.research ? "Deep research complete" : "Profile built from a standard scan",
+        description: json.research ? "Here's what P&R knows about your brand — review and save." : json.note,
+      });
+    } catch (err) {
+      toast({
+        title: "Deep research failed",
+        description: err instanceof Error ? err.message : undefined,
+        variant: "destructive",
+      });
+    } finally {
+      setResearching(false);
+    }
   }
 
   function openEdit(b: BrandDTO) {
     setEditing(b);
     setForm(formFromBrand(b));
+    setResearch(b.research ?? null);
     setDialogOpen(true);
   }
 
@@ -140,11 +185,16 @@ export function BrandsView({
       toast({ title: "Brand name is required", variant: "destructive" });
       return;
     }
+    if (!form.website.trim()) {
+      toast({ title: "Website is required — deep research starts from your site", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
         name: form.name.trim(),
-        website: form.website.trim() || undefined,
+        website: form.website.trim(),
+        research: research ?? undefined,
         industry: form.industry.trim() || undefined,
         description: form.description.trim() || undefined,
         products: form.products.trim() || undefined,
@@ -259,6 +309,12 @@ export function BrandsView({
                 <p className="text-sm text-muted-foreground line-clamp-2">{b.description}</p>
               ) : null}
 
+              {b.research?.analysisSummary ? (
+                <Badge variant="outline" className="w-fit text-emerald-400 border-emerald-500/30">
+                  <Sparkles className="h-3 w-3 mr-1" /> Deep research on file
+                </Badge>
+              ) : null}
+
               <div className="flex flex-wrap gap-1">
                 {b.languages.map((code) => (
                   <LangChip key={code} code={code} />
@@ -309,7 +365,7 @@ export function BrandsView({
           <DialogHeader>
             <DialogTitle>{editing ? `Edit "${editing.name}"` : "New brand profile"}</DialogTitle>
             <DialogDescription>
-              Only the name is required — everything else sharpens the generated content.
+              Name and website are required — P&R deep research starts from your site and fills in the rest.
             </DialogDescription>
           </DialogHeader>
 
@@ -326,7 +382,7 @@ export function BrandsView({
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="grid gap-1.5">
-                <Label htmlFor="brand-website">Website</Label>
+                <Label htmlFor="brand-website">Website *</Label>
                 <Input
                   id="brand-website"
                   value={form.website}
@@ -345,6 +401,55 @@ export function BrandsView({
                   className="h-11"
                 />
               </div>
+            </div>
+            <div className="rounded-xl border border-primary/25 bg-primary/5 p-4 grid gap-3">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2 font-medium text-sm">
+                  <Sparkles className="h-4 w-4 text-primary" /> P&R deep research
+                </div>
+                <Button type="button" onClick={runResearch} disabled={researching} className="font-semibold">
+                  {researching ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Researching… (a minute or two)
+                    </>
+                  ) : research ? (
+                    "Re-run research"
+                  ) : (
+                    "Research my brand"
+                  )}
+                </Button>
+              </div>
+              {research ? (
+                <div className="grid gap-2 text-sm">
+                  <p className="font-medium">What we know about your brand</p>
+                  {research.analysisSummary ? (
+                    <p className="text-muted-foreground">{research.analysisSummary}</p>
+                  ) : null}
+                  {research.pains.length ? (
+                    <p className="text-muted-foreground">
+                      <span className="text-foreground font-medium">Customer pains: </span>
+                      {research.pains.join(" · ")}
+                    </p>
+                  ) : null}
+                  {research.angles.length ? (
+                    <p className="text-muted-foreground">
+                      <span className="text-foreground font-medium">Angles that land: </span>
+                      {research.angles.join(" · ")}
+                    </p>
+                  ) : null}
+                  {research.competitors.length ? (
+                    <p className="text-muted-foreground">
+                      <span className="text-foreground font-medium">Competitors spotted: </span>
+                      {research.competitors.join(", ")}
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Enter your brand name and website, then run research — P&R reads your site and the web,
+                  and fills this profile with what it finds. The fields below update automatically.
+                </p>
+              )}
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="brand-description">Description</Label>

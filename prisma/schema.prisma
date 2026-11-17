@@ -61,6 +61,7 @@ model BrandProfile {
   languages   String   @default("[\"en\"]")
   cta         String?
   links       String?
+  researchJson String? // P&R deep-research summary (slice 3), JSON-encoded ResearchSummary
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

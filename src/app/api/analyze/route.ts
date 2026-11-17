@@ -1,15 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getWhopUser } from "@/lib/auth";
-import { buildProfileFromSignals, researchWebsite } from "@/lib/pr-engine";
-import type { AnalyzeResponse } from "@/lib/types";
+import { buildProfileFromResearch, buildProfileFromSignals, researchWebsite } from "@/lib/pr-engine";
+import type { AnalyzeResponse, ResearchSummary } from "@/lib/types";
 import { isSupportedLanguage } from "@/lib/languages";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 interface AnalyzeBody {
-  source: "url" | "description" | "idea";
+  source: "url" | "description" | "idea" | "brand";
   value: string;
+  brandName?: string;
+}
+
+function toSummary(r: {
+  brandName?: string;
+  voice?: string;
+  hashtag?: string;
+  analysisSummary?: string;
+  offer?: string;
+  audience?: string;
+  pains: string[];
+  angles: string[];
+  competitors: string[];
+  sourceUrl?: string;
+  researchedAt?: number;
+}): ResearchSummary {
+  return {
+    brandName: r.brandName,
+    voice: r.voice,
+    hashtag: r.hashtag,
+    analysisSummary: r.analysisSummary,
+    offer: r.offer,
+    audience: r.audience,
+    pains: r.pains,
+    angles: r.angles,
+    competitors: r.competitors,
+    sourceUrl: r.sourceUrl,
+    researchedAt: r.researchedAt,
+  };
 }
 
 export async function POST(req: NextRequest) {
@@ -19,6 +48,40 @@ export async function POST(req: NextRequest) {
     const value = (body.value ?? "").trim();
     if (!value) {
       return NextResponse.json({ error: "Provide a website URL, description or idea." }, { status: 400 });
+    }
+
+    if (body.source === "brand") {
+      // Deep-research entry (slice 3): brand name + website are BOTH
+      // required. The bridge runs from this server on the house key —
+      // the member is not logged in to P&R and holds no key yet.
+      const brandName = (body.brandName ?? "").trim();
+      if (!brandName || !value) {
+        return NextResponse.json(
+          { error: "Brand name and website are both required for deep research." },
+          { status: 400 },
+        );
+      }
+      try {
+        const { profile, research } = await buildProfileFromResearch({ brandName, website: value });
+        const payload: AnalyzeResponse = { profile: sanitize(profile), researched: true, research: toSummary(research) };
+        return NextResponse.json(payload);
+      } catch {
+        // Deep research failed (site blocks research, engine busy) —
+        // fall back to the standard scan so the member is never stuck.
+        const research = await researchWebsite(value);
+        const profile = await buildProfileFromSignals({
+          website: value,
+          pageText: research.pageText,
+          title: brandName,
+          metaDescription: research.metaDescription,
+        });
+        const payload: AnalyzeResponse = {
+          profile: sanitize({ ...profile, name: brandName }),
+          researched: research.researched,
+          note: "Deep research couldn't complete this time, so this profile comes from a standard website scan. Please review and edit before continuing.",
+        };
+        return NextResponse.json(payload);
+      }
     }
 
     if (body.source === "url") {

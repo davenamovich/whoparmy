@@ -31,6 +31,7 @@ CREATE TABLE "BrandProfile" (
     "languages" TEXT NOT NULL DEFAULT '["en"]',
     "cta" TEXT,
     "links" TEXT,
+    "researchJson" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "BrandProfile_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE

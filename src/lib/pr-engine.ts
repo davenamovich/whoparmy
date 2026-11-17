@@ -5,7 +5,7 @@ import { FORMAT_MAP, CATEGORY_LABELS, type ContentCategory } from "@/lib/formats
 import { LANGUAGE_MAP, languageLabel } from "@/lib/languages";
 import { OBJECTIVE_MAP, TONE_MAP } from "@/lib/formats";
 import type { ProfileDTO } from "@/lib/types";
-import { generateEngineMeme, memeBackend } from "@/lib/engine";
+import { generateEngineMeme, memeBackend, researchBrand, type EngineResearch } from "@/lib/engine";
 
 // ─── Text generation backend (Starimg) ──────────────────────────────
 // Slice 1 of the P&R rewire (REWIRE-DESIGN.md): every text call in this
@@ -205,6 +205,36 @@ export async function buildProfileFromSignals(opts: {
     suggestedLanguages: Array.isArray(parsed.suggestedLanguages) ? parsed.suggestedLanguages.map(String) : ["en"],
     suggestedTones: Array.isArray(parsed.suggestedTones) ? parsed.suggestedTones.map(String) : ["casual"],
   };
+}
+
+/**
+ * Brand profile built on P&R deep research (slice 3). The engine's
+ * research_brand digests the member's website into sourced brand
+ * knowledge; that digest feeds the profile builder, and the engine's
+ * own findings win on the fields it speaks to directly (name,
+ * description, audience, angles). Runs on the bridge key — the member
+ * is not logged in to P&R and holds no key yet.
+ */
+export async function buildProfileFromResearch(opts: {
+  brandName: string;
+  website: string;
+}): Promise<{ profile: ProfileDTO; research: EngineResearch }> {
+  const research = await researchBrand({ url: opts.website });
+  const dto = await buildProfileFromSignals({
+    website: opts.website,
+    pageText: research.digest,
+    title: opts.brandName,
+  });
+  dto.name = research.brandName || opts.brandName;
+  if (research.analysisSummary) dto.description = research.analysisSummary;
+  if (research.audience) dto.audience = research.audience;
+  dto.website = opts.website;
+  const angles = research.angles.filter((a) => !dto.sellingPoints.includes(a));
+  dto.sellingPoints = [...angles, ...dto.sellingPoints].slice(0, 6);
+  if (research.offer && !dto.products.some((p) => p.toLowerCase().includes(research.offer!.slice(0, 24).toLowerCase()))) {
+    dto.products = [research.offer, ...dto.products].slice(0, 6);
+  }
+  return { profile: dto, research };
 }
 
 // ─── Text content generation ────────────────────────────────────────

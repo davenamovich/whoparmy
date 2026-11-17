@@ -57,6 +57,7 @@ export function CreateWizard({
   const [step, setStep] = useState(initialProfile ? 1 : 0);
   const [sourceTab, setSourceTab] = useState<SourceTab>("url");
   const [sourceValue, setSourceValue] = useState("");
+  const [brandName, setBrandName] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeMeta, setAnalyzeMeta] = useState<AnalyzeResponse | null>(null);
   const [profile, setProfile] = useState<Partial<ProfileDTO>>(initialProfile ?? {});
@@ -88,13 +89,24 @@ export function CreateWizard({
       toast({ title: "Enter something to analyze first", variant: "destructive" });
       return;
     }
+    // Website path = deep research: brand name + website are both
+    // required, and the bridge runs from the Whoparmy server (slice 3).
+    const useBrandMode = sourceTab === "url";
+    if (useBrandMode && !brandName.trim()) {
+      toast({ title: "Brand name is required for deep research", variant: "destructive" });
+      return;
+    }
     setAnalyzing(true);
     setAnalyzeMeta(null);
     try {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source: sourceTab, value: sourceValue.trim() }),
+        body: JSON.stringify(
+          useBrandMode
+            ? { source: "brand", brandName: brandName.trim(), value: sourceValue.trim() }
+            : { source: sourceTab, value: sourceValue.trim() },
+        ),
       });
       const json = (await res.json()) as AnalyzeResponse & { error?: string };
       if (!res.ok) throw new Error(json.error ?? "Analysis failed");
@@ -269,7 +281,7 @@ export function CreateWizard({
         <div className="space-y-6">
           <div>
             <h2 className="text-xl sm:text-2xl font-bold tracking-tight">What are we promoting?</h2>
-            <p className="text-muted-foreground text-sm mt-1">Start with a website (recommended), a description, or just an idea.</p>
+            <p className="text-muted-foreground text-sm mt-1">Start with your brand name and website — P&R deep research reads your site and the web, and builds the profile. (Description and idea still work as fallbacks.)</p>
           </div>
 
           {initialProfile ? (
@@ -284,7 +296,7 @@ export function CreateWizard({
           <div className="grid grid-cols-3 gap-2">
             {(
               [
-                { key: "url", label: "Website URL", icon: Globe, hint: "Recommended" },
+                { key: "url", label: "Brand + Website", icon: Globe, hint: "Deep research" },
                 { key: "description", label: "Description", icon: FileText, hint: "Paste your copy" },
                 { key: "idea", label: "Start with an Idea", icon: Lightbulb, hint: "Just a concept" },
               ] as const
@@ -306,14 +318,22 @@ export function CreateWizard({
 
           <div className="flex flex-col sm:flex-row gap-2">
             {sourceTab === "url" ? (
-              <Input
-                placeholder="https://yourbusiness.com"
-                value={sourceValue}
-                onChange={(e) => setSourceValue(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && analyze()}
-                inputMode="url"
-                className="h-12 text-base"
-              />
+              <div className="grid gap-2 flex-1">
+                <Input
+                  placeholder="Brand name (required)"
+                  value={brandName}
+                  onChange={(e) => setBrandName(e.target.value)}
+                  className="h-12 text-base"
+                />
+                <Input
+                  placeholder="https://yourbusiness.com"
+                  value={sourceValue}
+                  onChange={(e) => setSourceValue(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && analyze()}
+                  inputMode="url"
+                  className="h-12 text-base"
+                />
+              </div>
             ) : (
               <Textarea
                 placeholder={
@@ -350,6 +370,26 @@ export function CreateWizard({
                   <X className="h-3.5 w-3.5" /> Clear
                 </Button>
               </div>
+              {analyzeMeta?.research ? (
+                <div className="rounded-lg border border-primary/25 bg-primary/5 p-4 grid gap-2 text-sm">
+                  <p className="font-medium">What P&R knows about this brand</p>
+                  {analyzeMeta.research.analysisSummary ? (
+                    <p className="text-muted-foreground">{analyzeMeta.research.analysisSummary}</p>
+                  ) : null}
+                  {analyzeMeta.research.pains.length ? (
+                    <p className="text-muted-foreground">
+                      <span className="text-foreground font-medium">Customer pains: </span>
+                      {analyzeMeta.research.pains.join(" · ")}
+                    </p>
+                  ) : null}
+                  {analyzeMeta.research.angles.length ? (
+                    <p className="text-muted-foreground">
+                      <span className="text-foreground font-medium">Angles that land: </span>
+                      {analyzeMeta.research.angles.join(" · ")}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="grid sm:grid-cols-2 gap-3">
                 <LabeledInput label="Business name" value={profile.name ?? ""} onChange={(v) => setProfile((p) => ({ ...p, name: v }))} />
                 <LabeledInput label="Industry" value={profile.industry ?? ""} onChange={(v) => setProfile((p) => ({ ...p, industry: v }))} />

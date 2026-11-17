@@ -50,6 +50,7 @@ async function callTool(
   cfg: { key: string; base: string },
   name: string,
   args: Record<string, unknown>,
+  timeoutMs?: number,
 ): Promise<Record<string, unknown>> {
   const res = await fetch(`${cfg.base}/api/mcp`, {
     method: "POST",
@@ -64,6 +65,7 @@ async function callTool(
       method: "tools/call",
       params: { name, arguments: args },
     }),
+    ...(timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {}),
   });
   if (!res.ok) throw new Error(`Engine answered HTTP ${res.status}`);
   const payload = (await res.json()) as {
@@ -121,4 +123,100 @@ export async function generateEngineMeme(input: {
     creditCost: typeof out.creditCost === "number" ? out.creditCost : 1,
     creditsRemaining: typeof out.creditsRemaining === "number" ? out.creditsRemaining : null,
   };
+}
+
+// ─── Deep research bridge (slice 3) ─────────────────────────────────
+// Members are not logged in to P&R and hold no key yet, so brand
+// research runs from this server on the bridge house key.
+// research_brand is a FREE engine call, but slow (~1–2 minutes).
+
+export interface EngineResearch {
+  brandName?: string;
+  voice?: string;
+  hashtag?: string;
+  analysisSummary?: string;
+  offer?: string;
+  audience?: string;
+  pains: string[];
+  angles: string[];
+  competitors: string[];
+  sourceUrl?: string;
+  researchedAt?: number;
+  /** Plain-text digest of the research, fed to the profile builder. */
+  digest: string;
+}
+
+type Leaf = { value?: unknown } | string | null | undefined;
+
+function leafText(x: Leaf): string | null {
+  if (typeof x === "string") return x.trim() || null;
+  if (x && typeof x === "object" && typeof x.value === "string") return x.value.trim() || null;
+  return null;
+}
+
+function leafList(x: unknown, cap: number): string[] {
+  if (!Array.isArray(x)) return [];
+  return x.map((i) => leafText(i as Leaf)).filter((s): s is string => Boolean(s)).slice(0, cap);
+}
+
+function competitorNames(x: unknown): string[] {
+  if (!Array.isArray(x)) return [];
+  return x
+    .map((c) => {
+      if (typeof c === "string") return c;
+      if (c && typeof c === "object") {
+        const o = c as Record<string, unknown>;
+        return leafText(o.name as Leaf) ?? leafText(o as Leaf);
+      }
+      return null;
+    })
+    .filter((s): s is string => Boolean(s))
+    .slice(0, 5);
+}
+
+export async function researchBrand(input: { url: string; notes?: string }): Promise<EngineResearch> {
+  const cfg = engineConfig();
+  if (!cfg) {
+    throw new Error(
+      "PR_ENGINE_API_KEY is not set in the app environment — the operator sets it at deploy (Railway env) and the engine client picks it up.",
+    );
+  }
+  const out = await callTool(
+    cfg,
+    "research_brand",
+    { url: input.url, brief: true, ...(input.notes ? { notes: input.notes } : {}) },
+    240_000,
+  );
+  const bp = (out.brandProfile ?? {}) as Record<string, unknown>;
+  const campaign = (out.campaign ?? {}) as Record<string, unknown>;
+  const offerObj = (campaign.offer ?? {}) as Record<string, unknown>;
+  const audienceObj = (campaign.audience ?? {}) as Record<string, unknown>;
+
+  const research: EngineResearch = {
+    brandName: typeof bp.name === "string" ? bp.name : undefined,
+    voice: typeof bp.voice === "string" ? bp.voice : undefined,
+    hashtag: typeof bp.hashtag === "string" ? bp.hashtag : undefined,
+    analysisSummary: typeof out.analysisSummary === "string" ? out.analysisSummary : undefined,
+    offer: leafText(offerObj.whatItIs as Leaf) ?? undefined,
+    audience: leafText(audienceObj.who as Leaf) ?? undefined,
+    pains: leafList(campaign.painPoints, 5),
+    angles: leafList(campaign.angles, 5),
+    competitors: competitorNames(campaign.competitors),
+    sourceUrl: typeof out.sourceUrl === "string" ? out.sourceUrl : undefined,
+    researchedAt: typeof out.researchedAt === "number" ? out.researchedAt : undefined,
+    digest: "",
+  };
+
+  const lines = [
+    research.brandName ? `Brand: ${research.brandName}` : "",
+    research.analysisSummary ? `What the business is: ${research.analysisSummary}` : "",
+    research.offer ? `Offer: ${research.offer}` : "",
+    research.audience ? `Audience: ${research.audience}` : "",
+    research.pains.length ? `Customer pains: ${research.pains.join("; ")}` : "",
+    research.angles.length ? `Marketing angles: ${research.angles.join("; ")}` : "",
+    research.competitors.length ? `Competitors: ${research.competitors.join(", ")}` : "",
+    research.voice ? `Brand voice: ${research.voice.slice(0, 600)}` : "",
+  ].filter(Boolean);
+  research.digest = lines.join("\n");
+  return research;
 }

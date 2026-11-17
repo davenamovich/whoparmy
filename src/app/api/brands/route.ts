@@ -27,6 +27,7 @@ interface BrandBody {
   languages?: string[];
   cta?: string;
   links?: string;
+  research?: import("@/lib/types").ResearchSummary;
 }
 
 export async function POST(req: NextRequest) {
@@ -34,6 +35,12 @@ export async function POST(req: NextRequest) {
     const user = await getWhopUser();
     const body = (await req.json()) as BrandBody;
     if (!body.name?.trim()) return NextResponse.json({ error: "Brand name is required." }, { status: 400 });
+    if (!body.website?.trim()) {
+      return NextResponse.json(
+        { error: "Website is required — P&R deep research starts from your site." },
+        { status: 400 },
+      );
+    }
 
     const plan = getPlan(user.plan);
     const count = await db.brandProfile.count({ where: { userId: user.id } });
@@ -57,6 +64,7 @@ export async function POST(req: NextRequest) {
         languages: JSON.stringify(body.languages?.length ? body.languages : ["en"]),
         cta: body.cta?.trim() || null,
         links: body.links?.trim() || null,
+        researchJson: body.research ? JSON.stringify(body.research).slice(0, 60_000) : null,
       },
     });
     return NextResponse.json({ brand: serializeBrand(brand) });

@@ -73,6 +73,7 @@ export function serializeBrand(b: BrandProfile): BrandDTO {
     languages: safeParse<string[]>(b.languages, ["en"]),
     cta: b.cta,
     links: b.links,
+    research: b.researchJson ? safeParse<BrandDTO["research"]>(b.researchJson, null) : null,
     createdAt: b.createdAt.toISOString(),
   };
 }

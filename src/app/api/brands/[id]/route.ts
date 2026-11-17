@@ -9,7 +9,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   try {
     const user = await getWhopUser();
     const { id } = await ctx.params;
-    const body = (await req.json()) as Record<string, string | string[] | undefined>;
+    const body = (await req.json()) as Record<string, unknown>;
 
     const brand = await db.brandProfile.findFirst({ where: { id, userId: user.id } });
     if (!brand) return NextResponse.json({ error: "Brand not found" }, { status: 404 });
@@ -28,6 +28,9 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         ...(str(body.cta) !== undefined ? { cta: str(body.cta) } : {}),
         ...(str(body.links) !== undefined ? { links: str(body.links) } : {}),
         ...(Array.isArray(body.languages) ? { languages: JSON.stringify(body.languages) } : {}),
+        ...(body.research && typeof body.research === "object"
+          ? { researchJson: JSON.stringify(body.research).slice(0, 60_000) }
+          : {}),
       },
     });
     return NextResponse.json({ brand: serializeBrand(updated) });
