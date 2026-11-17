@@ -71,11 +71,19 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 /** Compose a classic meme (image + impact-style captions) and download it. */
 export async function downloadMeme(opts: {
   imageUrl: string;
+  assetId?: string;
   topText?: string | null;
   bottomText?: string | null;
   filename: string;
 }) {
-  const img = await loadImage(opts.imageUrl);
+  // Remote (engine-hosted) images send no CORS headers, so the canvas
+  // compositor cannot load them cross-origin. Route those through the
+  // same-origin asset image proxy instead.
+  const src =
+    opts.assetId && opts.imageUrl.startsWith("http")
+      ? `/api/assets/${opts.assetId}/image`
+      : opts.imageUrl;
+  const img = await loadImage(src);
   const canvas = document.createElement("canvas");
   canvas.width = img.naturalWidth;
   canvas.height = img.naturalHeight;

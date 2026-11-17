@@ -32,7 +32,8 @@
     "studio": "Meme Studio",
     "taglineBody": "Every piece is culturally adapted by a native-voice engine — never word-for-word translation.",
     "taglineTitle": "One idea. 23 languages.",
-    "warRoom": "War Room"
+    "warRoom": "War Room",
+    "llm": "LLM Control"
   },
   "onboarding": {
     "bridgeNote": "No key yet? Start free on the bridge — packs and previews, on us.",

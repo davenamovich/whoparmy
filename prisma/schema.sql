@@ -396,3 +396,11 @@ CREATE INDEX "ResearchJob_userId_website_idx" ON "ResearchJob"("userId", "websit
 -- CreateIndex
 CREATE INDEX "ResearchJob_userId_createdAt_idx" ON "ResearchJob"("userId", "createdAt");
 
+
+-- CreateTable
+CREATE TABLE "RoutingPolicy" (
+    "tier" TEXT NOT NULL PRIMARY KEY,
+    "model" TEXT NOT NULL,
+    "updatedAt" DATETIME NOT NULL,
+    "updatedBy" TEXT
+);

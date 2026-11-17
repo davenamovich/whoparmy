@@ -12,6 +12,7 @@ import {
   Flame,
   Trophy,
   Bot,
+  Cpu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +24,7 @@ import { MemeStudio } from "@/components/factory/meme-studio";
 import { MemeArmy } from "@/components/factory/meme-army";
 import { WarRoom } from "@/components/factory/war-room";
 import { AgentsView } from "@/components/factory/agents";
+import { LlmConsole } from "@/components/factory/llm-console";
 import { CampaignsView } from "@/components/factory/campaigns";
 import { LibraryView } from "@/components/factory/library";
 import { BrandsView } from "@/components/factory/brands";
@@ -43,9 +45,10 @@ type View =
   | "army"
   | "warroom"
   | "agents"
+  | "llm"
   | "account";
 
-type NavKey = "create" | "studio" | "campaigns" | "library" | "brands" | "publishing" | "army" | "warRoom" | "agents" | "account";
+type NavKey = "create" | "studio" | "campaigns" | "library" | "brands" | "publishing" | "army" | "warRoom" | "agents" | "llm" | "account";
 
 const NAV: { key: View; labelKey: NavKey; icon: React.ComponentType<{ className?: string }>; badge?: string }[] = [
   { key: "create", labelKey: "create", icon: Sparkles },
@@ -57,6 +60,7 @@ const NAV: { key: View; labelKey: NavKey; icon: React.ComponentType<{ className?
   { key: "army", labelKey: "army", icon: Swords, badge: "PRO" },
   { key: "warroom", labelKey: "warRoom", icon: Trophy, badge: "NEW" },
   { key: "agents", labelKey: "agents", icon: Bot, badge: "NEW" },
+  { key: "llm", labelKey: "llm", icon: Cpu, badge: "OPS" },
   { key: "account", labelKey: "account", icon: UserRound },
 ];
 
@@ -178,7 +182,7 @@ export default function Home() {
       <div className="flex-1 flex w-full mx-auto max-w-7xl">
         {/* sidebar — desktop */}
         <aside className="hidden lg:flex flex-col w-60 shrink-0 border-r border-border/60 px-3 py-5 gap-1 sticky top-14 self-start h-[calc(100vh-3.5rem)]">
-          {NAV.map((item) => (
+          {NAV.filter((n) => n.key !== "llm" || session?.mode === "operator").map((item) => (
             <button
               key={item.key}
               onClick={() => {
@@ -222,6 +226,7 @@ export default function Home() {
           {view === "army" ? <MemeArmy /> : null}
           {view === "warroom" ? <WarRoom /> : null}
           {view === "agents" ? <AgentsView /> : null}
+          {view === "llm" && session?.mode === "operator" ? <LlmConsole /> : null}
           {view === "account" ? <AccountView /> : null}
         </main>
       </div>

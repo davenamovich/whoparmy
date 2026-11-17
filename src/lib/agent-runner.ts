@@ -4,6 +4,7 @@ import { JOB_TIERS } from "@/lib/agents";
 import { MODEL_TIERS, awardXp } from "@/lib/game";
 import { recordUsage } from "@/lib/pr-engine";
 import { languageLabel } from "@/lib/languages";
+import { getLadder, starimgConfig } from "@/lib/llm-policy";
 
 /**
  * ─── AGENT RUNNER — executes the job queue for real ─────────────────
@@ -26,15 +27,6 @@ import { languageLabel } from "@/lib/languages";
  * refunded to the agent's allocation — failed work is never charged.
  */
 
-const TIER_LADDERS: Record<string, string[]> = {
-  volume: ["deepseek-v4.1-flash-1017"],
-  mid: ["gpt-6-luna", "deepseek-v4.1-flash-1017"],
-  final: ["gpt-6-sol", "gpt-6-luna", "deepseek-v4.1-flash-1017"],
-  quality: ["claude-sonnet-5", "gpt-6-sol", "gpt-6-luna", "deepseek-v4.1-flash-1017"],
-};
-
-const COEF: Record<string, number> = Object.fromEntries(MODEL_TIERS.map((t) => [t.model, t.coefficient]));
-
 const KIND_INSTRUCTIONS: Record<string, string> = {
   SCOUT:
     "You are a Trend Scout agent. From the brief, produce a scouting report: 5 trend angles or hooks the business can use this week, each one line, plus the single strongest pick and why. Concrete and specific — no generic filler.",
@@ -47,13 +39,6 @@ const KIND_INSTRUCTIONS: Record<string, string> = {
   CAMPAIGN:
     "You are a campaign agent. From the brief, produce a ready-to-run mini campaign pack: 1 announcement post, 2 meme concepts (TOP/BOTTOM text), 2 short social posts, and 3 CTA lines. Ready for the owner to approve and ship.",
 };
-
-function starimgConfig() {
-  const key = process.env.STARIMG_API_KEY?.trim();
-  if (!key) return null;
-  const base = (process.env.STARIMG_BASE_URL?.trim() || "https://ai.starimg.ru/v1").replace(/\/$/, "");
-  return { key, base };
-}
 
 async function liveModelIds(base: string, key: string): Promise<Set<string> | null> {
   try {
@@ -83,7 +68,7 @@ async function callStarimg(tierKey: string, system: string, user: string): Promi
       "STARIMG_API_KEY is not set in the app environment — the operator sets it at deploy (Railway env) and the runner picks it up. Job refunded.",
     );
   }
-  const ladder = TIER_LADDERS[tierKey] ?? TIER_LADDERS.mid;
+  const ladder = await getLadder(tierKey);
   const live = await liveModelIds(cfg.base, cfg.key);
   const candidates = ladder.filter((m) => !live || live.has(m));
   if (candidates.length === 0) {

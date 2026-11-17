@@ -317,6 +317,7 @@ export function AssetCard({
               onClick={() =>
                 downloadMeme({
                   imageUrl: asset.imageUrl!,
+                  assetId: asset.id,
                   topText: asset.topText,
                   bottomText: asset.bottomText,
                   filename: `meme-${safeFilename(asset.title || asset.formatLabel)}-${asset.language}.png`,

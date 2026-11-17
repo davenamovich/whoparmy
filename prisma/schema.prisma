@@ -287,6 +287,18 @@ model ReferralEarning {
   @@index([referrerId])
 }
 
+// ─── LLM ROUTING POLICY — operator console ──────────────────────────
+// One row per tier the operator has overridden from the LLM Control
+// console. No row = the code default (MODEL_TIERS in lib/game.ts).
+// The agent runner reads these on every job, so a policy change takes
+// effect on the next job — no redeploy.
+model RoutingPolicy {
+  tier      String   @id // volume | mid | final | quality
+  model     String
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
 // ─── P&R MEME ARMY — multi-tenant Telegram bot engine ───────────────
 model ArmyBot {
   id            String   @id @default(cuid())
