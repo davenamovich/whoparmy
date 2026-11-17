@@ -186,7 +186,7 @@ export default function Home() {
       <div className="flex-1 flex w-full mx-auto max-w-7xl">
         {/* sidebar — desktop */}
         <aside className="hidden lg:flex flex-col w-60 shrink-0 border-r border-border/60 px-3 py-5 gap-1 sticky top-14 self-start h-[calc(100vh-3.5rem)]">
-          {NAV.filter((n) => n.key !== "llm" || session?.mode === "operator").map((item) => (
+          {NAV.filter((n) => n.key !== "llm" || session?.admin).map((item) => (
             <button
               key={item.key}
               onClick={() => {
@@ -231,7 +231,7 @@ export default function Home() {
           {view === "warroom" ? <WarRoom /> : null}
           {view === "agents" ? <AgentsView /> : null}
           {view === "trending" ? <TrendingView onGoAgents={() => setView("agents")} /> : null}
-          {view === "llm" && session?.mode === "operator" ? <LlmConsole /> : null}
+          {view === "llm" && session?.admin ? <LlmConsole /> : null}
           {view === "account" ? <AccountView /> : null}
         </main>
       </div>

@@ -11,10 +11,17 @@ export const runtime = "nodejs";
  */
 export async function GET() {
   try {
-    const { user, mode } = await getWhopUserWithMode();
+    const { user, mode, viaFallback } = await getWhopUserWithMode();
+    // "admin" is the REAL operator lock: a designated Whop login
+    // (OPERATOR_WHOP_IDS / OPERATOR_WHOP_USERNAMES), not the anonymous
+    // fallback session the rest of the app runs on. The client gates
+    // operator surfaces (LLM Control) on this — the APIs enforce the
+    // same rule server-side regardless.
+    const admin = mode === "operator" && (!viaFallback || process.env.ALLOW_OPERATOR_FALLBACK === "1");
     const plan = getPlan(user.plan);
     return NextResponse.json({
-      mode, // "whop" = signed in via Whop OAuth | "operator" = sandbox/dev fallback
+      mode,
+      admin, // "whop" = signed in via Whop OAuth | "operator" = sandbox/dev fallback
       user: {
         id: user.id,
         name: user.name,
