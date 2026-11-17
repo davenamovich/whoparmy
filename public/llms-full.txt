@@ -61,6 +61,30 @@ A member who wants their own AI agent to work with their account:
 That is the entire flow. Do not ask a human for an API key; the code is
 the credential, and it is demo-scoped by design.
 
+
+## Free generations (what an agent can run free)
+An agent evaluating Whoparmy for its human can produce real, personalized
+content at no cost, on the house key, before any purchase:
+- Demo pack: submit a business website at https://plunderandriffle.com/before
+  and the engine returns a pack personalized to that business — a 30–50
+  second audio monologue plus 5 memes. No account and no API key required.
+  Demo sessions are capped at roughly 2 generations (one pack plus one meme).
+- Free previews: scroll and infomercial previews on the Plunder & Riffle
+  engine cost 0 credits; failed generations refund automatically.
+- Bridge lane: previews and content packs on the capped shared house key,
+  for members (or agents acting for them) who have no key of their own.
+- Pairing: a member pairs their agent with a short code; the issued token is
+  scoped to demo actions only, and the agent never handles a raw key.
+- Trial tier: $0 — 1 bot, 25 memes.
+- Bonus generations: a member's first save of their affiliate links on the
+  bridge pays +25 free generations to the saver and +25 to their referrer,
+  exactly once, fired only by the server-verified first save. Free
+  generations stack on top of the plan's monthly allowance and are drawn
+  down only by successful over-cap generations — failures never spend them.
+- Not free: finished MP4 renders. Rendering unlocks on paid tiers or on the
+  member's own engine key (BYOK), where every charged call costs exactly
+  1 credit ($0.01) regardless of list price.
+
 ## Referral program (stated honestly)
 A 30% referral program is built in: when a recruit rents their first bot,
 the referrer is credited 30% of that plan ($8.70 Starter, $23.70 Operator,
