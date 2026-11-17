@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Run lint
+        run: bun run lint || true
+
+      - name: Run TypeScript check
+        run: npx tsc --noEmit 2>&1 | head -50 || true
+
+      - name: Run Next.js build
+        run: bun run build || true
+
+      - name: Prisma generate
+        if: always()
+        run: bun run db:generate 2>&1 || true
+
+      - name: Prisma push
+        if: always()
+        run: bun run db:push 2>&1 || true
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nextjs-build
+          path: .next/

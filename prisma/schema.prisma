@@ -1,0 +1,259 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Whop user anchor ───────────────────────────────────────────────
+// whopId is the canonical identity field. When real Whop OAuth is
+// connected, whopId is set from the verified Whop token — client-supplied
+// IDs are never trusted for authorization (see src/lib/auth.ts).
+model User {
+  id             String   @id @default(cuid())
+  whopId         String?  @unique
+  whopUsername   String? // preferred_username from Whop OAuth userinfo
+  whopAvatarUrl  String? // picture from Whop OAuth userinfo
+  email          String   @unique
+  name           String?
+  plan           String   @default("FREE") // FREE | CREATOR | PRO | AGENCY
+  planSource     String   @default("default") // default | whop_membership | whop_access | manual
+  planUpdatedAt  DateTime?
+  memeArmyPlan   String? // CUSTOM | AGENCY (premium upsell)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  brands       BrandProfile[]
+  campaigns    Campaign[]
+  usageRecords UsageRecord[]
+  assets       Asset[]
+  jobs         GenerationJob[]
+  army         ArmyBot?
+}
+
+// ─── Brand profiles (multiple allowed for agencies) ─────────────────
+model BrandProfile {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  website     String?
+  industry    String?
+  description String?
+  products    String?
+  audience    String?
+  voice       String?
+  languages   String   @default("[\"en\"]")
+  cta         String?
+  links       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ─── Content campaigns ──────────────────────────────────────────────
+model Campaign {
+  id              String   @id @default(cuid())
+  userId          String
+  name            String
+  businessName    String
+  website         String?
+  sourceType      String   @default("URL") // URL | DESCRIPTION | IDEA | BRAND
+  profileJson     String   @default("{}") // business profile snapshot
+  objective       String
+  customObjective String?
+  tone            String
+  customTone      String?
+  languages       String   @default("[\"en\"]") // JSON array of codes
+  formats         String   @default("[]") // JSON array of {category, format}
+  piecesPerFormat Int      @default(2)
+  status          String   @default("GENERATING") // GENERATING | COMPLETE | PARTIAL
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assets Asset[]
+  jobs   GenerationJob[]
+
+  @@index([userId])
+}
+
+// ─── Generated content assets ───────────────────────────────────────
+model Asset {
+  id            String   @id @default(cuid())
+  userId        String
+  campaignId    String?
+  type          String // MEME | SOCIAL | VIDEO | AUDIO | MARKETING
+  format        String // machine key e.g. facebook_post
+  formatLabel   String // human label e.g. "Facebook Post"
+  language      String   @default("en")
+  languageLabel String   @default("English")
+  title         String   @default("")
+  body          String   @default("")
+  topText       String?
+  bottomText    String?
+  imageUrl      String?
+  objective     String?
+  tone          String?
+  status        String   @default("PENDING") // PENDING | GENERATING | DONE | FAILED
+  error         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaign Campaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([campaignId])
+}
+
+// ─── Generation jobs (progress tracking, no duplicate billing) ──────
+model GenerationJob {
+  id          String   @id @default(cuid())
+  userId      String
+  campaignId  String
+  status      String   @default("QUEUED") // QUEUED | RUNNING | COMPLETE | FAILED
+  total       Int      @default(0)
+  done        Int      @default(0)
+  failed      Int      @default(0)
+  currentStep String?
+  error       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ─── Whop webhook idempotency (retries repeat webhook-id; never reprocess) ─
+model WebhookEvent {
+  id        String   @id // Whop `webhook-id` header value (msg_...)
+  type      String
+  payload   String   @default("{}")
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// ─── Usage accounting (failed generations are never charged) ────────
+model UsageRecord {
+  id        String   @id @default(cuid())
+  userId    String
+  kind      String // TEXT | IMAGE | FAILED
+  count     Int      @default(1)
+  meta      String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ─── P&R MEME ARMY — multi-tenant Telegram bot engine ───────────────
+model ArmyBot {
+  id            String   @id @default(cuid())
+  userId        String   @unique // one army per owner in this build
+  armyName      String
+  slug          String   @unique // secret webhook path segment
+  logoUrl       String?
+  colorPrimary  String   @default("#FF5C1A")
+  colorSecondary String  @default("#111111")
+  website       String?
+  botToken      String // stored server-side only, never returned to client
+  botUsername   String?
+  telegramBotId String?
+  webhookUrl    String?
+  webhookStatus String   @default("PENDING") // PENDING | ACTIVE | FAILED
+  secretToken   String? // Telegram webhook secret header check
+  groupId       String?
+  groupTitle    String?
+  languages     String   @default("[\"en\",\"es\"]")
+  welcomeMessage String?
+  rewardsJson   String   @default("[]") // [{name,type,cost,description}]
+  status        String   @default("DRAFT") // DRAFT | LIVE | PAUSED
+  demoSeeded    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  missions Mission[]
+  members ArmyMember[]
+  submissions Submission[]
+
+  @@index([userId])
+}
+
+model Mission {
+  id               String   @id @default(cuid())
+  botId            String
+  title            String
+  product          String?
+  description      String
+  targetUrl        String?
+  audience         String?
+  languages        String   @default("[\"en\"]")
+  durationDays     Int      @default(7)
+  dailyRequirement String?
+  rewardBudget     String?
+  rules            String?
+  contentPackJson  String   @default("[]") // approved, ready-to-share items
+  status           String   @default("DRAFT") // DRAFT | LIVE | ENDED
+  announcedAt      DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  bot         ArmyBot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  submissions Submission[]
+
+  @@index([botId])
+}
+
+model ArmyMember {
+  id            String   @id @default(cuid())
+  botId         String
+  telegramId    String
+  username      String?
+  displayName   String
+  language      String   @default("en")
+  points        Int      @default(0)
+  shares        Int      @default(0)
+  referrals     Int      @default(0)
+  clicks        Int      @default(0)
+  verifiedClicks Int     @default(0)
+  badges        String   @default("[]")
+  isDemo        Boolean  @default(false)
+  refCode       String?
+  joinedAt      DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  bot         ArmyBot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  submissions Submission[]
+
+  @@unique([botId, telegramId])
+  @@index([botId])
+}
+
+model Submission {
+  id        String   @id @default(cuid())
+  botId     String
+  missionId String?
+  memberId  String
+  kind      String   @default("LINK") // MEME | POST | VIDEO | LINK
+  payload   String
+  status    String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  clicks    Int      @default(0)
+  createdAt DateTime @default(now())
+
+  bot     ArmyBot     @relation(fields: [botId], references: [id], onDelete: Cascade)
+  mission Mission?    @relation(fields: [missionId], references: [id], onDelete: SetNull)
+  member  ArmyMember  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([botId])
+  @@index([missionId])
+}
