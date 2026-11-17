@@ -11,6 +11,7 @@ import {
   UserRound,
   Flame,
   Trophy,
+  Bot,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +22,7 @@ import { ResultsWorkspace } from "@/components/factory/results-workspace";
 import { MemeStudio } from "@/components/factory/meme-studio";
 import { MemeArmy } from "@/components/factory/meme-army";
 import { WarRoom } from "@/components/factory/war-room";
+import { AgentsView } from "@/components/factory/agents";
 import { CampaignsView } from "@/components/factory/campaigns";
 import { LibraryView } from "@/components/factory/library";
 import { BrandsView } from "@/components/factory/brands";
@@ -38,6 +40,7 @@ type View =
   | "publishing"
   | "army"
   | "warroom"
+  | "agents"
   | "account";
 
 const NAV: { key: View; label: string; icon: React.ComponentType<{ className?: string }>; badge?: string }[] = [
@@ -49,10 +52,11 @@ const NAV: { key: View; label: string; icon: React.ComponentType<{ className?: s
   { key: "publishing", label: "Publishing", icon: Flame },
   { key: "army", label: "Meme Army", icon: Swords, badge: "PRO" },
   { key: "warroom", label: "War Room", icon: Trophy, badge: "NEW" },
+  { key: "agents", label: "Hire Agents", icon: Bot, badge: "NEW" },
   { key: "account", label: "Account / Usage", icon: UserRound },
 ];
 
-const MOBILE_NAV: View[] = ["create", "studio", "campaigns", "library", "army", "warroom", "account"];
+const MOBILE_NAV: View[] = ["create", "agents", "campaigns", "library", "army", "warroom", "account"];
 
 export default function Home() {
   const [view, setView] = useState<View>("create");
@@ -179,6 +183,7 @@ export default function Home() {
           {view === "publishing" ? <PublishingView /> : null}
           {view === "army" ? <MemeArmy /> : null}
           {view === "warroom" ? <WarRoom /> : null}
+          {view === "agents" ? <AgentsView /> : null}
           {view === "account" ? <AccountView /> : null}
         </main>
       </div>

@@ -33,6 +33,9 @@ model User {
   army         ArmyBot?
   gameProfile  GameProfile?
   xpEvents     XpEvent[]
+  hiredAgents  HiredAgent[]
+  agentJobs    AgentJob[]
+  listings     CampaignListing[]
 }
 
 // ─── Brand profiles (multiple allowed for agencies) ─────────────────
@@ -186,6 +189,68 @@ model XpEvent {
 
   @@index([userId])
   @@index([userId, kind])
+}
+
+// ─── AGENT ECONOMY — hire agents with tokens ────────────────────────
+// A member allocates weighted tokens from their plan wallet to a hired
+// agent. Jobs are charged against that allocation at the model's real
+// weighted cost (see MODEL_TIERS in src/lib/game.ts). Jobs sit QUEUED
+// until the agent's Agent37 slot executes them — the queue never fakes
+// completion. Campaign bounties are reserved from the poster's wallet
+// and stay SIMULATED value until real payments exist.
+model HiredAgent {
+  id          String   @id @default(cuid())
+  userId      String
+  templateKey String // scout | meme-smith | hook-smith | qa-editor
+  name        String
+  tokenBudget Int // weighted tokens allocated from the plan wallet
+  tokensUsed  Int      @default(0)
+  status      String   @default("ACTIVE") // ACTIVE | PAUSED | DEPLETED
+  agent37Ref  String? // Agent37 instance/session ref once provisioned
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobs AgentJob[]
+
+  @@index([userId])
+}
+
+model AgentJob {
+  id        String   @id @default(cuid())
+  hireId    String
+  userId    String
+  kind      String // SCOUT | MEME | HOOK | QA | CAMPAIGN
+  brief     String
+  pieces    Int      @default(1)
+  tokenCost Int // weighted tokens charged to the hire's allocation
+  status    String   @default("QUEUED") // QUEUED | RUNNING | DONE | FAILED | CANCELLED
+  result    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hire HiredAgent @relation(fields: [hireId], references: [id], onDelete: Cascade)
+  user User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([hireId])
+}
+
+model CampaignListing {
+  id           String   @id @default(cuid())
+  posterId     String
+  title        String
+  description  String
+  bountyTokens Int // weighted tokens reserved from the poster's wallet
+  status       String   @default("OPEN") // OPEN | ASSIGNED | COMPLETED | CANCELLED
+  assigneeId   String? // HiredAgent id that claimed it
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  poster User @relation(fields: [posterId], references: [id], onDelete: Cascade)
+
+  @@index([posterId])
+  @@index([status])
 }
 
 // ─── P&R MEME ARMY — multi-tenant Telegram bot engine ───────────────
