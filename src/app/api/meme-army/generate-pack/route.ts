@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import ZAI from "z-ai-web-dev-sdk";
 import { getWhopUser } from "@/lib/auth";
-import { parseJsonSafe, recordUsage } from "@/lib/pr-engine";
+import { chatCompletion, parseJsonSafe, recordUsage } from "@/lib/pr-engine";
 import { languageLabel } from "@/lib/languages";
 import { assertMonthlyAllowance } from "@/lib/usage-server";
 import { awardXp } from "@/lib/game";
@@ -47,7 +46,6 @@ export async function POST(req: NextRequest) {
     const primary = langs[0] ?? "en";
     const primaryLabel = languageLabel(primary);
 
-    const zai = await ZAI.create();
     const system = `You are P&R MCP, the content engine behind Meme Army mission campaigns.
 Generate a ready-to-share campaign content pack for a Telegram mission announcement.
 Language: write natively in ${primaryLabel} (code: ${primary}). Culturally adapt — never word-for-word.
@@ -72,19 +70,11 @@ Respond with STRICT JSON only: {"items":[{"kind":string,"title":string,"body":st
       .filter(Boolean)
       .join("\n");
 
-    const completion = await zai.chat.completions.create({
-      messages: [
-        { role: "assistant", content: system },
-        { role: "user", content: userPrompt },
-      ],
-      thinking: { type: "disabled" },
-    }).catch((err: unknown) => {
+    const raw = await chatCompletion(system, userPrompt).catch((err: unknown) => {
       // failed generations are never charged
       void recordUsage(user.id, "FAILED", 1, "meme-army-pack");
       throw err;
     });
-
-    const raw = completion.choices[0]?.message?.content ?? "";
     const parsed = parseJsonSafe<{ items?: { kind?: string; title?: string; body?: string }[] }>(raw);
     if (!parsed?.items?.length) {
       void recordUsage(user.id, "FAILED", 1, "meme-army-pack:unreadable");

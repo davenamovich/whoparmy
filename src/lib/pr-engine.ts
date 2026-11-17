@@ -1,4 +1,3 @@
-import ZAI from "z-ai-web-dev-sdk";
 import fs from "fs";
 import path from "path";
 import { db } from "@/lib/db";
@@ -7,12 +6,49 @@ import { LANGUAGE_MAP, languageLabel } from "@/lib/languages";
 import { OBJECTIVE_MAP, TONE_MAP } from "@/lib/formats";
 import type { ProfileDTO } from "@/lib/types";
 
-// ─── SDK instance ───────────────────────────────────────────────────
-let zaiInstance: Awaited<ReturnType<typeof ZAI.create>> | null = null;
+// ─── Text generation backend (Starimg) ──────────────────────────────
+// Slice 1 of the P&R rewire (REWIRE-DESIGN.md): every text call in this
+// module runs on Starimg chat completions — the same provider and env
+// names the agent runner already uses (STARIMG_API_KEY / STARIMG_BASE_URL).
+// The Z.ai SDK this module originally ran on only exists on its home
+// build platform, so it has been removed from the text path entirely.
+// Image generation is slice 2 and stays unwired until Dave picks the lane.
 
-async function getZAI() {
-  if (!zaiInstance) zaiInstance = await ZAI.create();
-  return zaiInstance;
+function starimgConfig(): { key: string; base: string } | null {
+  const key = process.env.STARIMG_API_KEY?.trim();
+  if (!key) return null;
+  const base = (process.env.STARIMG_BASE_URL?.trim() || "https://ai.starimg.ru/v1").replace(/\/$/, "");
+  return { key, base };
+}
+
+let modelListPromise: Promise<string[]> | null = null;
+
+async function starimgModels(cfg: { key: string; base: string }): Promise<string[]> {
+  if (!modelListPromise) {
+    modelListPromise = (async () => {
+      try {
+        const res = await fetch(`${cfg.base}/models`, {
+          headers: { Authorization: ["Bearer", cfg.key].join(" ") },
+        });
+        if (!res.ok) return [];
+        const json = (await res.json()) as { data?: Array<{ id?: string }> };
+        return (json.data ?? []).map((m) => m.id).filter((id): id is string => typeof id === "string");
+      } catch {
+        return [];
+      }
+    })();
+  }
+  return modelListPromise;
+}
+
+async function pickTextModel(cfg: { key: string; base: string }): Promise<string> {
+  const preferred = process.env.STARIMG_TEXT_MODEL?.trim();
+  if (preferred) return preferred;
+  const live = await starimgModels(cfg);
+  for (const candidate of ["gpt-6-luna", "claude-haiku-4-5"]) {
+    if (live.includes(candidate)) return candidate;
+  }
+  return live[0] ?? "gpt-6-luna";
 }
 
 // ─── Robust JSON extraction from LLM output ─────────────────────────
@@ -39,18 +75,33 @@ export function parseJsonSafe<T>(raw: string): T | null {
 }
 
 async function llm(system: string, user: string): Promise<string> {
-  const zai = await getZAI();
+  const cfg = starimgConfig();
+  if (!cfg) {
+    throw new Error(
+      "STARIMG_API_KEY is not set in the app environment — the operator sets it at deploy (Railway env) and the text engine picks it up.",
+    );
+  }
+  const model = await pickTextModel(cfg);
   let lastError: unknown;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const completion = await zai.chat.completions.create({
-        messages: [
-          { role: "assistant", content: system },
-          { role: "user", content: user },
-        ],
-        thinking: { type: "disabled" },
+      const res = await fetch(`${cfg.base}/chat/completions`, {
+        method: "POST",
+        headers: {
+          Authorization: ["Bearer", cfg.key].join(" ") },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: user },
+          ],
+        }),
       });
-      const content = completion.choices[0]?.message?.content;
+      if (!res.ok) throw new Error(`Text engine answered HTTP ${res.status}`);
+      const completion = (await res.json()) as {
+        choices?: Array<{ message?: { content?: string } }>;
+      };
+      const content = completion.choices?.[0]?.message?.content;
       if (!content || !content.trim()) throw new Error("Empty response from generation engine");
       return content;
     } catch (err) {
@@ -59,6 +110,11 @@ async function llm(system: string, user: string): Promise<string> {
     }
   }
   throw lastError instanceof Error ? lastError : new Error("Generation engine unavailable");
+}
+
+/** Shared text completion for routes that used to call the Z.ai SDK directly. */
+export async function chatCompletion(system: string, user: string): Promise<string> {
+  return llm(system, user);
 }
 
 // ─── Website research (real fetch, then LLM synthesis) ──────────────
@@ -258,19 +314,15 @@ Respond with STRICT JSON only: {"items":[{"title":string,"imagePrompt":string,"t
 const GEN_DIR = path.join(process.cwd(), "public", "generated");
 
 export async function generateMemeImage(assetId: string, imagePrompt: string): Promise<string> {
-  const zai = await getZAI();
-  const prompt = `${imagePrompt}, meme-worthy expressive scene, high contrast, vibrant colors, detailed, high quality, no text, no words, no letters, no captions, no watermark`;
-  const response = await zai.images.generations.create({ prompt, size: "1024x1024" });
-  const base64 = response.data?.[0]?.base64;
-  if (!base64) throw new Error("Image generation returned no data");
-  const buffer = Buffer.from(base64, "base64");
-  // Detect real format from magic bytes — the engine may return JPEG or PNG
-  const isJpeg = buffer[0] === 0xff && buffer[1] === 0xd8;
-  const ext = isJpeg ? "jpg" : "png";
-  await fs.promises.mkdir(GEN_DIR, { recursive: true });
-  const filePath = path.join(GEN_DIR, `${assetId}.${ext}`);
-  await fs.promises.writeFile(filePath, buffer);
-  return `/generated/${assetId}.${ext}`;
+  // Slice 2 of the rewire (REWIRE-DESIGN.md) — intentionally unwired.
+  // The Z.ai image API this used only exists on its home build platform.
+  // Dave picks the image lane: a hosted image API behind this seam, or
+  // the meme pipeline rebuilt on the P&R engine's meme kinds. Until then
+  // this throws an honest error and callers mark the asset failed, the
+  // same failure shape as before, with the real reason attached.
+  void assetId;
+  void imagePrompt;
+  throw new Error("Image generation lane is not wired yet (REWIRE-DESIGN slice 2). Text generation works; meme images wait on the lane decision.");
 }
 
 export async function deleteMemeImage(imageUrl?: string | null) {

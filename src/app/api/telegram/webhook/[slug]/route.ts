@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import ZAI from "z-ai-web-dev-sdk";
 import { db } from "@/lib/db";
-import { parseJsonSafe } from "@/lib/pr-engine";
+import { chatCompletion, parseJsonSafe } from "@/lib/pr-engine";
 import { tgSendMessage, tgAnswerCallbackQuery, inlineKeyboard, escapeHtml, type TgUpdate } from "@/lib/telegram";
 import { LANGUAGES, languageLabel } from "@/lib/languages";
 
@@ -197,21 +196,11 @@ async function handleMessage(
       const lang = member?.language ?? enabled[0] ?? "en";
       await tgSendMessage(bot.botToken, chatId, "Firing up the meme engine…");
       try {
-        const zai = await ZAI.create();
-        const completion = await zai.chat.completions.create({
-          messages: [
-            {
-              role: "assistant",
-              content: `You are the meme engine for "${bot.armyName}". Create ONE meme about the campaign below, written natively in ${languageLabel(lang)} (code: ${lang}). Culturally adapt the humor. Respond STRICT JSON: {"topText":string (max 60 chars),"bottomText":string (max 60 chars)}`,
-            },
-            {
-              role: "user",
-              content: `Campaign: ${live.title}\nProduct: ${live.product ?? ""}\nDescription: ${live.description}`,
-            },
-          ],
-          thinking: { type: "disabled" },
-        });
-        const parsed = parseJsonSafe<{ topText?: string; bottomText?: string }>(completion.choices[0]?.message?.content ?? "");
+        const raw = await chatCompletion(
+          `You are the meme engine for "${bot.armyName}". Create ONE meme about the campaign below, written natively in ${languageLabel(lang)} (code: ${lang}). Culturally adapt the humor. Respond STRICT JSON: {"topText":string (max 60 chars),"bottomText":string (max 60 chars)}`,
+          `Campaign: ${live.title}\nProduct: ${live.product ?? ""}\nDescription: ${live.description}`,
+        );
+        const parsed = parseJsonSafe<{ topText?: string; bottomText?: string }>(raw);
         if (parsed?.topText && parsed?.bottomText) {
           await tgSendMessage(
             bot.botToken,
