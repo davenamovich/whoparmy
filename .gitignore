@@ -59,3 +59,4 @@ tool-results/
 .zscripts/dev.pid
 dev.log
 server.log
+prisma/*.db
