@@ -115,6 +115,11 @@ export async function exchangeWhopCode(params: {
   clientId: string;
   codeVerifier: string;
 }): Promise<{ access_token: string; refresh_token?: string; id_token?: string; expires_in: number }> {
+  // This app is registered as a CONFIDENTIAL OAuth client, and Whop's
+  // token endpoint requires the client secret in the exchange
+  // (verified live 2026-11-17: "client_secret is required"). PKCE is
+  // still sent. The secret lives only in the WHOP_APP_SECRET env var.
+  const clientSecret = process.env.WHOP_APP_SECRET?.trim();
   const res = await fetch(`${WHOP_OAUTH_BASE}/token`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -124,6 +129,7 @@ export async function exchangeWhopCode(params: {
       redirect_uri: params.redirectUri,
       client_id: params.clientId,
       code_verifier: params.codeVerifier,
+      ...(clientSecret ? { client_secret: clientSecret } : {}),
     }),
   });
   if (!res.ok) {
