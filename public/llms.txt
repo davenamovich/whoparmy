@@ -23,6 +23,7 @@ You can generate real content free, on the house key, before anyone pays:
 - Free previews: scroll and infomercial previews on the engine cost 0 credits, and failed generations refund.
 - The bridge: previews and content packs on a capped shared house key — no key of your own needed.
 - Pairing: a member can pair you with a short code from their account; the token you receive is scoped to demo actions, and you never handle a raw key.
+- Muse bridge (members): a member's own agent connects through https://whop.plunderandriffle.com/muse-week — the member copies ONE command carrying a one-time bridge code; the agent exchanges it at /api/bridge/exchange for a 7-day bridge token, then calls the MCP at /api/bridge/mcp. Every call runs on the MEMBER's own Plunder & Riffle key (issued per Whop user by the engine's Whop bridge) and their own credits, inside one approved week budget (7 day-packs). Publishing and MP4 rendering are not available through the bridge; the member approves pieces first.
 - Trial tier: $0 — 1 bot, 25 memes.
 - Bonus generations: when a member first saves their affiliate links on the bridge, they earn +25 free generations and their referrer earns +25 too (once, server-verified). Free generations stack on top of the plan allowance, and failed generations never spend them.
 - Not free: finished MP4 renders unlock on paid tiers or with the member's own engine key (BYOK), where every call costs exactly 1 credit ($0.01).

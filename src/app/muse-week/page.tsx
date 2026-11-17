@@ -1,0 +1,259 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
+import { Bot, CheckCircle2, Coins, Copy, KeyRound, Loader2, Lock, RefreshCw, ShieldOff } from "lucide-react";
+
+/**
+ * ─── MUSE WEEK ───────────────────────────────────────────────────────
+ * Dave's end result (2026-11-17): the member creates a Muse account,
+ * copies ONE command from this page, and their Muse makes a week of
+ * content through the bridge — on the member's own P&R credits.
+ * The command text here and in MEMBER-ONE-COMMAND.md are the same text;
+ * if you change one, change the other.
+ */
+
+interface BridgeAccount {
+  connected: boolean;
+  botPlan: string;
+  credits: number | null;
+  granted: number;
+  period: string | null;
+  brand: { name: string; website: string | null } | null;
+  tokens: Array<{ id: string; budgetCredits: number; spentCredits: number; expiresAt: string; active: boolean }>;
+  weekBudgetCredits: number;
+  error: string | null;
+  errorCode: string | null;
+}
+
+function commandText(code: string, businessUrl: string, budget: number): string {
+  return `Make my week of content
+
+You are my content agent, connected to my Plunder & Riffle account through my bridge at whop.plunderandriffle.com. My credits are mine — never ask me for an API key; it stays on the engine side and I will never paste it anywhere.
+
+1. My bridge code is ${code} (one-time, expires in 15 minutes). Exchange it: POST https://whop.plunderandriffle.com/api/bridge/exchange with {"code": "${code}"}. You get a bridge token (7 days) and the MCP URL. Use the token as the Bearer credential for every MCP call. Never print the token back to me, and never store it past this week.
+2. My business is ${businessUrl}. Research it first through the bridge MCP (research_brand, then create_campaign_from_research) — both are free. Work only from what the research actually found about my business; invent nothing.
+3. Quote me the week before you spend anything: 7 day-packs (create_demo_pack — 5 memes, an iMessage, a Top 10 and a slideshow per day), one for each day, each on a different angle from the research: Day 1 my offer · Day 2 my customer's pain · Day 3 proof · Day 4 one product · Day 5 me vs. the alternative · Day 6 questions customers ask · Day 7 best-of + call to action. The week is approved for up to ${budget} credits. Tell me the exact credit cost and my remaining balance (get_account through the bridge), and wait for my "go". No go, no spend.
+4. On my "go", make all 7 packs through the bridge MCP, polling get_job_status until each is done. A failed piece refunds — if a whole pack fails, tell me and retry it once.
+5. Deliver my week as a calendar: for each day, the pack's share-page link and what's in it. End with the receipt: credits spent, credits remaining. Do not publish anything and do not render MP4s — I'll approve the pieces I want first.
+6. When the week is delivered or my token expires, stop. Next week I'll get a fresh code from whop.plunderandriffle.com/muse-week.`;
+}
+
+export default function MuseWeekPage() {
+  const { toast } = useToast();
+  const [gate, setGate] = useState<"loading" | "teaser" | "open">("loading");
+  const [account, setAccount] = useState<BridgeAccount | null>(null);
+  const [code, setCode] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const loadAccount = useCallback(async () => {
+    const res = await fetch("/api/bridge/account");
+    if (res.ok) {
+      const json = (await res.json()) as { account: BridgeAccount };
+      setAccount(json.account);
+    }
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/auth/session");
+        const json = (await res.json()) as { connected?: boolean };
+        if (!json.connected) {
+          setGate("teaser");
+          return;
+        }
+        setGate("open");
+        await loadAccount();
+      } catch {
+        setGate("teaser");
+      }
+    })();
+  }, [loadAccount]);
+
+  const generateCode = async () => {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/bridge/code", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      const json = (await res.json()) as { code?: string; error?: string };
+      if (!res.ok || !json.code) throw new Error(json.error || "Could not generate a code");
+      setCode(json.code);
+      setCopied(false);
+    } catch (err) {
+      toast({ title: "Bridge code failed", description: err instanceof Error ? err.message : "Try again", variant: "destructive" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const revoke = async (tokenId: string) => {
+    await fetch("/api/bridge/revoke", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tokenId }),
+    });
+    await loadAccount();
+  };
+
+  if (gate === "loading") {
+    return (
+      <main className="mx-auto max-w-3xl px-4 py-12">
+        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Checking your connection…
+        </p>
+      </main>
+    );
+  }
+
+  if (gate === "teaser") {
+    return (
+      <main className="mx-auto max-w-3xl px-4 py-12 space-y-6">
+        <h1 className="text-3xl font-bold">Your Muse makes your week</h1>
+        <p className="text-muted-foreground">
+          Create a Muse, paste one command from this page, and your agent makes 7 days of content for your business —
+          on your own Plunder &amp; Riffle credits, through this bridge. Connect with Whop to see your command.
+        </p>
+        <Button asChild>
+          <a href="/api/auth/whop">Connect with Whop</a>
+        </Button>
+      </main>
+    );
+  }
+
+  const businessUrl = account?.brand?.website || "https://your-business-website.com";
+  const budget = account?.weekBudgetCredits ?? 805;
+
+  return (
+    <main className="mx-auto max-w-3xl px-4 py-12 space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">Your Muse makes your week</h1>
+        <p className="mt-2 text-muted-foreground">
+          One command. Seven days of content. Your credits, your agent, your approval before anything publishes.
+        </p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Bot className="h-5 w-5" /> 1 · Your Muse
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <p>
+            Don&apos;t have a Muse yet? Join with invite code <strong>49YNE2</strong> — you get 1 billion tokens and
+            so does the member who invited you (join within 48 hours of the invite for it to count).
+          </p>
+          <Button variant="outline" asChild>
+            <a href="https://plunderandriffle.com/muse-invite" target="_blank" rel="noreferrer">
+              Create your Muse
+            </a>
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Coins className="h-5 w-5" /> 2 · Your credits
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          {!account && (
+            <p className="flex items-center gap-2 text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Reading your P&amp;R balance…
+            </p>
+          )}
+          {account?.connected && (
+            <>
+              <p>
+                Balance: <strong>{account.credits === -1 ? "Unlimited" : `${account.credits} credits`}</strong>
+                {account.granted > 0 && <> · {account.granted} granted this cycle</>}
+                {account.period && <> · cycle {account.period.replace("paid:", "")}</>}
+              </p>
+              <p className="text-muted-foreground">
+                These credits live on your own Plunder &amp; Riffle key, issued for your Whop account. Your Muse
+                spends them through this bridge — it never sees the key itself.
+              </p>
+            </>
+          )}
+          {account && !account.connected && (
+            <p className="flex items-start gap-2 text-amber-500">
+              <Lock className="mt-0.5 h-4 w-4 shrink-0" />
+              {account.errorCode === "NO_WHOP_ID"
+                ? "Sign in with Whop (not the operator fallback) so your account can be linked to its credits."
+                : account.error ?? "The bridge is not reachable yet."}
+            </p>
+          )}
+          {account && account.tokens.length > 0 && (
+            <div className="space-y-1 pt-2">
+              <p className="font-medium">Bridge tokens</p>
+              {account.tokens.map((t) => (
+                <p key={t.id} className="flex items-center justify-between gap-2 text-muted-foreground">
+                  <span>
+                    {t.active ? "Active" : "Dead"} · spent {t.spentCredits} of {t.budgetCredits} credits · expires{" "}
+                    {new Date(t.expiresAt).toLocaleDateString()}
+                  </span>
+                  {t.active && (
+                    <Button size="sm" variant="ghost" onClick={() => revoke(t.id)}>
+                      <ShieldOff className="mr-1 h-3.5 w-3.5" /> Revoke
+                    </Button>
+                  )}
+                </p>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <KeyRound className="h-5 w-5" /> 3 · Your one command
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          {!account?.brand?.website && account?.connected && (
+            <p className="text-amber-500">
+              Add a brand with your business website first (Brands, above) — the command below carries a placeholder
+              URL until you do. You can also just tell your Muse the right URL when you paste it.
+            </p>
+          )}
+          {!code ? (
+            <Button onClick={generateCode} disabled={busy || !account?.connected}>
+              {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
+              Generate my command
+            </Button>
+          ) : (
+            <>
+              <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-4 text-xs leading-relaxed">
+                {commandText(code, businessUrl, budget)}
+              </pre>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(commandText(code, businessUrl, budget));
+                    setCopied(true);
+                  }}
+                >
+                  {copied ? <CheckCircle2 className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
+                  {copied ? "Copied" : "Copy the command"}
+                </Button>
+                <Button variant="outline" onClick={generateCode} disabled={busy}>
+                  <RefreshCw className="mr-2 h-4 w-4" /> Fresh code (kills the old one)
+                </Button>
+              </div>
+              <p className="text-muted-foreground">
+                The code inside expires in 15 minutes and works once. The token it issues lasts 7 days — one pairing,
+                one week. Your Muse will quote the week (list price {budget} credits for 7 day-packs) and wait for
+                your &ldquo;go&rdquo; before spending anything.
+              </p>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </main>
+  );
+}

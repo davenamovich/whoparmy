@@ -28,6 +28,9 @@ model User {
   brands       BrandProfile[]
   campaigns    Campaign[]
   usageRecords UsageRecord[]
+  bridgeConnection BridgeConnection?
+  bridgeCodes  BridgeCode[]
+  bridgeTokens BridgeToken[]
   researchJobs ResearchJob[]
   videoJobs    VideoJob[]
   engineLinks  EngineLink[]
@@ -472,6 +475,64 @@ model EngineLink {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, partner])
+  @@index([userId])
+}
+
+// ─── Muse bridge connector (Dave, 2026-11-17) ──────────────────────
+// The member's own Muse calls the P&R MCP through
+// whop.plunderandriffle.com/api/bridge/mcp, linked to THIS user.
+// Identity + credits live bot-side: the bot's Whop bridge
+// (POST /api/bridge/whop/key) derives one agent key per Whop user;
+// this app fetches it server-to-server and NEVER stores it — the
+// rows below hold only status snapshots, hashes and budgets.
+// See lib/muse-bridge.ts and ~/workspace/whoparmy/BRIDGE-CONNECTOR-DESIGN.md.
+model BridgeConnection {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  botPlan       String // free | creator | pro — the bot bridge's plan names
+  period        String? // last grant period the bot reported (e.g. paid:2026-11-01)
+  credits       Int? // last known P&R balance snapshot (display only; the bot is the source of truth)
+  granted       Int? // credits granted by the last key fetch
+  status        String    @default("ACTIVE") // ACTIVE | BLOCKED | UNCONFIGURED
+  lastFetchedAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// One-time code the member generates on /muse-week and pastes to their
+// Muse inside the one command. Only its SHA-256 is stored.
+model BridgeCode {
+  id            String    @id @default(cuid())
+  userId        String
+  codeHash      String    @unique
+  budgetCredits Int // the week budget this code will approve on exchange
+  expiresAt     DateTime
+  usedAt        DateTime?
+  createdAt     DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// The 7-day bridge token (prb_…) the member's Muse holds. Only its
+// SHA-256 is stored. spentCredits is settled from the engine's own
+// credit deltas after every generating call, never from estimates.
+model BridgeToken {
+  id            String    @id @default(cuid())
+  userId        String
+  tokenHash     String    @unique
+  budgetCredits Int
+  spentCredits  Int       @default(0)
+  expiresAt     DateTime
+  revokedAt     DateTime?
+  lastUsedAt    DateTime?
+  createdAt     DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId])
 }
 

@@ -86,6 +86,25 @@ configured" state — buttons never pretend.
 `SESSION_SECRET` — any long random string. Required in production (the dev
 fallback derives a stable local secret).
 
+## 7. Muse bridge connector (member's own Muse → MCP, their credits)
+
+Powers /muse-week and `POST /api/bridge/mcp`. Two sides must agree:
+
+- **This app (Railway, whopparmy service):** `WHOP_BRIDGE_KEY` — the shared
+  bridge key, set as a server variable. It must match the bot's
+  `WHOP_BRIDGE_KEY` exactly. Never expose it to the browser.
+- **The bot (bot.plunderandriffle.com host):** `WHOP_BRIDGE_KEY` (same
+  value), `WHOP_BRIDGE_KEY_SECRET` (a different, longer secret the bot
+  derives member keys from — bot-only, never set here), and the plan
+  allowances `WHOP_FREE_CREDITS` / `WHOP_CREATOR_CREDITS` /
+  `WHOP_PRO_CREDITS`. Unset allowances grant 0 credits; a missing bot-side
+  config answers 503 and /muse-week shows "not configured" honestly.
+- Optional: `BOT_BRIDGE_BASE_URL` overrides the bot base
+  (default https://bot.plunderandriffle.com).
+
+Until `WHOP_BRIDGE_KEY` is set on this app, /api/bridge/* answers
+503 NOT_CONFIGURED and nothing spends.
+
 ## Local self-test (no Whop account needed)
 
 The repo ships a dev webhook secret so you can exercise the full signature →
