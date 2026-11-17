@@ -74,6 +74,19 @@ export function getPlan(key: string): PlanDef {
   return PLAN_MAP[key] ?? PLANS[0];
 }
 
+/**
+ * Bot creation gate (Dave, 2026-11-17): not everyone can create their
+ * own Telegram army bot. Creation requires a paid base plan
+ * (Starter/Operator/Agency) or a Meme Army upsell plan. Trial members
+ * use the content factory on the bridge; the bot is a paid unlock.
+ * Existing owners are never gated out of managing their bot — the
+ * check applies at creation only (enforced in the onboard route).
+ */
+export function canCreateArmyBot(user: { plan: string; memeArmyPlan?: string | null }): boolean {
+  if (user.memeArmyPlan) return true;
+  return user.plan === "CREATOR" || user.plan === "PRO" || user.plan === "AGENCY";
+}
+
 // ─── Meme Army premium upsell pricing (separate recurring revenue) ──
 export interface ArmyPlanDef {
   key: string;

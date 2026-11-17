@@ -26,13 +26,26 @@ export async function getWhopUser(): Promise<User> {
 }
 
 /** Same as getWhopUser, but reports which branch resolved the identity. */
-export async function getWhopUserWithMode(): Promise<{ user: User; mode: "whop" | "operator" }> {
+/** Designated operators: real Whop accounts that get operator mode.
+ *  Set OPERATOR_WHOP_IDS (Whop user ids) and/or OPERATOR_WHOP_USERNAMES
+ *  in the app env — this is how the owner keeps operator surfaces
+ *  (LLM console) with a real Whop login once the anonymous fallback
+ *  is locked down in production. */
+export function isDesignatedOperator(user: { whopId: string | null; whopUsername: string | null }): boolean {
+  const ids = (process.env.OPERATOR_WHOP_IDS ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+  const names = (process.env.OPERATOR_WHOP_USERNAMES ?? "").split(",").map((x) => x.trim().toLowerCase()).filter(Boolean);
+  if (user.whopId && ids.includes(user.whopId)) return true;
+  if (user.whopUsername && names.includes(user.whopUsername.toLowerCase())) return true;
+  return false;
+}
+
+export async function getWhopUserWithMode(): Promise<{ user: User; mode: "whop" | "operator"; viaFallback: boolean }> {
   const sessionUserId = await getSessionUserId();
   if (sessionUserId) {
     const user = await db.user.findUnique({ where: { id: sessionUserId } });
-    if (user) return { user, mode: "whop" };
+    if (user) return { user, mode: isDesignatedOperator(user) ? "operator" : "whop", viaFallback: false };
   }
-  return { user: await getOperatorUser(), mode: "operator" };
+  return { user: await getOperatorUser(), mode: "operator", viaFallback: true };
 }
 
 /** Stable operator account (dev/sandbox mode before Whop credentials exist). */

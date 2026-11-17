@@ -1951,7 +1951,23 @@ export function MemeArmy() {
     <>
       {bot === null ? (
         <>
-          <UpsellLanding onDeploy={() => { setOnboardMode("create"); setOnboardOpen(true); }} />
+          <UpsellLanding
+            onDeploy={() => {
+              // Bot creation gate: Trial members land on the pricing
+              // plans instead of the deploy wizard (the API enforces
+              // the same rule server-side).
+              if (data?.canCreateBot === false) {
+                toast({
+                  title: "Your own Telegram bot is a paid unlock",
+                  description: "Pick a Meme Army plan below — or upgrade your membership — and deploying unlocks right away.",
+                });
+                document.getElementById("army-pricing")?.scrollIntoView({ behavior: "smooth" });
+                return;
+              }
+              setOnboardMode("create");
+              setOnboardOpen(true);
+            }}
+          />
           <OnboardingDialog open={onboardOpen} onOpenChange={setOnboardOpen} mode={onboardMode} bot={null} onCompleted={refresh} />
         </>
       ) : data ? (

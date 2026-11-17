@@ -28,8 +28,16 @@ const USD_PER_TOKEN_BULK = 100 / 2_000_000_000;
 const USD_PER_TOKEN_PACK = 28 / 250_000_000;
 
 async function requireOperator() {
-  const { user, mode } = await getWhopUserWithMode();
+  const { user, mode, viaFallback } = await getWhopUserWithMode();
   if (mode !== "operator") throw new Error("OPERATOR_ONLY");
+  // The anonymous operator fallback is a dev convenience. In production
+  // it must not unlock this console for anyone who simply is not signed
+  // in: real operator access comes from a Whop login designated via
+  // OPERATOR_WHOP_IDS / OPERATOR_WHOP_USERNAMES, or an explicit
+  // ALLOW_OPERATOR_FALLBACK=1 in the environment (local dev).
+  if (viaFallback && process.env.NODE_ENV === "production" && process.env.ALLOW_OPERATOR_FALLBACK !== "1") {
+    throw new Error("OPERATOR_ONLY");
+  }
   return user;
 }
 

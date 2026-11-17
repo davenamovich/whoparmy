@@ -207,4 +207,5 @@ export interface ArmyResponseDTO {
   missions: MissionDTO[];
   members: MemberDTO[];
   stats: ArmyStatsDTO;
+  canCreateBot?: boolean; // bot creation gate: paid plan or army upsell
 }

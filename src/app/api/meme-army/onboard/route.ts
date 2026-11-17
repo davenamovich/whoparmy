@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUserWithMode } from "@/lib/auth";
+import { canCreateArmyBot } from "@/lib/plans";
 import { serializeBot } from "@/lib/serialize";
 import { tgGetMe, tgSetWebhook } from "@/lib/telegram";
 import { isSupportedLanguage } from "@/lib/languages";
@@ -30,7 +31,7 @@ interface OnboardBody {
  */
 export async function POST(req: NextRequest) {
   try {
-    const user = await getWhopUser();
+    const { user, mode } = await getWhopUserWithMode();
     const body = (await req.json()) as OnboardBody;
 
     const armyName = body.armyName?.trim();
@@ -44,6 +45,21 @@ export async function POST(req: NextRequest) {
     }
 
     const existing = await db.armyBot.findUnique({ where: { userId: user.id } });
+
+    // Bot creation gate (Dave, 2026-11-17): creating a NEW bot
+    // requires a paid plan or a Meme Army upsell — Trial members use
+    // the factory, they don't deploy bots. Updates by existing owners
+    // are never gated. The operator account (Dave's backstage
+    // identity) bypasses.
+    if (!existing && mode !== "operator" && !canCreateArmyBot(user)) {
+      return NextResponse.json(
+        {
+          error: "Deploying your own Telegram bot is a paid unlock. Upgrade to a paid plan or add a Meme Army plan, then come back and launch it.",
+          code: "bot_gate",
+        },
+        { status: 403 },
+      );
+    }
 
     // update mode: a blank token field means "keep the stored token" —
     // the stored token is never exposed to the client, so it can never

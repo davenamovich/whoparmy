@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, getWhopUserWithMode } from "@/lib/auth";
+import { canCreateArmyBot } from "@/lib/plans";
 import { serializeBot, serializeMission, serializeMember } from "@/lib/serialize";
 import { tgGetMe, tgDeleteWebhook } from "@/lib/telegram";
 import type { ArmyResponseDTO } from "@/lib/types";
@@ -11,7 +12,7 @@ export const maxDuration = 60;
 /** Full Meme Army state for the owner control panel. */
 export async function GET() {
   try {
-    const user = await getWhopUser();
+    const { user, mode } = await getWhopUserWithMode();
 
     const bot = await db.armyBot.findUnique({
       where: { userId: user.id },
@@ -27,6 +28,7 @@ export async function GET() {
         missions: [],
         members: [],
         stats: { participants: 0, shares: 0, referrals: 0, verifiedClicks: 0, contentGenerated: 0 },
+        canCreateBot: mode === "operator" || canCreateArmyBot(user),
       };
       return NextResponse.json(empty);
     }
