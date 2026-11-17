@@ -18,6 +18,12 @@ import { db } from "@/lib/db";
  * timestamp is the idempotency anchor. (The grant used to ride on
  * referral conversion; Dave moved it here. Commissions keep their own
  * trigger and eligibility gates — see lib/referrals.ts.)
+ *
+ * Dave extended it the same day (the trial run-out offer): the SAVER
+ * also earns LINK_SAVE_FREE_GENS on that first save — "additional
+ * credits if they sign up and save their unique affiliate links."
+ * Both sides of one verified first save earn 25; still exactly once
+ * per member, ever, anchored on the same linksSavedAt flip.
  */
 
 export const LINK_SAVE_FREE_GENS = 25;
@@ -93,7 +99,7 @@ export async function getBridgeState(userId: string): Promise<BridgeState> {
 }
 
 export type SaveBridgeResult =
-  | { ok: true; firstSave: boolean; referrerPaid: boolean; state: BridgeState }
+  | { ok: true; firstSave: boolean; referrerPaid: boolean; saverPaid: boolean; state: BridgeState }
   | { ok: false; error: string };
 
 /**
@@ -144,11 +150,16 @@ export async function saveBridgeLinks(
   });
   let firstSave = false;
   let referrerPaid = false;
+  let saverPaid = false;
   if (me && !me.linksSavedAt) {
     const remaining = await db.engineLink.count({ where: { userId } });
     if (remaining > 0) {
       firstSave = true;
-      await db.user.update({ where: { id: userId }, data: { linksSavedAt: new Date() } });
+      await db.user.update({
+        where: { id: userId },
+        data: { linksSavedAt: new Date(), freeGenBalance: { increment: LINK_SAVE_FREE_GENS } },
+      });
+      saverPaid = true;
       if (me.referredById) {
         await db.user.update({
           where: { id: me.referredById },
@@ -159,5 +170,5 @@ export async function saveBridgeLinks(
     }
   }
 
-  return { ok: true, firstSave, referrerPaid, state: await getBridgeState(userId) };
+  return { ok: true, firstSave, referrerPaid, saverPaid, state: await getBridgeState(userId) };
 }

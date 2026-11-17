@@ -1,0 +1,258 @@
+import "server-only";
+import { db } from "@/lib/db";
+import { BRIDGE_PARTNERS } from "@/lib/bridge";
+
+/**
+ * ─── THE DAILY ROTATOR — auctioned, admin controlled ───────────────
+ *
+ * Dave's direction (2026-11-17): traffic that arrives WITHOUT a sign
+ * up link (no referrer) goes to one destination per ET day, and that
+ * slot is an AUCTION, admin controlled.
+ *
+ * - Members bid FREE GENERATIONS to feature one of their own saved
+ *   bridge links for a day. One bid per member per day (re-bidding
+ *   updates it). Bids are promises, not payments: nothing is deducted
+ *   until an admin confirms a winner.
+ * - An operator (admin) opens days, confirms the winner (default:
+ *   highest bid; the admin may pick any bid), or cancels a day.
+ *   Confirming snapshots the winner's CURRENT saved URL for the bid
+ *   partner — the featured URL always comes from the member's saved
+ *   EngineLink, never from bid input — and deducts the bid from the
+ *   winner's freeGenBalance. Cancelling a confirmed day refunds.
+ * - Resolution for a day: a CONFIRMED auction wins. Otherwise the
+ *   house fallback rotates Dave's own partner links deterministically
+ *   by day-of-year, so unsold days still land somewhere exact and the
+ *   pick is recomputable from the date alone.
+ *
+ * Attribution: the day record IS the attribution. Every no-ref click
+ * through /api/bridge/rotator/go on a given ET date went to the URL
+ * stored (or computable) for that date — nothing else, all day.
+ */
+
+const ET = "America/New_York";
+
+export function etDateString(d = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: ET,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+export function etTomorrowString(): string {
+  return etDateString(new Date(Date.now() + 24 * 60 * 60 * 1000));
+}
+
+function dayOfYearET(dateStr: string): number {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const start = Date.UTC(y, 0, 1);
+  const cur = Date.UTC(y, m - 1, d);
+  return Math.floor((cur - start) / 86400000) + 1;
+}
+
+/** House fallback pool: Dave's own partner links (real URLs only). */
+const HOUSE_POOL = BRIDGE_PARTNERS.filter((p) => p.example.startsWith("http")).map((p) => ({
+  partner: p.key,
+  name: p.name,
+  url: p.example,
+}));
+
+export interface RotatorDestination {
+  date: string;
+  url: string;
+  partner: string;
+  partnerName: string;
+  source: "auction" | "house";
+  winnerUserId: string | null;
+}
+
+export async function getRotatorDestination(date = etDateString()): Promise<RotatorDestination> {
+  const day = await db.rotatorDay.findUnique({ where: { date } });
+  if (day?.status === "CONFIRMED" && day.winnerUrl) {
+    const partner = BRIDGE_PARTNERS.find((p) => p.key === day.winnerPartner);
+    return {
+      date,
+      url: day.winnerUrl,
+      partner: day.winnerPartner ?? "",
+      partnerName: partner?.name ?? day.winnerPartner ?? "",
+      source: "auction",
+      winnerUserId: day.winnerUserId,
+    };
+  }
+  const pick = HOUSE_POOL[(dayOfYearET(date) - 1) % HOUSE_POOL.length];
+  return { date, url: pick.url, partner: pick.partner, partnerName: pick.name, source: "house", winnerUserId: null };
+}
+
+export interface RotatorDayState {
+  date: string;
+  status: string;
+  topBid: number | null;
+  bidCount: number;
+  myBid: { partner: string; amount: number } | null;
+  isWinner: boolean;
+}
+
+export interface RotatorState {
+  today: RotatorDestination;
+  myFreeGenBalance: number;
+  myPartners: Array<{ key: string; name: string; url: string }>;
+  days: RotatorDayState[];
+}
+
+async function dayState(date: string, userId: string): Promise<RotatorDayState> {
+  const day = await db.rotatorDay.findUnique({
+    where: { date },
+    include: { bids: { orderBy: { amount: "desc" } } },
+  });
+  if (!day) return { date, status: "UNOPENED", topBid: null, bidCount: 0, myBid: null, isWinner: false };
+  const mine = day.bids.find((b) => b.userId === userId);
+  return {
+    date,
+    status: day.status,
+    topBid: day.bids.length ? day.bids[0].amount : null,
+    bidCount: day.bids.length,
+    myBid: mine ? { partner: mine.partner, amount: mine.amount } : null,
+    isWinner: day.status === "CONFIRMED" && day.winnerUserId === userId,
+  };
+}
+
+/** Member-facing state: today + tomorrow + the day after (biddable window). */
+export async function getRotatorState(userId: string): Promise<RotatorState> {
+  const [user, links, today] = await Promise.all([
+    db.user.findUnique({ where: { id: userId }, select: { freeGenBalance: true } }),
+    db.engineLink.findMany({ where: { userId }, select: { partner: true, url: true } }),
+    getRotatorDestination(),
+  ]);
+  const dates = [0, 1, 2].map((n) => etDateString(new Date(Date.now() + n * 86400000)));
+  const days = await Promise.all(dates.map((d) => dayState(d, userId)));
+  const nameOf = (k: string) => BRIDGE_PARTNERS.find((p) => p.key === k)?.name ?? k;
+  return {
+    today,
+    myFreeGenBalance: user?.freeGenBalance ?? 0,
+    myPartners: links.map((l) => ({ key: l.partner, name: nameOf(l.partner), url: l.url })),
+    days,
+  };
+}
+
+export type BidResult = { ok: true } | { ok: false; error: string };
+
+export async function placeRotatorBid(
+  userId: string,
+  input: { date: unknown; partner: unknown; amount: unknown },
+): Promise<BidResult> {
+  const date = typeof input.date === "string" ? input.date : "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: "Bad date." };
+  const today = etDateString();
+  if (date < today) return { ok: false, error: "That day is already gone." };
+  const partner = typeof input.partner === "string" ? input.partner : "";
+  const amount = typeof input.amount === "number" ? Math.floor(input.amount) : NaN;
+  if (!Number.isFinite(amount) || amount < 1) return { ok: false, error: "Bid at least 1 free generation." };
+
+  const [user, link, day] = await Promise.all([
+    db.user.findUnique({ where: { id: userId }, select: { freeGenBalance: true } }),
+    db.engineLink.findUnique({ where: { userId_partner: { userId, partner } } }),
+    db.rotatorDay.findUnique({ where: { date } }),
+  ]);
+  if (!link) return { ok: false, error: "Save that partner link on the bridge first — the rotator only features saved links." };
+  if (!user || amount > user.freeGenBalance) {
+    return { ok: false, error: `You have ${user?.freeGenBalance ?? 0} free generations — a bid can't exceed your balance.` };
+  }
+  if (day && day.status !== "OPEN") return { ok: false, error: `That day is ${day.status.toLowerCase()} — bidding is closed.` };
+
+  const openDay =
+    day ??
+    (await db.rotatorDay.create({ data: { date, status: "OPEN" } }));
+  await db.rotatorBid.upsert({
+    where: { dayId_userId: { dayId: openDay.id, userId } },
+    create: { dayId: openDay.id, userId, partner, amount },
+    update: { partner, amount },
+  });
+  return { ok: true };
+}
+
+// ─── Admin (operator only — enforced in the route) ─────────────────
+
+export interface AdminDayView {
+  date: string;
+  status: string;
+  winnerUserId: string | null;
+  winnerUrl: string | null;
+  winningBid: number | null;
+  bids: Array<{ userId: string; partner: string; amount: number }>;
+}
+
+export async function listRotatorDaysForAdmin(): Promise<AdminDayView[]> {
+  const days = await db.rotatorDay.findMany({
+    orderBy: { date: "desc" },
+    take: 14,
+    include: { bids: { orderBy: { amount: "desc" } } },
+  });
+  return days.map((d) => ({
+    date: d.date,
+    status: d.status,
+    winnerUserId: d.winnerUserId,
+    winnerUrl: d.winnerUrl,
+    winningBid: d.winningBid,
+    bids: d.bids.map((b) => ({ userId: b.userId, partner: b.partner, amount: b.amount })),
+  }));
+}
+
+export type AdminResult = { ok: true; detail: string } | { ok: false; error: string };
+
+export async function adminConfirmWinner(date: string, pickUserId?: string): Promise<AdminResult> {
+  const day = await db.rotatorDay.findUnique({
+    where: { date },
+    include: { bids: { orderBy: { amount: "desc" } } },
+  });
+  if (!day) return { ok: false, error: "No auction exists for that date." };
+  if (day.status === "CONFIRMED") return { ok: false, error: "That day already has a confirmed winner." };
+  if (day.status === "CANCELLED") return { ok: false, error: "That day is cancelled." };
+  const bid = pickUserId ? day.bids.find((b) => b.userId === pickUserId) : day.bids[0];
+  if (!bid) return { ok: false, error: pickUserId ? "That member has no bid on this day." : "No bids on this day yet." };
+
+  // The featured URL comes from the winner's SAVED link, right now.
+  const link = await db.engineLink.findUnique({
+    where: { userId_partner: { userId: bid.userId, partner: bid.partner } },
+  });
+  if (!link) return { ok: false, error: "The winning bidder no longer has that link saved — pick another bid." };
+  const winner = await db.user.findUnique({ where: { id: bid.userId }, select: { freeGenBalance: true } });
+  if (!winner || winner.freeGenBalance < bid.amount) {
+    return { ok: false, error: "The winning bidder's balance no longer covers the bid — pick another bid." };
+  }
+
+  await db.user.update({
+    where: { id: bid.userId },
+    data: { freeGenBalance: { decrement: bid.amount } },
+  });
+  await db.rotatorDay.update({
+    where: { id: day.id },
+    data: {
+      status: "CONFIRMED",
+      winnerUserId: bid.userId,
+      winnerPartner: bid.partner,
+      winnerUrl: link.url,
+      winningBid: bid.amount,
+      gensDeducted: true,
+      confirmedAt: new Date(),
+    },
+  });
+  return { ok: true, detail: `Confirmed ${bid.partner} (${bid.amount} gens) for ${date}: ${link.url}` };
+}
+
+export async function adminCancelDay(date: string): Promise<AdminResult> {
+  const day = await db.rotatorDay.findUnique({ where: { date } });
+  if (!day) return { ok: false, error: "No auction exists for that date." };
+  if (day.status === "CANCELLED") return { ok: false, error: "That day is already cancelled." };
+  if (day.status === "CONFIRMED" && day.gensDeducted && day.winnerUserId && day.winningBid) {
+    await db.user.update({
+      where: { id: day.winnerUserId },
+      data: { freeGenBalance: { increment: day.winningBid } },
+    });
+  }
+  await db.rotatorDay.update({
+    where: { id: day.id },
+    data: { status: "CANCELLED", winnerUserId: null, winnerPartner: null, winnerUrl: null, winningBid: null, gensDeducted: false, confirmedAt: null },
+  });
+  return { ok: true, detail: `Cancelled ${date}${day.status === "CONFIRMED" ? " and refunded the winner" : ""}.` };
+}

@@ -329,6 +329,35 @@ CREATE TABLE "EngineLink" (
     CONSTRAINT "EngineLink_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
+-- CreateTable
+CREATE TABLE "RotatorDay" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "date" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'OPEN',
+    "winnerUserId" TEXT,
+    "winnerPartner" TEXT,
+    "winnerUrl" TEXT,
+    "winningBid" INTEGER,
+    "gensDeducted" BOOLEAN NOT NULL DEFAULT false,
+    "confirmedAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "RotatorDay_winnerUserId_fkey" FOREIGN KEY ("winnerUserId") REFERENCES "User" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "RotatorBid" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "dayId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "partner" TEXT NOT NULL,
+    "amount" INTEGER NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "RotatorBid_dayId_fkey" FOREIGN KEY ("dayId") REFERENCES "RotatorDay" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "RotatorBid_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_whopId_key" ON "User"("whopId");
 
@@ -424,4 +453,10 @@ CREATE INDEX "EngineLink_userId_idx" ON "EngineLink"("userId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "EngineLink_userId_partner_key" ON "EngineLink"("userId", "partner");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "RotatorDay_date_key" ON "RotatorDay"("date");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "RotatorBid_dayId_userId_key" ON "RotatorBid"("dayId", "userId");
 

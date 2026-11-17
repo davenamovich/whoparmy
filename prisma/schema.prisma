@@ -30,6 +30,8 @@ model User {
   usageRecords UsageRecord[]
   researchJobs ResearchJob[]
   engineLinks  EngineLink[]
+  rotatorBids  RotatorBid[]
+  rotatorWins  RotatorDay[] @relation("RotatorWins")
   linksSavedAt DateTime? // first bridge link save — pays the referrer's free generations (lib/bridge.ts)
   assets       Asset[]
   jobs         GenerationJob[]
@@ -450,4 +452,44 @@ model EngineLink {
 
   @@unique([userId, partner])
   @@index([userId])
+}
+
+// ─── Daily rotator auction (Dave, 2026-11-17) ──────────────────────
+// Traffic that arrives with no referrer ("no sign up link") is sent
+// to ONE destination per ET day. That day's slot is an AUCTION: members
+// bid free generations to feature one of their own saved bridge links;
+// an admin (operator) confirms the winner. The winning URL is
+// snapshotted from the winner's saved EngineLink at confirm time —
+// never taken from bid input — so attribution is exact and auditable.
+// Unsold days fall back to a deterministic house-offer rotation.
+model RotatorDay {
+  id            String    @id @default(cuid())
+  date          String    @unique // ET calendar day, yyyy-mm-dd
+  status        String    @default("OPEN") // OPEN | CONFIRMED | CANCELLED
+  winnerUserId  String?
+  winnerPartner String?
+  winnerUrl     String?
+  winningBid    Int?
+  gensDeducted  Boolean   @default(false)
+  confirmedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  winner User?        @relation("RotatorWins", fields: [winnerUserId], references: [id], onDelete: SetNull)
+  bids   RotatorBid[]
+}
+
+model RotatorBid {
+  id        String   @id @default(cuid())
+  dayId     String
+  userId    String
+  partner   String // BRIDGE_PARTNERS key — which of the member's saved links is featured
+  amount    Int // free generations bid; deducted only when an admin confirms this bid the winner
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  day  RotatorDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  user User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([dayId, userId])
 }
