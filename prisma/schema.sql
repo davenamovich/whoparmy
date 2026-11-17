@@ -305,6 +305,23 @@ CREATE TABLE "Submission" (
 );
 
 -- CreateTable
+CREATE TABLE "VideoJob" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "format" TEXT NOT NULL,
+    "paramsJson" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'RUNNING',
+    "engineJobId" TEXT,
+    "engineKind" TEXT,
+    "pageUrl" TEXT,
+    "shareUrl" TEXT,
+    "error" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "VideoJob_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
 CREATE TABLE "ResearchJob" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "userId" TEXT NOT NULL,
@@ -451,6 +468,9 @@ CREATE INDEX "Submission_botId_idx" ON "Submission"("botId");
 
 -- CreateIndex
 CREATE INDEX "Submission_missionId_idx" ON "Submission"("missionId");
+
+-- CreateIndex
+CREATE INDEX "VideoJob_userId_idx" ON "VideoJob"("userId");
 
 -- CreateIndex
 CREATE INDEX "ResearchJob_userId_website_idx" ON "ResearchJob"("userId", "website");

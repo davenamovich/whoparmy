@@ -264,6 +264,7 @@ export function AgentsView() {
                         <option value="MEME">Meme pack (mid)</option>
                         <option value="HOOK">Hooks (final)</option>
                         <option value="QA">Claude QA pass (quality)</option>
+                        <option value="VIDEO">Video (engine — brief = topic, or JSON {"{format,…}"})</option>
                       </select>
                       <select
                         className="h-9 rounded-md border border-input bg-background px-2 text-sm"

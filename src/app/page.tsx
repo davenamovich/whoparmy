@@ -20,6 +20,7 @@ import type { ProfileDTO } from "@/lib/types";
 import { CreateWizard, type WizardResult } from "@/components/factory/create-wizard";
 import { ResultsWorkspace } from "@/components/factory/results-workspace";
 import { MemeStudio } from "@/components/factory/meme-studio";
+import { VideoStudio } from "@/components/factory/video-studio";
 import { MemeArmy } from "@/components/factory/meme-army";
 import { WarRoom } from "@/components/factory/war-room";
 import { AgentsView } from "@/components/factory/agents";
@@ -229,6 +230,7 @@ export default function Home() {
             <div className="space-y-12">
               <CreateWizard onCompleted={onWizardCompleted} initialProfile={brandPrefill} initialProfileName={brandPrefillName} />
               <MemeStudio />
+              <VideoStudio />
             </div>
           ) : null}
           {view === "results" && resultsCampaignId ? (

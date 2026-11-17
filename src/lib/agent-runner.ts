@@ -126,6 +126,70 @@ export async function runAgentJob(jobId: string): Promise<void> {
   const job = await db.agentJob.findUnique({ where: { id: jobId }, include: { hire: true } });
   if (!job) return;
   const hire = job.hire;
+
+  // VIDEO jobs (Dave, 2026-11-17) run on the P&R engine's video lane,
+  // not the LLM: the brief is either JSON ({format, ...params}) or a
+  // plain topic (→ a Ridiculous episode). The video job runs detached
+  // and lands its preview in the member's library; the hire's token
+  // charge is refunded because video is accounted in VIDEO usage
+  // against the plan allowance, not hire tokens.
+  if (job.kind === "VIDEO") {
+    const refund = db.hiredAgent.update({
+      where: { id: hire.id },
+      data: { tokensUsed: Math.max(0, hire.tokensUsed - job.tokenCost) },
+    });
+    try {
+      const { startVideoJob, VIDEO_FORMATS } = await import("@/lib/video-jobs");
+      let format: string = "RIDICULOUS";
+      let params: Record<string, unknown> = { topic: job.brief.slice(0, 400) };
+      try {
+        const parsed = JSON.parse(job.brief) as Record<string, unknown>;
+        if (parsed && typeof parsed === "object" && typeof parsed.format === "string") {
+          format = parsed.format.toUpperCase();
+          params = { ...parsed };
+          delete params.format;
+        }
+      } catch {
+        // plain-text brief → Ridiculous topic, as defaulted above
+      }
+      if (!(VIDEO_FORMATS as readonly string[]).includes(format)) {
+        throw new Error(`Unknown video format "${format}" in the job brief.`);
+      }
+      if (!params.language) params.language = languageLabel(job.language);
+      const vjob = await startVideoJob(job.userId, format as never, params);
+      await db.$transaction([
+        db.agentJob.update({
+          where: { id: job.id },
+          data: {
+            status: "DONE",
+            tokenCost: 0,
+            result: JSON.stringify({
+              videoJobId: vjob.id,
+              format,
+              note: "Video preview generating in the background — it lands in the library when the engine finishes.",
+            }),
+          },
+        }),
+        refund,
+      ]);
+    } catch (err) {
+      await db.$transaction([
+        db.agentJob.update({
+          where: { id: job.id },
+          data: {
+            status: "FAILED",
+            result: JSON.stringify({
+              error: err instanceof Error ? err.message.slice(0, 500) : "Video job failed",
+              provider: "pr-engine",
+            }),
+          },
+        }),
+        refund,
+      ]).catch(() => {});
+    }
+    return;
+  }
+
   const tierKey = JOB_TIERS[job.kind] ?? "mid";
 
   try {

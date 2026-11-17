@@ -23,7 +23,7 @@ export function usageMonthStart(): Date {
 export async function countMonthlyUsage(userId: string): Promise<number> {
   const usage = await db.usageRecord.groupBy({
     by: ["kind"],
-    where: { userId, createdAt: { gte: usageMonthStart() }, kind: { in: ["TEXT", "IMAGE"] } },
+    where: { userId, createdAt: { gte: usageMonthStart() }, kind: { in: ["TEXT", "IMAGE", "VIDEO"] } },
     _sum: { count: true },
   });
   return usage.reduce((n, u) => n + (u._sum.count ?? 0), 0);

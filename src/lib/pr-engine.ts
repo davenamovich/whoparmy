@@ -599,7 +599,7 @@ function engineMemeBrief(opts: {
   return parts.filter(Boolean).join("\n");
 }
 
-export async function recordUsage(userId: string, kind: "TEXT" | "IMAGE" | "FAILED", count: number, meta?: string) {
+export async function recordUsage(userId: string, kind: "TEXT" | "IMAGE" | "VIDEO" | "FAILED", count: number, meta?: string) {
   if (count <= 0) return;
   try {
     await db.usageRecord.create({ data: { userId, kind, count, meta } });

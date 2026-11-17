@@ -24,7 +24,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const kind = (body.kind ?? "MEME").toUpperCase();
     if (!(kind in JOB_TIERS)) {
-      return NextResponse.json({ error: "Job kind must be SCOUT, MEME, HOOK, QA or CAMPAIGN." }, { status: 400 });
+      return NextResponse.json({ error: "Job kind must be SCOUT, MEME, HOOK, QA, CAMPAIGN or VIDEO." }, { status: 400 });
     }
     const brief = body.brief?.trim();
     if (!brief) return NextResponse.json({ error: "Give the agent a brief." }, { status: 400 });
@@ -40,10 +40,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     // Meme output draws on the plan's monthly meme meter (house lane).
-    if (kind === "MEME" || kind === "CAMPAIGN") {
+    // VIDEO draws on the same meter (1–3 units by format steps).
+    if (kind === "MEME" || kind === "CAMPAIGN" || kind === "VIDEO") {
       const plan = getPlan(user.plan);
       const usedMemes = await countMonthlyUsage(user.id);
-      if (usedMemes + pieces > plan.monthlyItems) {
+      let requested = pieces;
+      if (kind === "VIDEO") {
+        requested = 1;
+        try {
+          const parsed = JSON.parse(brief) as { format?: string };
+          if (typeof parsed?.format === "string" && parsed.format.toUpperCase() === "FUNNEL") requested = 3;
+        } catch {
+          // plain-topic brief → a single 1-credit sitdown job
+        }
+      }
+      if (usedMemes + requested > plan.monthlyItems) {
         return NextResponse.json(
           { error: `You're out of memes on the ${plan.name} plan this month (${plan.monthlyItems}/mo). Upgrade — or connect your own key (BYOK) and the meter lifts.` },
           { status: 402 },
@@ -51,7 +62,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
     }
 
-    const cost = tierCost(JOB_TIERS[kind]) * pieces;
+    const cost = kind === "VIDEO" ? 0 : tierCost(JOB_TIERS[kind]) * pieces;
     const remaining = hire.tokenBudget - hire.tokensUsed;
     if (cost > remaining) {
       return NextResponse.json(

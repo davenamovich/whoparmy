@@ -74,6 +74,10 @@ export const JOB_TIERS: Record<string, (typeof MODEL_TIERS)[number]["key"]> = {
   HOOK: "final",
   QA: "quality",
   CAMPAIGN: "mid",
+  // VIDEO runs on the engine's video lane (agent-runner intercepts it);
+  // the tier only satisfies kind validation — its order cost is 0
+  // because video is accounted in VIDEO usage, not hire tokens.
+  VIDEO: "mid",
 };
 
 export async function getWalletState(userId: string, planKey: string) {

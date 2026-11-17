@@ -29,6 +29,7 @@ model User {
   campaigns    Campaign[]
   usageRecords UsageRecord[]
   researchJobs ResearchJob[]
+  videoJobs    VideoJob[]
   engineLinks  EngineLink[]
   rotatorBids  RotatorBid[]
   rotatorWins  RotatorDay[] @relation("RotatorWins")
@@ -419,6 +420,25 @@ model Submission {
 // the server process, and clients poll. Result holds the full
 // AnalyzeResponse JSON so consumers use it exactly like the old
 // synchronous analyze payload.
+model VideoJob {
+  id          String   @id @default(cuid())
+  userId      String
+  format      String // BEST_OF | RIDICULOUS | NEWS | PRESENT | BEFORE_PACK | FUNNEL | SCROLL | INFOMERCIAL | FOLLOWUP
+  paramsJson  String // the submit arguments the member chose (brief, links, offer url, source job…)
+  status      String   @default("RUNNING") // RUNNING | DONE | FAILED
+  engineJobId String? // engine job id (sitdown/scroll/infomercial/funnel/demo_pack); null for synchronous followups
+  engineKind  String? // get_job_status kind for polling
+  pageUrl     String? // the finished preview page
+  shareUrl    String? // funnel bestof day-pack share page
+  error       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
 model ResearchJob {
   id         String   @id @default(cuid())
   userId     String
