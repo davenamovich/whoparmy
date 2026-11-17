@@ -28,4 +28,4 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 # SQLite lives on a Railway volume mounted at /data (DATABASE_URL=file:/data/custom.db).
 # First boot creates the schema; later boots are no-ops.
-CMD ["sh", "-c", "mkdir -p /data && (bunx prisma db push --skip-generate --accept-data-loss || true) && bun server.js"]
+CMD ["sh", "-c", "mkdir -p /data && (bunx prisma db push --skip-generate || true) && bun server.js"]
