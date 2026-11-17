@@ -13,6 +13,7 @@ import {
   Trophy,
   Bot,
   Cpu,
+  TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +26,7 @@ import { MemeArmy } from "@/components/factory/meme-army";
 import { WarRoom } from "@/components/factory/war-room";
 import { AgentsView } from "@/components/factory/agents";
 import { LlmConsole } from "@/components/factory/llm-console";
+import { TrendingView } from "@/components/factory/trending";
 import { CampaignsView } from "@/components/factory/campaigns";
 import { LibraryView } from "@/components/factory/library";
 import { BrandsView } from "@/components/factory/brands";
@@ -45,10 +47,11 @@ type View =
   | "army"
   | "warroom"
   | "agents"
+  | "trending"
   | "llm"
   | "account";
 
-type NavKey = "create" | "studio" | "campaigns" | "library" | "brands" | "publishing" | "army" | "warRoom" | "agents" | "llm" | "account";
+type NavKey = "create" | "studio" | "campaigns" | "library" | "brands" | "publishing" | "army" | "warRoom" | "agents" | "trending" | "llm" | "account";
 
 const NAV: { key: View; labelKey: NavKey; icon: React.ComponentType<{ className?: string }>; badge?: string }[] = [
   { key: "create", labelKey: "create", icon: Sparkles },
@@ -60,6 +63,7 @@ const NAV: { key: View; labelKey: NavKey; icon: React.ComponentType<{ className?
   { key: "army", labelKey: "army", icon: Swords, badge: "PRO" },
   { key: "warroom", labelKey: "warRoom", icon: Trophy, badge: "NEW" },
   { key: "agents", labelKey: "agents", icon: Bot, badge: "NEW" },
+  { key: "trending", labelKey: "trending", icon: TrendingUp, badge: "LIVE" },
   { key: "llm", labelKey: "llm", icon: Cpu, badge: "OPS" },
   { key: "account", labelKey: "account", icon: UserRound },
 ];
@@ -226,6 +230,7 @@ export default function Home() {
           {view === "army" ? <MemeArmy /> : null}
           {view === "warroom" ? <WarRoom /> : null}
           {view === "agents" ? <AgentsView /> : null}
+          {view === "trending" ? <TrendingView onGoAgents={() => setView("agents")} /> : null}
           {view === "llm" && session?.mode === "operator" ? <LlmConsole /> : null}
           {view === "account" ? <AccountView /> : null}
         </main>
