@@ -10,6 +10,7 @@ import {
   Swords,
   UserRound,
   Flame,
+  Trophy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +20,7 @@ import { CreateWizard, type WizardResult } from "@/components/factory/create-wiz
 import { ResultsWorkspace } from "@/components/factory/results-workspace";
 import { MemeStudio } from "@/components/factory/meme-studio";
 import { MemeArmy } from "@/components/factory/meme-army";
+import { WarRoom } from "@/components/factory/war-room";
 import { CampaignsView } from "@/components/factory/campaigns";
 import { LibraryView } from "@/components/factory/library";
 import { BrandsView } from "@/components/factory/brands";
@@ -35,6 +37,7 @@ type View =
   | "brands"
   | "publishing"
   | "army"
+  | "warroom"
   | "account";
 
 const NAV: { key: View; label: string; icon: React.ComponentType<{ className?: string }>; badge?: string }[] = [
@@ -45,10 +48,11 @@ const NAV: { key: View; label: string; icon: React.ComponentType<{ className?: s
   { key: "brands", label: "Brand Profiles", icon: Fingerprint },
   { key: "publishing", label: "Publishing", icon: Flame },
   { key: "army", label: "Meme Army", icon: Swords, badge: "PRO" },
+  { key: "warroom", label: "War Room", icon: Trophy, badge: "NEW" },
   { key: "account", label: "Account / Usage", icon: UserRound },
 ];
 
-const MOBILE_NAV: View[] = ["create", "studio", "campaigns", "library", "army", "account"];
+const MOBILE_NAV: View[] = ["create", "studio", "campaigns", "library", "army", "warroom", "account"];
 
 export default function Home() {
   const [view, setView] = useState<View>("create");
@@ -174,6 +178,7 @@ export default function Home() {
           {view === "brands" ? <BrandsView onUseInCampaign={startWizardWithBrand} /> : null}
           {view === "publishing" ? <PublishingView /> : null}
           {view === "army" ? <MemeArmy /> : null}
+          {view === "warroom" ? <WarRoom /> : null}
           {view === "account" ? <AccountView /> : null}
         </main>
       </div>
@@ -196,7 +201,7 @@ export default function Home() {
         className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border/60 bg-background/95 backdrop-blur-md pb-safe"
         aria-label="Primary"
       >
-        <div className="grid grid-cols-6">
+        <div className="grid grid-cols-7">
           {NAV.filter((n) => MOBILE_NAV.includes(n.key)).map((item) => (
             <button
               key={item.key}

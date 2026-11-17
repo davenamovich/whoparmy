@@ -5,6 +5,7 @@ import { runGenerationJob, recordUsage } from "@/lib/pr-engine";
 import { FORMAT_MAP, isContentCategory } from "@/lib/formats";
 import { isSupportedLanguage, languageLabel } from "@/lib/languages";
 import { getPlan } from "@/lib/plans";
+import { awardXp } from "@/lib/game";
 import type { ProfileDTO } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -118,6 +119,10 @@ export async function POST(req: NextRequest) {
         status: "GENERATING",
       },
     });
+
+    // War Room: creating a campaign is a real work event — it earns XP.
+    // XP is a reward, never a gate: a failure here must not fail creation.
+    void awardXp(user.id, "CAMPAIGN_CREATED", campaign.name.slice(0, 80)).catch(() => {});
 
     // ── pre-create asset placeholders ──
     const assetData: {

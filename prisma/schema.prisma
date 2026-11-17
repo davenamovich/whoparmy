@@ -31,6 +31,8 @@ model User {
   assets       Asset[]
   jobs         GenerationJob[]
   army         ArmyBot?
+  gameProfile  GameProfile?
+  xpEvents     XpEvent[]
 }
 
 // ─── Brand profiles (multiple allowed for agencies) ─────────────────
@@ -153,6 +155,37 @@ model UsageRecord {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+// ─── WAR ROOM — gamified Bifrost layer ──────────────────────────────
+// The member's game identity. XP comes only from real work events
+// (packs generated, campaigns created) recorded in XpEvent — never
+// from page views or clicks. Energy is NOT stored: it is the plan's
+// monthly allowance read against UsageRecord (see src/lib/game.ts).
+model GameProfile {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  xp           Int      @default(0)
+  streakDays   Int      @default(0)
+  lastActiveOn String? // YYYY-MM-DD (UTC) of the last XP-earning day
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model XpEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  kind      String // PACK_GENERATED | CAMPAIGN_CREATED | SMART_ROUTE
+  amount    Int
+  meta      String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, kind])
 }
 
 // ─── P&R MEME ARMY — multi-tenant Telegram bot engine ───────────────

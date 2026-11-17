@@ -4,6 +4,7 @@ import { getWhopUser } from "@/lib/auth";
 import { parseJsonSafe, recordUsage } from "@/lib/pr-engine";
 import { languageLabel } from "@/lib/languages";
 import { assertMonthlyAllowance } from "@/lib/usage-server";
+import { awardXp } from "@/lib/game";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -91,6 +92,9 @@ Respond with STRICT JSON only: {"items":[{"kind":string,"title":string,"body":st
     }
 
     void recordUsage(user.id, "TEXT", 1, "meme-army-pack");
+    // War Room: a generated pack is a real work event — it earns XP.
+    // XP is a reward, never a gate: a failure here must not fail the pack.
+    void awardXp(user.id, "PACK_GENERATED", body.title?.slice(0, 80)).catch(() => {});
 
     const items = parsed.items.slice(0, 6).map((it) => ({
       kind: (it.kind ?? "POST").toString().toUpperCase().slice(0, 16),
