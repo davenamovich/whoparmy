@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowRight, Coins, Link2, Lock, MousePointerClick, Sparkles } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, Coins, Link2, Lock, MousePointerClick, Sparkles } from "lucide-react";
 import { stashRefFromUrl } from "@/lib/ref-stash";
 import type { BridgePartner } from "@/lib/bridge";
 
@@ -45,26 +45,25 @@ const STEPS = [
 
 export function LandingPage() {
   const [partners, setPartners] = useState<BridgePartner[]>([]);
-  const [active, setActive] = useState<string>("");
+  const sliderRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     stashRefFromUrl();
     void fetch("/api/bridge/partners")
       .then((r) => r.json())
       .then((data) => {
-        if (Array.isArray(data.partners)) {
-          setPartners(data.partners as BridgePartner[]);
-          setActive((data.partners as BridgePartner[])[0]?.key ?? "");
-        }
+        if (Array.isArray(data.partners)) setPartners(data.partners as BridgePartner[]);
       })
       .catch(() => undefined);
   }, []);
 
-  const activePartner = partners.find((p) => p.key === active);
+  function slide(dir: 1 | -1) {
+    sliderRef.current?.scrollBy({ left: dir * 264, behavior: "smooth" });
+  }
 
   return (
     <main className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto max-w-4xl px-4 py-12 space-y-14">
+      <div className="mx-auto max-w-4xl px-4 py-10 space-y-10">
         <header className="text-center space-y-5">
           <p className="text-xs font-bold tracking-[0.25em] text-primary uppercase">
             Plunder &amp; Riffle — The Global Content Factory
@@ -94,41 +93,56 @@ export function LandingPage() {
           </p>
         </header>
 
-        <section className="space-y-4">
-          <h2 className="text-sm font-bold text-center uppercase tracking-widest text-muted-foreground">
-            The stack you&apos;ll own
-          </h2>
-          <div className="flex flex-wrap justify-center gap-2">
-            {partners.map((p) => (
+        <section className="space-y-3">
+          <div className="flex items-center justify-center gap-3">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
+              The stack you&apos;ll own
+            </h2>
+            <div className="flex gap-1">
               <button
-                key={p.key}
-                onClick={() => setActive(p.key)}
-                className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
-                  p.key === active
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border hover:border-primary/60"
-                }`}
+                onClick={() => slide(-1)}
+                aria-label="Previous offers"
+                className="rounded-full border border-border p-1.5 text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
               >
-                {p.name}
+                <ChevronLeft className="h-4 w-4" />
               </button>
+              <button
+                onClick={() => slide(1)}
+                aria-label="Next offers"
+                className="rounded-full border border-border p-1.5 text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+          {/* The offer slider (Dave, 2026-11-17): one compact card per
+              offer — name, a one-line highlight, and the locked link
+              teaser — in a horizontal snap slider instead of a tall
+              list, so the front door stays short. */}
+          <div
+            ref={sliderRef}
+            className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2 [scrollbar-width:thin]"
+          >
+            {partners.map((p) => (
+              <div
+                key={p.key}
+                className="snap-start shrink-0 w-[248px] rounded-xl border border-border bg-card p-4 space-y-2.5"
+              >
+                <p className="font-bold text-sm">{p.name}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">{p.blurb}</p>
+                <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground pt-0.5">
+                  <Lock className="h-3.5 w-3.5 shrink-0 text-primary" />
+                  Your link here once you connect
+                </p>
+              </div>
             ))}
           </div>
-          {activePartner ? (
-            <Card>
-              <CardContent className="py-6 space-y-4">
-                <p className="text-center text-muted-foreground max-w-xl mx-auto">{activePartner.blurb}</p>
-                <div className="mx-auto max-w-md flex items-center gap-2 rounded-md border border-dashed border-border px-3 py-2.5 text-sm text-muted-foreground">
-                  <Lock className="h-4 w-4 shrink-0 text-primary" />
-                  <span className="truncate">Your {activePartner.name} link lives here once you connect.</span>
-                </div>
-                <p className="text-center">
-                  <a href="/api/auth/whop" className="text-sm text-primary underline underline-offset-2">
-                    Connect with Whop to save yours
-                  </a>
-                </p>
-              </CardContent>
-            </Card>
-          ) : null}
+          <p className="text-center text-xs text-muted-foreground">
+            <a href="/api/auth/whop" className="text-primary underline underline-offset-2">
+              Connect with Whop
+            </a>{" "}
+            to save yours — your first save earns 25 free generations.
+          </p>
         </section>
 
         <section id="how" className="space-y-4 scroll-mt-8">

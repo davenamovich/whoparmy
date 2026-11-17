@@ -97,18 +97,6 @@ export const BRIDGE_PARTNERS: BridgePartner[] = [
     blurb: "Where apps deploy — host your own stack the way this one runs.",
     example: "Your Railway referral link",
   },
-  {
-    key: "polyshares",
-    name: "Polyshares",
-    blurb: "Prediction-market shares your audience can trade on.",
-    example: "Your Polyshares referral link",
-  },
-  {
-    key: "amelia",
-    name: "Amelia",
-    blurb: "Booking and scheduling for service businesses.",
-    example: "Your Amelia referral link",
-  },
 ];
 
 const PARTNER_KEYS = new Set(BRIDGE_PARTNERS.map((p) => p.key));
