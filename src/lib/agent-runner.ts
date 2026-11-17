@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { JOB_TIERS } from "@/lib/agents";
 import { MODEL_TIERS, awardXp } from "@/lib/game";
 import { recordUsage } from "@/lib/pr-engine";
+import { languageLabel } from "@/lib/languages";
 
 /**
  * ─── AGENT RUNNER — executes the job queue for real ─────────────────
@@ -138,7 +139,12 @@ export async function runAgentJob(jobId: string): Promise<void> {
   const tierKey = JOB_TIERS[job.kind] ?? "mid";
 
   try {
-    const system = KIND_INSTRUCTIONS[job.kind] ?? KIND_INSTRUCTIONS.MEME;
+    // Dave's language rule: any language in, selected language out. The
+    // instruction scaffold stays English; the output is pinned to the
+    // job's selected language no matter what language the brief used.
+    const system =
+      (KIND_INSTRUCTIONS[job.kind] ?? KIND_INSTRUCTIONS.MEME) +
+      `\n\nOUTPUT LANGUAGE: Write ALL of your output in ${languageLabel(job.language)} (${job.language}), regardless of the language the brief is written in. The brief may arrive in any language; your output language is always the selected one, never the brief's.`;
     const user = `Agent: ${hire.name} (${hire.templateKey})\nPieces requested: ${job.pieces}\nBrief: ${job.brief}`;
     const result = await callStarimg(tierKey, system, user);
 

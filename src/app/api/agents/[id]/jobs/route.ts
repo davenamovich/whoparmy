@@ -5,6 +5,7 @@ import { JOB_TIERS, tierCost } from "@/lib/agents";
 import { runAgentJob } from "@/lib/agent-runner";
 import { getPlan } from "@/lib/plans";
 import { countMonthlyUsage } from "@/lib/usage-server";
+import { isSupportedLanguage } from "@/lib/languages";
 
 export const runtime = "nodejs";
 
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     const user = await getWhopUser();
     const { id } = await params;
-    const body = (await req.json()) as { kind?: string; brief?: string; pieces?: number };
+    const body = (await req.json()) as { kind?: string; brief?: string; pieces?: number; language?: string };
 
     const kind = (body.kind ?? "MEME").toUpperCase();
     if (!(kind in JOB_TIERS)) {
@@ -28,6 +29,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const brief = body.brief?.trim();
     if (!brief) return NextResponse.json({ error: "Give the agent a brief." }, { status: 400 });
     const pieces = Math.min(10, Math.max(1, Math.floor(Number(body.pieces ?? 1)) || 1));
+    // Any language in, selected language out: the brief may be written in
+    // anything; the job's output language is the member's selection.
+    const language = isSupportedLanguage(body.language ?? "") ? (body.language as string) : "en";
 
     const hire = await db.hiredAgent.findFirst({ where: { id, userId: user.id } });
     if (!hire) return NextResponse.json({ error: "Agent not found." }, { status: 404 });
@@ -59,7 +63,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const used = hire.tokensUsed + cost;
     const [job] = await db.$transaction([
       db.agentJob.create({
-        data: { hireId: hire.id, userId: user.id, kind, brief: brief.slice(0, 2000), pieces, tokenCost: cost },
+        data: { hireId: hire.id, userId: user.id, kind, brief: brief.slice(0, 2000), language, pieces, tokenCost: cost },
       }),
       db.hiredAgent.update({
         where: { id: hire.id },

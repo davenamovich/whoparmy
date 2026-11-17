@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
+import { LANGUAGES, isSupportedLanguage } from "@/lib/languages";
 import type { AgentTemplate } from "@/lib/agents";
 
 interface Hire {
@@ -59,13 +60,17 @@ export function AgentsView() {
   const { toast } = useToast();
   const tA = useTranslations("agents");
   const tO = useTranslations("onboarding");
+  const uiLocale = useLocale();
+  // Job output defaults to the member's UI language when it's one of the
+  // 23 content languages; the job form lets them pick any other.
+  const defaultJobLanguage = isSupportedLanguage(uiLocale) ? uiLocale : "en";
   const [planInfo, setPlanInfo] = useState<{ name: string; price: string; botSeats: number; botsRented: number; memesUsed: number; memesLimit: number } | null>(null);
   const [catalog, setCatalog] = useState<AgentTemplate[]>([]);
   const [hires, setHires] = useState<Hire[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [listings, setListings] = useState<Listing[]>([]);
   const [myUserId, setMyUserId] = useState<string>("");
-  const [jobForms, setJobForms] = useState<Record<string, { kind: string; brief: string; pieces: string }>>({});
+  const [jobForms, setJobForms] = useState<Record<string, { kind: string; brief: string; pieces: string; language: string }>>({});
   const [campForm, setCampForm] = useState({ title: "", description: "", bounty: "100" });
   const [claimAgent, setClaimAgent] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -217,7 +222,7 @@ export function AgentsView() {
           </CardHeader>
           <CardContent className="space-y-4">
             {hires.map((h) => {
-              const form = jobForms[h.id] ?? { kind: "MEME", brief: "", pieces: "1" };
+              const form = jobForms[h.id] ?? { kind: "MEME", brief: "", pieces: "1", language: defaultJobLanguage };
               return (
                 <div key={h.id} className="rounded-lg border border-border/60 p-4 space-y-3">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -252,6 +257,18 @@ export function AgentsView() {
                         <option value="HOOK">Hooks (final)</option>
                         <option value="QA">Claude QA pass (quality)</option>
                       </select>
+                      <select
+                        className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                        value={form.language}
+                        onChange={(e) => setJobForms((f) => ({ ...f, [h.id]: { ...form, language: e.target.value } }))}
+                        aria-label="Output language"
+                      >
+                        {LANGUAGES.map((l) => (
+                          <option key={l.code} value={l.code}>
+                            {l.flag} {l.native}
+                          </option>
+                        ))}
+                      </select>
                       <Input
                         className="flex-1"
                         placeholder="Brief — what should the agent make?"
@@ -273,7 +290,7 @@ export function AgentsView() {
                               fetch(`/api/agents/${h.id}/jobs`, {
                                 method: "POST",
                                 headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ kind: form.kind, brief: form.brief, pieces: Number(form.pieces || 1) }),
+                                body: JSON.stringify({ kind: form.kind, brief: form.brief, pieces: Number(form.pieces || 1), language: form.language }),
                               }),
                             "Job queued for your agent",
                           )

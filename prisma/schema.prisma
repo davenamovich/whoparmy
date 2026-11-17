@@ -231,6 +231,7 @@ model AgentJob {
   userId    String
   kind      String // SCOUT | MEME | HOOK | QA | CAMPAIGN
   brief     String
+  language  String   @default("en") // selected OUTPUT language (content catalog code): any language in, selected language out
   pieces    Int      @default(1)
   tokenCost Int // weighted tokens charged to the hire's allocation
   status    String   @default("QUEUED") // QUEUED | RUNNING | DONE | FAILED | CANCELLED
