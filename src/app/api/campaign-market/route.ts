@@ -31,14 +31,16 @@ export async function POST(req: NextRequest) {
     if (!title || !description) {
       return NextResponse.json({ error: "A campaign needs a title and a brief." }, { status: 400 });
     }
+    // Bounties are denominated in memes (the member-facing unit).
+    // The bountyTokens column stores the count; tokens stay internal.
     const bounty = Math.floor(Number(body.bountyTokens ?? 0));
-    if (!Number.isFinite(bounty) || bounty < 1000) {
-      return NextResponse.json({ error: "Bounty must be at least 1,000 tokens." }, { status: 400 });
+    if (!Number.isFinite(bounty) || bounty < 10) {
+      return NextResponse.json({ error: "Bounty must be at least 10 memes." }, { status: 400 });
     }
     const wallet = await getWalletState(user.id, user.plan);
     if (bounty > wallet.available) {
       return NextResponse.json(
-        { error: `Bounty exceeds your unallocated balance (${wallet.available.toLocaleString()} tokens).` },
+        { error: `That bounty is more than your plan can reserve right now. Lower it or upgrade.` },
         { status: 402 },
       );
     }

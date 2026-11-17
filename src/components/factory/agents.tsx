@@ -1,14 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Bot, Wallet, Pause, Play, Store, Briefcase, ListOrdered } from "lucide-react";
+import { Bot, Wallet, Pause, Play, Store, Briefcase, ListOrdered, Zap } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import type { AgentTemplate, WalletState } from "@/lib/agents";
+import type { AgentTemplate } from "@/lib/agents";
 
 interface Hire {
   id: string;
@@ -45,25 +45,25 @@ interface Listing {
 const fmt = (n: number) => n.toLocaleString();
 
 /**
- * HIRE AGENTS — the agent economy.
- * Members allocate weighted tokens from their plan wallet to an agent;
- * the agent works a job queue against that budget at real model costs.
- * Jobs execute through Starimg the moment they're ordered (agent
- * runner, src/lib/agent-runner.ts); failed runs are refunded in full.
- * Campaign bounties are token reservations between members —
+ * RENT A BOT — the bot rental economy.
+ * Members rent bots by the month on their plan's seats and count
+ * memes, never tokens (pricing decision 2026-11-17). Tokens remain an
+ * internal ops ledger: each bot carries an internal fuel budget and
+ * jobs execute through Starimg the moment they're ordered (agent
+ * runner, src/lib/agent-runner.ts); failed runs are never charged.
+ * Campaign bounties are meme reservations between members —
  * SIMULATED value until real payments exist.
  */
 export function AgentsView() {
   const { toast } = useToast();
-  const [wallet, setWallet] = useState<WalletState | null>(null);
+  const [planInfo, setPlanInfo] = useState<{ name: string; price: string; botSeats: number; botsRented: number; memesUsed: number; memesLimit: number } | null>(null);
   const [catalog, setCatalog] = useState<AgentTemplate[]>([]);
   const [hires, setHires] = useState<Hire[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [listings, setListings] = useState<Listing[]>([]);
   const [myUserId, setMyUserId] = useState<string>("");
-  const [budgets, setBudgets] = useState<Record<string, string>>({});
   const [jobForms, setJobForms] = useState<Record<string, { kind: string; brief: string; pieces: string }>>({});
-  const [campForm, setCampForm] = useState({ title: "", description: "", bounty: "10000" });
+  const [campForm, setCampForm] = useState({ title: "", description: "", bounty: "100" });
   const [claimAgent, setClaimAgent] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
 
@@ -71,7 +71,7 @@ export function AgentsView() {
     const [a, c] = await Promise.all([fetch("/api/agents"), fetch("/api/campaign-market")]);
     if (a.ok) {
       const d = await a.json();
-      setWallet(d.wallet);
+      setPlanInfo(d.plan);
       setCatalog(d.catalog);
       setHires(d.hires);
       setJobs(d.jobs);
@@ -116,35 +116,42 @@ export function AgentsView() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
-          <Bot className="h-6 w-6 text-primary" /> Hire Agents
+          <Bot className="h-6 w-6 text-primary" /> Rent a Bot
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Your own agent, funded with your tokens. Allocate a budget, order work, and the agent burns tokens only at
-          real model costs. Owner approves — agents create.
+          Your own meme bot, rented by the month. Order work, watch it ship, approve what goes out. No dashboards to
+          learn, no AI math — just memes. Owner approves — bots create.
         </p>
       </div>
 
-      {wallet ? (
+      {planInfo ? (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Wallet className="h-3.5 w-3.5 text-primary" /> Token wallet (monthly)
+              <Wallet className="h-3.5 w-3.5 text-primary" /> Your plan — {planInfo.name} ({planInfo.price})
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-center">
-              {[
-                ["Allowance", wallet.allowance],
-                ["Allocated to agents", wallet.allocated],
-                ["Spent by agents", wallet.spent],
-                ["Bounties reserved", wallet.bountyReserved],
-                ["Available", wallet.available],
-              ].map(([label, v]) => (
-                <div key={label as string} className="rounded-lg border border-border/60 p-3">
-                  <div className="text-lg font-black">{fmt(v as number)}</div>
-                  <div className="text-[11px] text-muted-foreground">{label}</div>
-                </div>
-              ))}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-center">
+              <div className="rounded-lg border border-border/60 p-3">
+                <div className="text-lg font-black">{planInfo.botsRented} / {planInfo.botSeats}</div>
+                <div className="text-[11px] text-muted-foreground">Bots rented</div>
+              </div>
+              <div className="rounded-lg border border-border/60 p-3">
+                <div className="text-lg font-black">{fmt(planInfo.memesUsed)} / {fmt(planInfo.memesLimit)}</div>
+                <div className="text-[11px] text-muted-foreground">Memes this month</div>
+              </div>
+              <div className="rounded-lg border border-border/60 p-3">
+                <div className="text-lg font-black">{fmt(Math.max(0, planInfo.memesLimit - planInfo.memesUsed))}</div>
+                <div className="text-[11px] text-muted-foreground">Memes left</div>
+              </div>
+            </div>
+            <div className="mt-3">
+              <Progress value={planInfo.memesLimit > 0 ? Math.min(100, Math.round((planInfo.memesUsed / planInfo.memesLimit) * 100)) : 0} className="h-2" />
+              <p className="text-[11px] text-muted-foreground mt-1.5">
+                On the house lane your memes come out of this monthly meter. Connect your own key (BYOK) and the
+                meter lifts — you pay a cent per call on your key, the bot never stops.
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -153,7 +160,7 @@ export function AgentsView() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-2">
-            <Store className="h-4 w-4 text-primary" /> Agent marketplace
+            <Store className="h-4 w-4 text-primary" /> Bot rental
           </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2">
@@ -164,33 +171,44 @@ export function AgentsView() {
                 <Badge className="bg-primary/15 text-primary border-0 text-[10px]">{t.tierKey} tier</Badge>
               </div>
               <p className="text-xs text-muted-foreground">{t.role}</p>
-              <p className="text-[11px] text-muted-foreground">Minimum allocation {fmt(t.minBudget)} tokens</p>
-              <div className="flex gap-2">
-                <Input
-                  inputMode="numeric"
-                  placeholder={`${t.minBudget}`}
-                  value={budgets[t.key] ?? ""}
-                  onChange={(e) => setBudgets((b) => ({ ...b, [t.key]: e.target.value }))}
-                />
+              <div className="flex items-center gap-2">
                 <Button
-                  disabled={busy}
+                  disabled={busy || (planInfo != null && planInfo.botsRented >= planInfo.botSeats)}
                   onClick={() =>
                     void act(
                       () =>
                         fetch("/api/agents", {
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ templateKey: t.key, tokenBudget: Number(budgets[t.key] || t.minBudget) }),
+                          body: JSON.stringify({ templateKey: t.key }),
                         }),
-                      `${t.name} hired`,
+                      `${t.name} rented — it's on your team`,
                     )
                   }
                 >
-                  Hire
+                  Rent this bot
                 </Button>
+                {planInfo && planInfo.botsRented >= planInfo.botSeats ? (
+                  <span className="text-[11px] text-muted-foreground">All your bot seats are rented — upgrade for more.</span>
+                ) : null}
               </div>
             </div>
           ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Zap className="h-4 w-4 text-primary" /> The upgrade: bring your own key
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Connect your own P&amp;R key and the house meter lifts. You pay a cent per call on your own key, your
+            bots run uncapped, and the rental is just for the bots and the platform. Guided key setup arrives with
+            the BYOK onboarding pass — until then, the house lane above is the way in.
+          </p>
         </CardContent>
       </Card>
 
@@ -198,12 +216,11 @@ export function AgentsView() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <Bot className="h-4 w-4 text-primary" /> Your agents
+              <Bot className="h-4 w-4 text-primary" /> Your bots
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {hires.map((h) => {
-              const pct = h.tokenBudget > 0 ? Math.round((h.tokensUsed / h.tokenBudget) * 100) : 0;
               const form = jobForms[h.id] ?? { kind: "MEME", brief: "", pieces: "1" };
               return (
                 <div key={h.id} className="rounded-lg border border-border/60 p-4 space-y-3">
@@ -222,12 +239,10 @@ export function AgentsView() {
                       ) : null}
                     </div>
                   </div>
-                  <div>
-                    <Progress value={pct} className="h-2" />
-                    <div className="text-[11px] text-muted-foreground mt-1">
-                      {fmt(h.tokensUsed)} / {fmt(h.tokenBudget)} tokens used · {fmt(h.tokenBudget - h.tokensUsed)} left
-                      {h.agent37Ref ? ` · Agent37: ${h.agent37Ref}` : " · runs on the in-app Starimg runner"}
-                    </div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {jobs.filter((j) => j.hireId === h.id && j.status === "DONE").length} jobs finished ·{" "}
+                    {jobs.filter((j) => j.hireId === h.id && (j.status === "QUEUED" || j.status === "RUNNING")).length} in the queue
+                    {h.agent37Ref ? ` · Agent37: ${h.agent37Ref}` : " · runs on the P&R engine"}
                   </div>
                   {h.status === "ACTIVE" ? (
                     <div className="flex flex-col sm:flex-row gap-2">
@@ -316,10 +331,10 @@ export function AgentsView() {
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">{j.kind} — {j.brief}</div>
                       <div className="text-[11px] text-muted-foreground">
-                        {j.pieces} piece{j.pieces === 1 ? "" : "s"} · {fmt(j.tokenCost)} tokens
+                        {j.pieces} piece{j.pieces === 1 ? "" : "s"}
                         {j.status === "QUEUED" ? " · runs automatically through Starimg" : ""}
                         {j.status === "DONE" && parsed?.model ? ` · ran on ${parsed.model}` : ""}
-                        {j.status === "FAILED" ? " · charge refunded" : ""}
+                        {j.status === "FAILED" ? " · nothing charged" : ""}
                       </div>
                     </div>
                   </div>
@@ -347,13 +362,14 @@ export function AgentsView() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-xs text-muted-foreground">
-            Post a campaign with a token bounty and another member's agent takes it on — or send your agent out to
-            earn. Bounties are token reservations; their value is SIMULATED until real payments exist.
+            Post a campaign with a meme bounty and another member's bot takes it on — or send your bot out to
+            earn. Bounties are reservations from your monthly memes; their cash value is SIMULATED until real
+            payments exist.
           </p>
           <div className="grid gap-2 md:grid-cols-[1fr_1fr_140px_auto]">
             <Input placeholder="Campaign title" value={campForm.title} onChange={(e) => setCampForm((f) => ({ ...f, title: e.target.value }))} />
             <Input placeholder="Brief — what should the campaign do?" value={campForm.description} onChange={(e) => setCampForm((f) => ({ ...f, description: e.target.value }))} />
-            <Input inputMode="numeric" placeholder="Bounty" value={campForm.bounty} onChange={(e) => setCampForm((f) => ({ ...f, bounty: e.target.value }))} />
+            <Input inputMode="numeric" placeholder="Bounty (memes)" value={campForm.bounty} onChange={(e) => setCampForm((f) => ({ ...f, bounty: e.target.value }))} />
             <Button
               disabled={busy || !campForm.title.trim() || !campForm.description.trim()}
               onClick={() =>
@@ -377,7 +393,7 @@ export function AgentsView() {
               <div key={l.id} className="rounded-lg border border-border/60 p-3 space-y-1.5">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-semibold">{l.title}</span>
-                  <Badge className="bg-primary/15 text-primary border-0 text-[10px]">{fmt(l.bountyTokens)} token bounty</Badge>
+                  <Badge className="bg-primary/15 text-primary border-0 text-[10px]">{fmt(l.bountyTokens)} meme bounty</Badge>
                   <Badge variant="outline" className="text-[10px]">{l.status}</Badge>
                   <span className="text-[11px] text-muted-foreground">by {l.poster.whopUsername ?? l.poster.name ?? "a member"}</span>
                 </div>

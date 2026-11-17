@@ -1,45 +1,64 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getWhopUser } from "@/lib/auth";
-import { AGENT_CATALOG, getWalletState, templateByKey } from "@/lib/agents";
+import { AGENT_CATALOG, getWalletState, internalBotBudget, templateByKey } from "@/lib/agents";
+import { getPlan } from "@/lib/plans";
+import { countMonthlyUsage } from "@/lib/usage-server";
 
 export const runtime = "nodejs";
 
-/** Agent economy state: wallet, marketplace catalog, your agents, your job queue. */
+/** Agent economy state: plan + meme meter, bot catalog, your bots, your job queue.
+ *  Tokens are an internal ops ledger — members see bots and memes only. */
 export async function GET() {
   try {
     const user = await getWhopUser();
-    const [wallet, hires, jobs] = await Promise.all([
+    const plan = getPlan(user.plan);
+    const [wallet, hires, jobs, memesUsed] = await Promise.all([
       getWalletState(user.id, user.plan),
       db.hiredAgent.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" } }),
       db.agentJob.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" }, take: 20 }),
+      countMonthlyUsage(user.id),
     ]);
-    return NextResponse.json({ wallet, catalog: AGENT_CATALOG, hires, jobs });
+    return NextResponse.json({
+      wallet,
+      plan: {
+        key: plan.key,
+        name: plan.name,
+        price: plan.price,
+        botSeats: plan.botSeats,
+        botsRented: hires.length,
+        memesUsed,
+        memesLimit: plan.monthlyItems,
+      },
+      catalog: AGENT_CATALOG,
+      hires,
+      jobs,
+    });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to load agents" }, { status: 500 });
   }
 }
 
-/** Hire an agent: reserve `tokenBudget` weighted tokens from the plan wallet. */
+/** Rent a bot: fills one of the plan's bot seats. The bot's fuel budget
+ *  is allocated internally — members never handle tokens. */
 export async function POST(req: NextRequest) {
   try {
     const user = await getWhopUser();
-    const body = (await req.json()) as { templateKey?: string; name?: string; tokenBudget?: number };
+    const body = (await req.json()) as { templateKey?: string; name?: string };
     const template = body.templateKey ? templateByKey(body.templateKey) : undefined;
     if (!template) {
-      return NextResponse.json({ error: "Pick an agent from the marketplace catalog." }, { status: 400 });
+      return NextResponse.json({ error: "Pick a bot from the rental catalog." }, { status: 400 });
     }
-    const budget = Math.floor(Number(body.tokenBudget ?? 0));
-    if (!Number.isFinite(budget) || budget < template.minBudget) {
+    const plan = getPlan(user.plan);
+    const rented = await db.hiredAgent.count({ where: { userId: user.id } });
+    if (rented >= plan.botSeats) {
       return NextResponse.json(
-        { error: `${template.name} needs at least ${template.minBudget.toLocaleString()} tokens allocated.` },
-        { status: 400 },
-      );
-    }
-    const wallet = await getWalletState(user.id, user.plan);
-    if (budget > wallet.available) {
-      return NextResponse.json(
-        { error: `Not enough unallocated tokens — ${wallet.available.toLocaleString()} available in your ${user.plan} wallet.` },
+        {
+          error:
+            plan.botSeats === 1
+              ? `Your ${plan.name} plan includes 1 bot and it's already rented. Upgrade for more bots — or connect your own key (BYOK) to run uncapped.`
+              : `All ${plan.botSeats} bot seats on your ${plan.name} plan are rented. Upgrade for more bots.`,
+        },
         { status: 402 },
       );
     }
@@ -48,11 +67,11 @@ export async function POST(req: NextRequest) {
         userId: user.id,
         templateKey: template.key,
         name: body.name?.trim().slice(0, 60) || template.name,
-        tokenBudget: budget,
+        tokenBudget: internalBotBudget(user.plan),
       },
     });
     return NextResponse.json({ hire }, { status: 201 });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Hire failed" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Rental failed" }, { status: 500 });
   }
 }

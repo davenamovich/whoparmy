@@ -55,10 +55,10 @@ export type XpKind = keyof typeof XP_VALUES;
  *  proven live 2026-11-16 — see the Bifrost proof report). Costs are
  *  weighted tokens (tokens x coefficient) for one typical brief job. */
 export const MODEL_TIERS = [
-  { key: "volume", label: "Scout", model: "deepseek-v4.1-flash-1017", coefficient: 0.16, typicalWeightedTokens: 40, blurb: "Angles, drafts, scouting. Fastest and cheapest." },
-  { key: "mid", label: "Balanced", model: "gpt-6-luna", coefficient: 0.3, typicalWeightedTokens: 74, blurb: "Captions, variants, everyday generation." },
-  { key: "final", label: "Flagship", model: "gpt-6-sol", coefficient: 2, typicalWeightedTokens: 438, blurb: "The hook or headline that ships." },
-  { key: "quality", label: "Claude QA", model: "claude-sonnet-5", coefficient: 2, typicalWeightedTokens: 9000, blurb: "Rare quality pass. Costs ~200x a Scout run — the router never picks it for you." },
+  { key: "volume", label: "Scout", model: "deepseek-v4.1-flash-1017", coefficient: 0.16, typicalWeightedTokens: 40, fuel: "Low", blurb: "Angles, drafts, scouting. Fastest and lightest on fuel." },
+  { key: "mid", label: "Balanced", model: "gpt-6-luna", coefficient: 0.3, typicalWeightedTokens: 74, fuel: "Medium", blurb: "Captions, variants, everyday generation." },
+  { key: "final", label: "Flagship", model: "gpt-6-sol", coefficient: 2, typicalWeightedTokens: 438, fuel: "High", blurb: "The hook or headline that ships." },
+  { key: "quality", label: "Claude QA", model: "claude-sonnet-5", coefficient: 2, typicalWeightedTokens: 9000, fuel: "Very high", blurb: "Rare quality pass. Burns ~200x a Scout run — the router never picks it for you." },
 ] as const;
 
 function utcDay(d = new Date()): string {

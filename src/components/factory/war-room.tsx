@@ -200,7 +200,7 @@ export function WarRoom() {
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <span className="text-sm font-semibold">{t.label}</span>
                   <span className="text-[11px] text-muted-foreground">
-                    {t.model} · x{t.coefficient} · ~{t.typicalWeightedTokens.toLocaleString()} tokens a job
+                    {t.model} · fuel: {t.fuel}
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">{t.blurb}</p>
@@ -208,7 +208,7 @@ export function WarRoom() {
             ))}
             <p className="text-[11px] text-muted-foreground">
               Routing rule: volume on Scout, everyday work on Balanced, the line that ships on Flagship, Claude QA
-              only when it is worth ~200x. Costs verified in a live run, 2026-11-16.
+              only when it is worth it. Fuel use verified in a live run, 2026-11-16.
             </p>
           </CardContent>
         </Card>

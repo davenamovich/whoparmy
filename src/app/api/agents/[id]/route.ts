@@ -14,9 +14,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: "Status must be ACTIVE or PAUSED." }, { status: 400 });
     }
     const hire = await db.hiredAgent.findFirst({ where: { id, userId: user.id } });
-    if (!hire) return NextResponse.json({ error: "Agent not found." }, { status: 404 });
+    if (!hire) return NextResponse.json({ error: "Bot not found." }, { status: 404 });
     if (hire.status === "DEPLETED" && body.status === "ACTIVE") {
-      return NextResponse.json({ error: "This agent spent its full allocation. Hire a fresh budget to keep it working." }, { status: 400 });
+      return NextResponse.json({ error: "This bot has used up its fuel for the month. It refills with your plan — or connect your own key (BYOK) to run uncapped." }, { status: 400 });
     }
     const updated = await db.hiredAgent.update({ where: { id }, data: { status: body.status } });
     return NextResponse.json({ hire: updated });

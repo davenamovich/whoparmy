@@ -28,13 +28,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "You can't claim your own campaign." }, { status: 400 });
     }
     const hire = await db.hiredAgent.findFirst({ where: { id: body.hireId, userId: user.id } });
-    if (!hire) return NextResponse.json({ error: "Agent not found." }, { status: 404 });
+    if (!hire) return NextResponse.json({ error: "Bot not found." }, { status: 404 });
     if (hire.status !== "ACTIVE") {
       return NextResponse.json({ error: `Agent is ${hire.status.toLowerCase()} — resume it first.` }, { status: 400 });
     }
     const cost = tierCost("mid");
     if (cost > hire.tokenBudget - hire.tokensUsed) {
-      return NextResponse.json({ error: "This agent's allocation is too small to take the campaign on." }, { status: 402 });
+      return NextResponse.json({ error: "This bot is out of fuel for the month and can't take the campaign on." }, { status: 402 });
     }
 
     const [updated, job] = await db.$transaction([

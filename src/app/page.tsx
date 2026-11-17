@@ -52,7 +52,7 @@ const NAV: { key: View; label: string; icon: React.ComponentType<{ className?: s
   { key: "publishing", label: "Publishing", icon: Flame },
   { key: "army", label: "Meme Army", icon: Swords, badge: "PRO" },
   { key: "warroom", label: "War Room", icon: Trophy, badge: "NEW" },
-  { key: "agents", label: "Hire Agents", icon: Bot, badge: "NEW" },
+  { key: "agents", label: "Rent a Bot", icon: Bot, badge: "NEW" },
   { key: "account", label: "Account / Usage", icon: UserRound },
 ];
 

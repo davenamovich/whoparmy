@@ -6,7 +6,8 @@ export interface PlanDef {
   key: string;
   name: string;
   price: string;
-  monthlyItems: number; // max successful generated items / month
+  botSeats: number; // rented bots (agents) included in the plan
+  monthlyItems: number; // max successful generated items (memes) / month on the house lane
   maxFormatsPerCampaign: number;
   maxLanguagesPerCampaign: number;
   maxBrands: number;
@@ -17,44 +18,48 @@ export interface PlanDef {
 export const PLANS: PlanDef[] = [
   {
     key: "FREE",
-    name: "Starter",
+    name: "Trial",
     price: "$0",
-    monthlyItems: 60,
+    botSeats: 1,
+    monthlyItems: 25,
     maxFormatsPerCampaign: 2,
     maxLanguagesPerCampaign: 3,
     maxBrands: 1,
-    features: ["Core content formats", "Selected languages", "Basic content library"],
+    features: ["1 trial bot", "25 memes / month", "Previews only — bring your own key to unlock full generation"],
   },
   {
     key: "CREATOR",
-    name: "Creator",
-    price: "$19/mo",
-    monthlyItems: 500,
+    name: "Starter",
+    price: "$29/mo",
+    botSeats: 1,
+    monthlyItems: 300,
     maxFormatsPerCampaign: 6,
     maxLanguagesPerCampaign: 23,
-    maxBrands: 3,
-    features: ["All 23 languages", "Full format catalog", "Campaign generator", "Saved brand profiles"],
+    maxBrands: 1,
+    features: ["1 rented meme bot", "300 memes / month", "All 23 languages", "Full format catalog", "BYOK upgrade: your key, your fuel, caps lift"],
     highlight: true,
   },
   {
     key: "PRO",
-    name: "Pro",
-    price: "$49/mo",
-    monthlyItems: 2000,
+    name: "Operator",
+    price: "$79/mo",
+    botSeats: 3,
+    monthlyItems: 1500,
     maxFormatsPerCampaign: 12,
     maxLanguagesPerCampaign: 23,
-    maxBrands: 10,
-    features: ["Everything in Creator", "Larger campaigns", "Advanced variations", "Publishing integrations*"],
+    maxBrands: 5,
+    features: ["3 rented bots", "1,500 memes / month", "Campaign marketplace — post and claim", "Advanced variations", "BYOK upgrade: your key, your fuel, caps lift"],
   },
   {
     key: "AGENCY",
     name: "Agency",
-    price: "$99/mo",
-    monthlyItems: 10000,
+    price: "$199/mo",
+    botSeats: 10,
+    monthlyItems: 6000,
     maxFormatsPerCampaign: 25,
     maxLanguagesPerCampaign: 23,
-    maxBrands: 50,
-    features: ["Multiple brands", "Client campaign organization", "Bulk generation", "Highest limits"],
+    maxBrands: 25,
+    features: ["10 rented bots", "6,000 memes / month", "Client brands and workspaces", "Campaign marketplace priority", "BYOK upgrade: your key, your fuel, caps lift"],
   },
 ];
 

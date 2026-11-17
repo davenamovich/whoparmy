@@ -2,6 +2,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { JOB_TIERS } from "@/lib/agents";
 import { MODEL_TIERS, awardXp } from "@/lib/game";
+import { recordUsage } from "@/lib/pr-engine";
 
 /**
  * ─── AGENT RUNNER — executes the job queue for real ─────────────────
@@ -173,9 +174,12 @@ export async function runAgentJob(jobId: string): Promise<void> {
       }),
     ]);
 
-    // Real finished work earns XP, same as a hand-run pack.
+    // Real finished work earns XP, same as a hand-run pack — and meme
+    // output counts on the plan's monthly meme meter (the house lane
+    // the member sees), one usage item per piece.
     if (job.kind === "MEME" || job.kind === "CAMPAIGN") {
       await awardXp(job.userId, "PACK_GENERATED", `agent:${hire.name}`.slice(0, 80)).catch(() => {});
+      await recordUsage(job.userId, "TEXT", job.pieces, "agent-job");
     }
   } catch (err) {
     // Failed work is never charged: refund the full order-time charge.
