@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getWhopConfig, exchangeWhopCode, fetchWhopUserInfo } from "@/lib/whop";
-import { readPkceCookie, clearPkceCookie, setSessionCookie, resolveRedirectUri } from "@/lib/session";
+import { readPkceCookie, clearPkceCookie, setSessionCookie, resolveRedirectUri, canonicalOrigin } from "@/lib/session";
 import { upsertWhopUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
@@ -21,7 +21,10 @@ export const runtime = "nodejs";
  *      access tokens expire after 1 hour by design.
  */
 export async function GET(req: NextRequest) {
-  const origin = req.nextUrl.origin;
+  // nextUrl.origin is the container bind address behind Railway's
+  // proxy (verified live 2026-11-17) — pin redirects to the canonical
+  // public origin so members never land on 0.0.0.0:8080.
+  const origin = canonicalOrigin(req.nextUrl.origin);
   const fail = (message: string) =>
     NextResponse.redirect(`${origin}/?auth_error=${encodeURIComponent(message)}`, { status: 302 });
 

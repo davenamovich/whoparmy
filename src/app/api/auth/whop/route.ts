@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getWhopConfig, buildWhopAuthorizeUrl, whopPublicStatus } from "@/lib/whop";
-import { generatePkcePair, generateState, setPkceCookie, resolveRedirectUri } from "@/lib/session";
+import { generatePkcePair, generateState, setPkceCookie, resolveRedirectUri, canonicalOrigin } from "@/lib/session";
 
 export const runtime = "nodejs";
 
@@ -17,6 +17,19 @@ export const runtime = "nodejs";
  * they never touch the browser's JS.
  */
 export async function GET(req: NextRequest) {
+  // Pin the whole flow to the canonical origin: the PKCE cookie is
+  // host-scoped, so if the member starts on any other host (the Railway
+  // domain, a Whop-hosted link), the callback on the canonical origin
+  // would find no cookie and fail the state check. Bounce first, then
+  // plant the cookie on the canonical origin. NOTE: nextUrl.origin is
+  // the container bind address behind Railway's proxy, so the public
+  // host is read from the forwarding headers instead.
+  const canonical = canonicalOrigin(req.nextUrl.origin);
+  const publicHost = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  if (publicHost && publicHost !== new URL(canonical).host) {
+    return NextResponse.redirect(`${canonical}/api/auth/whop`, { status: 302 });
+  }
+
   const cfg = getWhopConfig();
   if (!cfg.appId) {
     return NextResponse.json(

@@ -90,3 +90,24 @@ export function resolveRedirectUri(origin: string): string {
   if (override) return override;
   return `${origin.replace(/\/$/, "")}/api/auth/whop/callback`;
 }
+
+/**
+ * The app's canonical public origin. Behind Railway's proxy,
+ * req.nextUrl.origin resolves to the container bind address
+ * (https://0.0.0.0:8080) instead of the public host — verified live
+ * 2026-11-17, when OAuth error redirects landed on 0.0.0.0:8080.
+ * WHOP_REDIRECT_URI is the one configured source of truth for where
+ * the app publicly lives, so every redirect the auth flow emits is
+ * pinned to its origin. Falls back to the request origin when unset.
+ */
+export function canonicalOrigin(requestOrigin: string): string {
+  const override = process.env.WHOP_REDIRECT_URI?.trim();
+  if (override) {
+    try {
+      return new URL(override).origin;
+    } catch {
+      // malformed override — fall through to the request origin
+    }
+  }
+  return requestOrigin;
+}
