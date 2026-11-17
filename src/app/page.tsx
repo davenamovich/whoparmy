@@ -33,6 +33,7 @@ import { BrandsView } from "@/components/factory/brands";
 import { AccountView } from "@/components/factory/account";
 import { PublishingView } from "@/components/factory/publishing";
 import { WhopAccountBadge, useWhopSession } from "@/components/factory/whop-auth";
+import { LandingPage } from "@/components/factory/landing";
 import { useTranslations } from "next-intl";
 import { LocaleSwitcher } from "@/components/factory/locale-switcher";
 
@@ -160,6 +161,16 @@ export default function Home() {
 
   const activeLabel =
     view === "results" ? tNav("results") : tNav(NAV.find((n) => n.key === view)?.labelKey ?? "create");
+
+  // The Whop-connection gate (Dave, 2026-11-17): anonymous visitors
+  // get the landing page — the front door borrowed from the Global
+  // Content Factory page. The app's working parts unlock only after
+  // Connect with Whop (any membership, Trial included). A failed
+  // session fetch (session === null) falls through to the app rather
+  // than locking anyone out on a network hiccup.
+  if (!sessionLoading && session && !session.connected) {
+    return <LandingPage />;
+  }
 
   return (
     <div className="min-h-screen flex flex-col">

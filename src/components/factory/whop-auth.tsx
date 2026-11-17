@@ -33,6 +33,7 @@ export interface WhopCheckoutUrls {
 export interface WhopSessionData {
   mode: "whop" | "operator";
   admin: boolean;
+  connected: boolean;
   user: {
     id: string;
     name: string | null;

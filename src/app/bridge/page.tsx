@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowRight, CheckCircle2, Gavel, Link2, Loader2, Trophy } from "lucide-react";
-import type { BridgeState } from "@/lib/bridge";
+import { ArrowRight, CheckCircle2, Gavel, Link2, Loader2, Lock, Trophy } from "lucide-react";
+import type { BridgePartner, BridgeState } from "@/lib/bridge";
 import type { AdminDayView, RotatorState } from "@/lib/rotator";
+import { clearStashedRef, readStashedRef, stashRefFromUrl } from "@/lib/ref-stash";
 
 /**
  * ─── THE BRIDGE ──────────────────────────────────────────────────────
@@ -22,31 +23,65 @@ export default function BridgePage() {
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [justSaved, setJustSaved] = useState<null | { firstSave: boolean; referrerPaid: boolean; saverPaid: boolean }>(null);
+  // The Whop-connection gate (Dave, 2026-11-17): the bridge's working
+  // parts (your links, the rewards, the rotator) unlock only after
+  // Connect with Whop. Anonymous visitors get the teaser.
+  const [gate, setGate] = useState<"loading" | "teaser" | "open">("loading");
+  const [teaserPartners, setTeaserPartners] = useState<BridgePartner[]>([]);
   const attributedRef = useRef(false);
 
   useEffect(() => {
-    // Arriving with ?ref=CODE attributes this member to their inviter
-    // (one-shot, server-side) so the link-save reward can find them.
-    if (!attributedRef.current) {
-      attributedRef.current = true;
-      const code = new URLSearchParams(window.location.search).get("ref");
-      if (code) {
-        void fetch("/api/referrals", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ code }),
-        }).catch(() => undefined);
-      }
-    }
+    // Capture ?ref= BEFORE the gate: an anonymous arrival stashes the
+    // code (lib/ref-stash) so attribution survives the Whop connect
+    // round trip; a connected arrival applies it right away.
+    stashRefFromUrl();
     let alive = true;
-    void fetch("/api/bridge/links")
+
+    void fetch("/api/auth/session", { cache: "no-store" })
       .then((r) => r.json())
-      .then((data) => {
-        if (!alive || !data.bridge) return;
-        setBridge(data.bridge as BridgeState);
-        setDraft(Object.fromEntries((data.bridge as BridgeState).partners.map((p) => [p.key, p.url])));
+      .then((session) => {
+        if (!alive) return;
+        if (!session?.connected) {
+          setGate("teaser");
+          void fetch("/api/bridge/partners")
+            .then((r) => r.json())
+            .then((data) => {
+              if (alive && Array.isArray(data.partners)) setTeaserPartners(data.partners as BridgePartner[]);
+            })
+            .catch(() => undefined);
+          return;
+        }
+        setGate("open");
+        // Apply attribution once: the URL code wins, else the stash
+        // from the pre-connect landing/teaser visit.
+        if (!attributedRef.current) {
+          attributedRef.current = true;
+          const code =
+            new URLSearchParams(window.location.search).get("ref") ?? readStashedRef();
+          if (code) {
+            void fetch("/api/referrals", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ code }),
+            })
+              .catch(() => undefined)
+              .finally(() => clearStashedRef());
+          }
+        }
+        void fetch("/api/bridge/links")
+          .then((r) => r.json())
+          .then((data) => {
+            if (!alive || !data.bridge) return;
+            setBridge(data.bridge as BridgeState);
+            setDraft(Object.fromEntries((data.bridge as BridgeState).partners.map((p) => [p.key, p.url])));
+          })
+          .catch(() => undefined);
       })
-      .catch(() => undefined);
+      .catch(() => {
+        // Session check failed — fall back to the teaser rather than
+        // exposing member state we cannot attribute to a session.
+        if (alive) setGate("teaser");
+      });
     return () => {
       alive = false;
     };
@@ -78,6 +113,83 @@ export default function BridgePage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  if (gate === "loading") {
+    return (
+      <main className="min-h-screen bg-background text-foreground">
+        <p className="mx-auto max-w-3xl px-4 py-12 text-sm text-muted-foreground flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" /> Checking your connection…
+        </p>
+      </main>
+    );
+  }
+
+  if (gate === "teaser") {
+    return (
+      <main className="min-h-screen bg-background text-foreground">
+        <div className="mx-auto max-w-3xl px-4 py-12 space-y-10">
+          <header className="text-center space-y-4">
+            <p className="text-xs font-bold tracking-[0.25em] text-primary uppercase">
+              Plunder &amp; Riffle — The Global Content Factory
+            </p>
+            <h1 className="text-4xl font-black leading-tight">
+              Don&apos;t just make content.
+              <br />
+              Build your own engine.
+            </h1>
+            <p className="text-muted-foreground max-w-xl mx-auto">
+              The tools powering the P&amp;R ecosystem have their own referral programs. Save{" "}
+              <b className="text-foreground">your</b> links for each one, and your stack is live — every
+              meme you make from here can carry the links that pay you. This is step one.
+            </p>
+          </header>
+
+          <Card className="border-primary/50">
+            <CardContent className="py-6 text-center space-y-3">
+              <p className="font-bold">Connect with Whop to open your bridge</p>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                Saving your links, the 25 free generations on your first save, and the daily
+                rotator all live behind your Whop membership — the free Trial counts.
+              </p>
+              <Button asChild size="lg">
+                <a href="/api/auth/whop">
+                  Connect with Whop <ArrowRight className="h-4 w-4 ml-1.5" />
+                </a>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <section className="space-y-4">
+            <h2 className="text-sm font-bold flex items-center gap-2">
+              <Link2 className="h-4 w-4 text-primary" /> The links you&apos;ll save
+            </h2>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {teaserPartners.map((p) => (
+                <Card key={p.key}>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">{p.name}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <p className="text-xs text-muted-foreground">{p.blurb}</p>
+                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Lock className="h-3.5 w-3.5 text-primary" /> Connect to save your link
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </section>
+
+          <footer className="text-center space-y-2 pt-4 border-t border-border/60">
+            <p className="text-[11px] text-muted-foreground">
+              Each referral program has its own terms and payout structure. Commissions aren&apos;t guaranteed.
+            </p>
+            <p className="text-[11px] text-muted-foreground">Powered by Plunder &amp; Riffle MCP.</p>
+          </footer>
+        </div>
+      </main>
+    );
   }
 
   return (

@@ -22,6 +22,12 @@ export async function GET() {
     return NextResponse.json({
       mode,
       admin, // "whop" = signed in via Whop OAuth | "operator" = sandbox/dev fallback
+      // The Whop-connection gate (Dave, 2026-11-17): a REAL session
+      // resolved — Whop member or designated operator — as opposed to
+      // the anonymous operator fallback. Public surfaces (the landing
+      // page, the bridge) show their working parts only when this is
+      // true; everyone else gets the teaser + Connect with Whop.
+      connected: !viaFallback,
       user: {
         id: user.id,
         name: user.name,
