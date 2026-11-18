@@ -164,9 +164,20 @@ export function maxBonusFor(floor: number): number {
   return Math.ceil(Math.max(0, floor) * MAX_BONUS_RATIO);
 }
 
-function bonusFor(roll: number, floor: number): number {
-  // Upside only, and small: a trade adds a tenth to a half of the pack.
-  const step = Math.max(1, Math.round(floor * 0.1));
+/**
+ * Each round's step shrinks: 10% of the pack, then 8%, then 6%.
+ *
+ * Flat steps made the ceiling bind on any pack with three rounds, so the
+ * promised "up to half your pack" quietly became "half your pack, every time"
+ * — no tension, and a ceiling doing the work of a budget. Diminishing steps
+ * keep the total near 42% across three rounds, leave the ceiling for the
+ * outlier, and make each trade feel like a negotiation that tightens.
+ */
+const STEP_PCT_BY_ROUND = [0.1, 0.08, 0.06];
+
+function bonusFor(roll: number, floor: number, round: number): number {
+  const pct = STEP_PCT_BY_ROUND[Math.min(round, STEP_PCT_BY_ROUND.length - 1)];
+  const step = Math.max(1, Math.round(floor * pct));
   if (roll < 0.45) return step;
   if (roll < 0.8) return step * 2;
   return step * 3;
@@ -190,7 +201,7 @@ export function roundFor(state: Pick<GameState, "seed" | "round" | "floor" | "br
 
   const bonus: Upside = {
     kind: "bonus_clips",
-    amount: bonusFor(a, state.floor),
+    amount: bonusFor(a, state.floor, state.round),
     label: "",
   };
   bonus.label = `${bonus.amount} extra clip${bonus.amount === 1 ? "" : "s"}`;
