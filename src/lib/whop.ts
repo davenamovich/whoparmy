@@ -259,6 +259,31 @@ export function verifyWhopWebhook(
   };
 }
 
+// ─── AI Assessments product (created 2026-11-18 at Dave's order) ────
+//
+// The $999 AI Assessments offer lives on its OWN Whop product, separate
+// from the Meme Content Engine bot-rental product:
+//   product  prod_375J8KgxlSmT1  "AI Assessments"        (visibility: hidden)
+//   plan     plan_s98ZsXPvBxNpO  "AI Assessment" $999 one-time (hidden)
+// Both flip visible when Dave launches the offer. Env vars override the
+// defaults so a re-created product never needs a code change. The check
+// Whoparmy runs is the standard product access check (whopCheckAccess) —
+// a buyer's purchase flips has_access to true (access_level "customer").
+
+export function getAssessmentsProduct() {
+  return {
+    productId: process.env.WHOP_ASSESSMENTS_PRODUCT_ID?.trim() || "prod_375J8KgxlSmT1",
+    planId: process.env.WHOP_ASSESSMENTS_PLAN_ID?.trim() || "plan_s98ZsXPvBxNpO",
+    checkoutUrl:
+      process.env.WHOP_ASSESSMENTS_CHECKOUT_URL?.trim() || "https://whop.com/checkout/plan_s98ZsXPvBxNpO",
+  };
+}
+
+/** Does this Whop user own the AI Assessments product? */
+export async function checkAssessmentAccess(userId: string): Promise<WhopAccessResult> {
+  return whopCheckAccess(userId, getAssessmentsProduct().productId);
+}
+
 // ─── Checkout URL status (booleans + public links, never secrets) ────
 
 export function whopPublicStatus() {
@@ -269,6 +294,7 @@ export function whopPublicStatus() {
     webhookConfigured: Boolean(cfg.webhookSecret),
     apiEnv: cfg.apiEnv,
     checkoutUrls: cfg.checkoutUrls,
+    assessments: getAssessmentsProduct(),
   };
 }
 
