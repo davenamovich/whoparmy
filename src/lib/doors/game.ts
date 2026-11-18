@@ -50,6 +50,11 @@ import { getAuctionState, type AuctionState } from "./auction";
 
 // ─── Errors ──────────────────────────────────────────────────────────────────
 
+/** The shadow test-play account (see route.ts): its whopId marks a
+ *  session as a test — repeatable starts, prizes stay on the throwaway
+ *  account, no real member state is touched. */
+export const DOORS_TEST_WHOPIID = "doors-test";
+
 export class DoorsError extends Error {
   constructor(
     public code: string,
@@ -174,7 +179,16 @@ export async function startGame(
   const existing = await db.doorsSession.findUnique({
     where: { userId_gameDate: { userId: user.id, gameDate } },
   });
-  if (existing) fail("already_played", 409);
+  if (existing) {
+    // Test play is repeatable: the shadow user's daily session is
+    // disposable, so a fresh test start replaces it. Real members keep
+    // the hard one-game-per-day rule.
+    if (user.whopId === DOORS_TEST_WHOPIID) {
+      await db.doorsSession.delete({ where: { id: existing.id } });
+    } else {
+      fail("already_played", 409);
+    }
+  }
 
   const assignment = shuffleAssignment((n) => randomInt(n));
   const sessionId = randomUUID();
