@@ -2,6 +2,7 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import type { User } from "@prisma/client";
 import { db } from "@/lib/db";
+import { isDesignatedOperator } from "@/lib/auth";
 
 /**
  * ─── Muse bridge connector (Dave, 2026-11-17) ───────────────────────
@@ -68,6 +69,28 @@ export function botPlanFor(user: Pick<User, "plan">): BotPlan {
   if (user.plan === "CREATOR") return "creator";
   if (user.plan === "PRO" || user.plan === "AGENCY") return "pro";
   return "free";
+}
+
+// ─── Eligibility — a special offer, not for everyone ────────────────
+// Dave, 2026-11-17: the bridge is an Operator + Agency offer (local
+// plan PRO is the Operator tier). Trial and Starter members can see
+// the offer but cannot mint codes, exchange them, or spend through a
+// token. Designated operators (the owner's own Whop accounts) always
+// pass so the owner can run acceptance on the live offer.
+
+export function bridgeEligible(user: Pick<User, "plan" | "whopId" | "whopUsername">): boolean {
+  if (user.plan === "PRO" || user.plan === "AGENCY") return true;
+  return isDesignatedOperator(user);
+}
+
+export function assertBridgeEligible(user: Pick<User, "plan" | "whopId" | "whopUsername">): void {
+  if (!bridgeEligible(user)) {
+    throw new BridgeError(
+      403,
+      "NOT_ELIGIBLE",
+      "The Muse bridge is a special offer for Operator and Agency members. Your current plan doesn't include it — upgrade to Operator or Agency in Whop to unlock your week of content.",
+    );
+  }
 }
 
 // ─── Tool allowlist ─────────────────────────────────────────────────
@@ -301,6 +324,13 @@ export async function exchangeBridgeCode(rawCode: string): Promise<{ token: stri
   const row = await db.bridgeCode.findUnique({ where: { codeHash: sha256(code) } });
   if (!row || row.usedAt) throw new BridgeError(400, "BAD_CODE", "That bridge code isn't valid.");
   if (row.expiresAt.getTime() <= Date.now()) throw new BridgeError(400, "BAD_CODE", "That bridge code expired. Generate a fresh one on /muse-week.");
+  // Eligibility is re-checked at exchange: a member downgraded after
+  // minting holds a code that no longer opens the offer. The code is
+  // NOT consumed by this refusal — it works again if they upgrade
+  // inside its 15 minutes.
+  const owner = await db.user.findUnique({ where: { id: row.userId } });
+  if (!owner) throw new BridgeError(400, "BAD_CODE", "That bridge code isn't valid.");
+  assertBridgeEligible(owner);
   // Single-use: claim it before minting, so a raced double exchange fails.
   const claimed = await db.bridgeCode.updateMany({
     where: { id: row.id, usedAt: null },
@@ -361,6 +391,12 @@ export async function proxyToolCall(session: BridgeSession, name: string, args: 
   if (!bridgeToolAllowed(name)) {
     return toolError(
       `The Muse bridge cannot call ${name}. It runs research and content generation on the member's own credits; publishing and MP4 rendering stay with the member's approval inside Whoparmy. Allowed: ${[...BRIDGE_FREE_TOOLS, ...Object.keys(BRIDGE_GENERATING_COSTS)].join(", ")}.`,
+    );
+  }
+
+  if (!bridgeEligible(session.user)) {
+    return toolError(
+      "The Muse bridge is a special offer for Operator and Agency members, and this connection's plan no longer includes it. Nothing was charged. The member can re-open the offer by upgrading in Whop.",
     );
   }
 
@@ -432,6 +468,8 @@ export async function proxyToolsList(session: BridgeSession): Promise<unknown> {
 
 export interface BridgeAccountView {
   connected: boolean;
+  /** Operator + Agency only (Dave, 2026-11-17) — see bridgeEligible. */
+  eligible: boolean;
   botPlan: BotPlan;
   credits: number | null;
   granted: number;
@@ -457,6 +495,7 @@ export async function getBridgeAccountView(user: User): Promise<BridgeAccountVie
   });
   const view: BridgeAccountView = {
     connected: false,
+    eligible: bridgeEligible(user),
     botPlan: botPlanFor(user),
     credits: null,
     granted: 0,
@@ -473,6 +512,13 @@ export async function getBridgeAccountView(user: User): Promise<BridgeAccountVie
     error: null,
     errorCode: null,
   };
+  if (!view.eligible) {
+    // The offer gate sits in front of the engine: a non-eligible
+    // member's visit never fetches a key and never triggers a grant.
+    view.error = "The Muse bridge is a special offer for Operator and Agency members.";
+    view.errorCode = "NOT_ELIGIBLE";
+    return view;
+  }
   try {
     const member = await getMemberEngineKey(user);
     view.connected = true;

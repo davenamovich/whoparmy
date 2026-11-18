@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getWhopUser } from "@/lib/auth";
-import { BridgeError, WEEK_BUDGET_CREDITS, getMemberEngineKey, mintBridgeCode } from "@/lib/muse-bridge";
+import { BridgeError, WEEK_BUDGET_CREDITS, assertBridgeEligible, getMemberEngineKey, mintBridgeCode } from "@/lib/muse-bridge";
 
 export const runtime = "nodejs";
 
@@ -14,6 +14,7 @@ export const runtime = "nodejs";
 export async function POST(req: NextRequest) {
   try {
     const user = await getWhopUser();
+    assertBridgeEligible(user);
     await getMemberEngineKey(user);
     const body = (await req.json().catch(() => ({}))) as { budgetCredits?: unknown };
     const budget = typeof body.budgetCredits === "number" ? body.budgetCredits : WEEK_BUDGET_CREDITS;

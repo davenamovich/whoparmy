@@ -22,9 +22,23 @@ async function call(method, url, { headers = {}, body } = {}) {
 const auth = { Cookie: `pr_session=${cookie}` };
 const rpc = (id, method, params) => ({ jsonrpc: "2.0", id, method, params });
 
+// 0. The gate: a Starter (CREATOR) member sees the offer but cannot
+// use it — account view not eligible, code generation refused 403.
+const starterCookie = process.env.STARTER_COOKIE;
+if (starterCookie) {
+  const sauth = { Cookie: `pr_session=${starterCookie}` };
+  let sr = await call("GET", `${APP}/api/bridge/account`, { headers: sauth });
+  check("starter account eligible=false", sr.json?.account?.eligible === false, JSON.stringify(sr.json).slice(0, 200));
+  check("starter account errorCode NOT_ELIGIBLE", sr.json?.account?.errorCode === "NOT_ELIGIBLE");
+  check("starter account not connected (engine untouched)", sr.json?.account?.connected === false);
+  sr = await call("POST", `${APP}/api/bridge/code`, { headers: sauth, body: {} });
+  check("starter code refused 403 NOT_ELIGIBLE", sr.status === 403 && sr.json?.code === "NOT_ELIGIBLE", `${sr.status} ${sr.text.slice(0, 120)}`);
+}
+
 // 1. Account view: connected, mock balance, brand carried.
 let r = await call("GET", `${APP}/api/bridge/account`, { headers: auth });
 check("account 200", r.status === 200, r.text.slice(0, 200));
+check("account eligible (Operator)", r.json?.account?.eligible === true);
 check("account connected", r.json?.account?.connected === true, JSON.stringify(r.json).slice(0, 200));
 check("account credits 1000", r.json?.account?.credits === 1000);
 check("account granted 1000", r.json?.account?.granted === 1000);

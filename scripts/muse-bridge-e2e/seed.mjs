@@ -11,6 +11,20 @@ await db.user.upsert({
     whopId: "user_e2e12345",
     email: "e2e@example.com",
     name: "E2E Member",
+    plan: "PRO",
+    planSource: "whop_membership",
+  },
+  update: {},
+});
+// A Starter (CREATOR) member: the bridge is an Operator + Agency
+// special offer, so this user must be refused at every gate.
+await db.user.upsert({
+  where: { id: "e2e-starter" },
+  create: {
+    id: "e2e-starter",
+    whopId: "user_e2e67890",
+    email: "starter@example.com",
+    name: "E2E Starter",
     plan: "CREATOR",
     planSource: "whop_membership",
   },

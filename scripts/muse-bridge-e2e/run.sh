@@ -7,7 +7,7 @@
 # drains at 115), starts the app, and drives the whole journey:
 # account → code → exchange (single-use) → MCP tools/list (allowlist)
 # → free tools → publish refused → 7 packs settle at exactly 805 →
-# 8th refused pre-spend → revoke kills the token. 38 checks.
+# 8th refused pre-spend → revoke kills the token. 43 checks.
 #
 # Usage: bash scripts/muse-bridge-e2e/run.sh
 set -euo pipefail
@@ -34,4 +34,5 @@ trap 'kill $MOCK_PID $APP_PID 2>/dev/null || true' EXIT
 for i in $(seq 1 30); do curl -s -o /dev/null http://127.0.0.1:3100/muse-week && break; sleep 2; done
 
 COOKIE=$(node scripts/muse-bridge-e2e/mint-session.mjs)
-SESSION_COOKIE="$COOKIE" node scripts/muse-bridge-e2e/drive.mjs
+STARTER=$(E2E_UID=e2e-starter node scripts/muse-bridge-e2e/mint-session.mjs)
+SESSION_COOKIE="$COOKIE" STARTER_COOKIE="$STARTER" node scripts/muse-bridge-e2e/drive.mjs
