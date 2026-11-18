@@ -175,6 +175,11 @@ export const BRIDGE_GENERATING_COSTS: Record<string, number> = {
   create_before_pitch: 50,
   generate_ad_creative: 60,
   generate_multilanguage_ads: 60,
+  // The clipping agent: one public clip in, one captioned 9:16 post out, no
+  // host (`.agents/skills/clipping-agent/SKILL.md`). 25 list credits is the
+  // engine's own price for a sit-down; without this entry the Clipper could
+  // queue a batch through the bridge and then be unable to render any of it.
+  create_sitdown: 25,
 };
 
 /**
@@ -337,7 +342,8 @@ interface McpReply {
   error?: { code?: number; message?: string };
 }
 
-async function mcpCall(key: string, method: string, params: Record<string, unknown>): Promise<McpReply> {
+/** Exported so the clip dispatcher drives the same MCP path as the bridge. */
+export async function mcpCall(key: string, method: string, params: Record<string, unknown>): Promise<McpReply> {
   const res = await fetch(`${botBaseUrl()}/api/mcp`, {
     method: "POST",
     headers: {

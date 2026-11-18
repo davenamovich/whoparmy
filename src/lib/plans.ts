@@ -9,6 +9,7 @@ export interface PlanDef {
   priceCents: number; // monthly price in cents (referral basis)
   botSeats: number; // rented bots (agents) included in the plan
   monthlyItems: number; // max successful generated items (memes) / month on the house lane
+  monthlyClips: number; // max successful clips / month (the Clipper; BYOK lifts it)
   maxFormatsPerCampaign: number;
   maxLanguagesPerCampaign: number;
   maxBrands: number;
@@ -24,10 +25,11 @@ export const PLANS: PlanDef[] = [
     priceCents: 0,
     botSeats: 1,
     monthlyItems: 25,
+    monthlyClips: 3,
     maxFormatsPerCampaign: 2,
     maxLanguagesPerCampaign: 3,
     maxBrands: 1,
-    features: ["1 trial bot", "25 memes / month", "Previews only — bring your own key to unlock full generation"],
+    features: ["1 trial bot", "25 memes / month", "3 clips / month", "Previews only — bring your own key to unlock full generation"],
   },
   {
     key: "CREATOR",
@@ -36,10 +38,11 @@ export const PLANS: PlanDef[] = [
     priceCents: 2900,
     botSeats: 1,
     monthlyItems: 300,
+    monthlyClips: 20,
     maxFormatsPerCampaign: 6,
     maxLanguagesPerCampaign: 23,
     maxBrands: 1,
-    features: ["1 rented meme bot", "300 memes / month", "All 23 languages", "Full format catalog", "BYOK upgrade: your key, your fuel, caps lift"],
+    features: ["1 rented meme bot", "300 memes / month", "20 clips / month, no pack needed", "All 23 languages", "Full format catalog", "BYOK upgrade: your key, your fuel, caps lift"],
     highlight: true,
   },
   {
@@ -49,10 +52,11 @@ export const PLANS: PlanDef[] = [
     priceCents: 7900,
     botSeats: 3,
     monthlyItems: 1500,
+    monthlyClips: 60,
     maxFormatsPerCampaign: 12,
     maxLanguagesPerCampaign: 23,
     maxBrands: 5,
-    features: ["3 rented bots", "1,500 memes / month", "Campaign marketplace — post and claim", "Advanced variations", "BYOK upgrade: your key, your fuel, caps lift"],
+    features: ["3 rented bots", "1,500 memes / month", "60 clips / month", "Campaign marketplace — post and claim", "Advanced variations", "BYOK upgrade: your key, your fuel, caps lift"],
   },
   {
     key: "AGENCY",
@@ -61,10 +65,11 @@ export const PLANS: PlanDef[] = [
     priceCents: 19900,
     botSeats: 10,
     monthlyItems: 6000,
+    monthlyClips: 200,
     maxFormatsPerCampaign: 25,
     maxLanguagesPerCampaign: 23,
     maxBrands: 25,
-    features: ["10 rented bots", "6,000 memes / month", "Client brands and workspaces", "Campaign marketplace priority", "BYOK upgrade: your key, your fuel, caps lift"],
+    features: ["10 rented bots", "6,000 memes / month", "200 clips / month", "Client brands and workspaces", "Campaign marketplace priority", "BYOK upgrade: your key, your fuel, caps lift"],
   },
 ];
 
