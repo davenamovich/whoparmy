@@ -67,6 +67,8 @@ model User {
   earnings     ReferralEarning[] @relation("Earner")
   earnedFrom   ReferralEarning[] @relation("Recruit")
 
+  clipPages    ClipPage[]
+  clipJobs     ClipJob[]
 }
 
 // ─── Brand profiles (multiple allowed for agencies) ─────────────────
@@ -732,33 +734,189 @@ model ClaimRedemption {
   @@index([userId])
 }
 
-// ─── App settings (operator-flippable, no redeploy) ─────────────────
-// Tiny key-value store backing the site gate and per-stack status
-// overrides (lib/site-gate.ts, lib/stacks.ts). Keys are namespaced
-// strings ("site:gate", "stack:<id>:status"); values are plain text.
-model AppSetting {
-  key       String   @id
-  value     String
-  updatedAt DateTime @updatedAt
+// ─── The Clipper ────────────────────────────────────────────────────
+// A clipping page: one niche, one handle, a cadence. The editorial
+// contract is `.agents/skills/clipping-agent/SKILL.md` in the engine
+// repo; the four gates it describes are enforced in lib/clips/guards.ts.
+//
+// Ownership: these rows are the single queue of record. Agent37 is an
+// executor that claims and reports (lib/clips/worker). Muse may create
+// drafts and read the queue; only a signed-in click writes `approved`.
+
+model ClipPage {
+  id            String   @id @default(cuid())
+  userId        String
+  name          String // "GTA 6 Daily"
+  handle        String // @gtadaily6
+  niche         String // the one angle the page runs
+  platforms     String   @default("[]") // json: ["tiktok","reels","shorts"]
+  timezone      String   @default("UTC")
+  approvalHours String? // "09:00-22:00" — nothing is approved outside it
+  cadence       String   @default("{}") // json: {"tiktok":2,"reels":1}
+  creatorAllow  String   @default("[]") // json: ["@studio"] — empty = any public source
+  creatorBlock  String   @default("[]") // json: ["@handle"] — page-local refusals
+  disclosure    String? // "Not affiliated with Rockstar Games"
+  voiceStyle    String   @default("captions") // the clipping agent is captions, never a host
+  archivedAt    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clips ClipJob[]
+
+  @@index([userId])
 }
 
+model ClipJob {
+  id            String   @id @default(cuid())
+  userId        String
+  pageId        String
+  // draft | queued | rendering | ready | approved | exported | failed | blocked
+  status        String   @default("draft")
+  sourceUrl     String
+  sourceKind    String // platform | media
+  sourceHost    String // youtube.com, x.com, …
+  clipSeconds   Int      @default(15)
+  hook          String?
+  caption       String?
+  warnings      String   @default("[]") // json: engine QA warnings, verbatim
+  pageUrl       String? // engine preview page
+  mp4Url        String?
+  creditWho     String? // @creator
+  creditUrl     String? // the source the credit points at
+  spoiler       Boolean  @default(false)
+  series        String?
+  episode       Int?
+  engineJobId   String?
+  attempts      Int      @default(0) // the worker retries once, then fails
+  blockedReason String? // guard code + hint when status = blocked
+  approvedAt    DateTime? // written only by the review desk
+  exportedAt    DateTime?
+  error         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-// ─── Telegram pairing (Dave, 2026-11-18) ─────────────────────────────
-// One-time codes that bind a member's Telegram account (in the
-// meme-loop-engine bot) to their Whoparmy account, so both surfaces
-// share one Mnemos memory scope (member-<userId>). Same discipline
-// as BridgeCode: only the SHA-256 hash is stored; the code is shown
-// once. The bot consumes it server-to-server via
-// POST /api/telegram/pair/verify behind TELEGRAM_PAIR_SECRET.
-model TelegramPairCode {
+  user   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  page   ClipPage  @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  credit ClipCredit?
+  tokens ClipExportToken[]
+
+  @@index([userId, status])
+  @@index([pageId, createdAt])
+}
+
+// The credit ledger. A clip cannot reach `ready` without one — the
+// engine's "🎬 @creator" placeholder fails the guard.
+model ClipCredit {
+  id         String   @id @default(cuid())
+  userId     String
+  clipId     String   @unique
+  who        String // @creator
+  url        String // where the clip came from
+  verified   Boolean  @default(false) // a human checked it points at the source
+  createdAt  DateTime @default(now())
+
+  clip ClipJob @relation(fields: [clipId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// A creator who asked to be removed. Global and permanent — not scoped
+// to the page where they complained.
+model ClipTakedown {
+  id          String   @id @default(cuid())
+  creator     String // handle, stored lowercased without @
+  sourceUrl   String?
+  note        String?
+  requestedAt DateTime @default(now())
+
+  @@unique([creator])
+}
+
+// The one-time export token minted by the approval click. The worker
+// spends it; Muse never sees it. This is how `request_mp4` stays shut
+// to everything except a human-approved job.
+model ClipExportToken {
   id        String    @id @default(cuid())
+  clipId    String
   userId    String
-  codeHash  String    @unique
+  tokenHash String    @unique
   expiresAt DateTime
   usedAt    DateTime?
   createdAt DateTime  @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clip ClipJob @relation(fields: [clipId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
+  @@index([clipId])
+}
+
+// What actually went out. Logged by hand after the human posts it —
+// never scraped, never inferred.
+model ClipPost {
+  id          String   @id @default(cuid())
+  userId      String
+  clipId      String
+  platform    String
+  externalUrl String?
+  postedAt    DateTime @default(now())
+
+  @@index([userId, postedAt])
+}
+
+// ─── The Box Trade (gamified clips) ─────────────────────────────────
+// Buy a pack; that count is the floor, permanently. Each round reveals two
+// upsides — extra clips or a brief — and the member takes one. Decline is
+// free. Offers are derived from `seed` + `round` (lib/clips/game.ts), so a
+// reload cannot fish for a better board: the same seed always deals the
+// same two options.
+model ClipGameSession {
+  id        String   @id @default(cuid())
+  userId    String
+  pageId    String
+  floor     Int // clips bought — the number that can never go down
+  bonus     Int      @default(0)
+  briefs    String   @default("[]") // json: BriefCard[]
+  round     Int      @default(0)
+  maxRounds Int      @default(3)
+  seed      Int
+  chosen    String   @default("[]") // json: 0 | 1 | -1 per round, for the audit trail
+  status    String   @default("open") // open | resolved | abandoned
+  resolvedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status])
+}
+
+// ─── Clip credits and feedback ──────────────────────────────────────
+// One visible balance, three sources. A grant is written when a pack is
+// paid for (Whop webhook), when a member is given free credits at signup,
+// or when a Box Trade resolves with bonus clips. Clips bought are never
+// taken back at a month rollover — only the plan lane resets.
+model ClipCreditGrant {
+  id        String    @id @default(cuid())
+  userId    String
+  amount    Int // clips granted
+  spent     Int       @default(0)
+  source    String // purchase | free_grant | game_bonus | referral
+  label     String? // what the member saw when it was granted
+  reference String? // whop payment id / session id, for the audit trail
+  expiresAt DateTime? // null = never expires
+  spentAt   DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, spentAt])
+}
+
+// What the member thought of a clip. This is opinion, not performance: it
+// feeds the brief library and mnemos, and it is never reported as a result.
+model ClipFeedback {
+  id        String   @id @default(cuid())
+  userId    String
+  clipId    String
+  verdict   String // good | meh | bad
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
