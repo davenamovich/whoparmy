@@ -11,6 +11,7 @@ import {
   Bot,
   Cpu,
   MessagesSquare,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -53,7 +54,7 @@ type View =
   | "llm"
   | "account";
 
-type NavKey = "create" | "ralph" | "campaigns" | "library" | "army" | "agents" | "llm" | "account";
+type NavKey = "create" | "ralph" | "campaigns" | "library" | "army" | "agents" | "llm" | "account" | "admin";
 
 // Consolidated menu (Dave, 2026-11-17): fewer doors, same rooms.
 // Meme Studio folded into Create; the War Room folded into Meme
@@ -246,6 +247,20 @@ export default function Home() {
               <span className="truncate">{tNav(item.labelKey)}</span>
             </button>
           ))}
+
+          {/* /admin door (Dave, 2026-11-18): shown only when an
+              admin/operator is logged in (same session.admin flag
+              that gates LLM Control). /admin is a real route that
+              404s for everyone else, so the link is safe to show. */}
+          {session?.admin ? (
+            <a
+              href="/admin"
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors text-left text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+            >
+              <ShieldCheck className="h-4.5 w-4.5 shrink-0" />
+              <span className="truncate">{tNav("admin")}</span>
+            </a>
+          ) : null}
 
           <div className="mt-auto rounded-xl border bg-card p-3.5">
             <div className="text-[11px] font-semibold uppercase tracking-wider text-primary mb-1">{tNav("taglineTitle")}</div>
