@@ -227,16 +227,18 @@ model XpEvent {
 // completion. Campaign bounties are reserved from the poster's wallet
 // and stay SIMULATED value until real payments exist.
 model HiredAgent {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   userId      String
   templateKey String // scout | meme-smith | hook-smith | qa-editor
   name        String
   tokenBudget Int // weighted tokens allocated from the plan wallet
-  tokensUsed  Int      @default(0)
-  status      String   @default("ACTIVE") // ACTIVE | PAUSED | DEPLETED
+  tokensUsed  Int       @default(0)
+  status      String    @default("ACTIVE") // ACTIVE | PAUSED | DEPLETED
+  source      String    @default("RENTAL") // RENTAL (a plan seat) | REFERRAL (24h earned bot — not a seat)
+  expiresAt   DateTime? // REFERRAL bots only: the grant dies at this instant
   agent37Ref  String? // Agent37 instance/session ref once provisioned
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   user User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   jobs AgentJob[]

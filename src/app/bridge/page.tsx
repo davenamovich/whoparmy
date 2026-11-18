@@ -230,9 +230,9 @@ export default function BridgePage() {
                     ? "You just earned 25 free generations for saving your links. "
                     : ""}
                   {justSaved.referrerPaid
-                    ? "The member who sent you just earned 25 free generations for bringing you in. When you invite your own people and they save their links, you earn them too."
+                    ? "The member who sent you just earned 25 free generations and a Meme Smith bot for 24 hours for bringing you in. When you invite your own people and they save their links, you earn them too."
                     : justSaved.firstSave
-                      ? "When you invite your own people and they save their links here, you earn 25 free generations for each one."
+                      ? "When you invite your own people and they save their links here, you earn 25 free generations and a Meme Smith bot for 24 hours for each one."
                       : ""}{" "}
                   {justSaved.placementsGranted.length > 0
                     ? `You also earned a free day in the rotator tomorrow for: ${justSaved.placementsGranted
@@ -293,7 +293,7 @@ export default function BridgePage() {
                   </span>
                 ) : (
                   <span className="text-xs text-muted-foreground">
-                    Saving your first link{bridge.hasReferrer ? " pays your inviter 25 free generations" : " starts your engine"}.
+                    Saving your first link{bridge.hasReferrer ? " pays your inviter 25 free generations and a Meme Smith bot for 24 hours" : " starts your engine"}.
                   </span>
                 )}
               </div>

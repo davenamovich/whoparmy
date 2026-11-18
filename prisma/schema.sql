@@ -158,6 +158,8 @@ CREATE TABLE "HiredAgent" (
     "tokenBudget" INTEGER NOT NULL,
     "tokensUsed" INTEGER NOT NULL DEFAULT 0,
     "status" TEXT NOT NULL DEFAULT 'ACTIVE',
+    "source" TEXT NOT NULL DEFAULT 'RENTAL',
+    "expiresAt" DATETIME,
     "agent37Ref" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,

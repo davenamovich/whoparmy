@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ImagePlus, Loader2, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,9 +17,19 @@ const HUMOR_STYLES = [
   { key: "promotional_meme", label: "Promotional" },
 ];
 
-export function MemeStudio() {
+export function MemeStudio({ prefill }: { prefill?: { topic: string; nonce: number } | null }) {
   const { toast } = useToast();
+  const rootRef = useRef<HTMLDivElement>(null);
   const [topic, setTopic] = useState("");
+
+  // Trending hands its brief over (Dave, 2026-11-17): the topic field
+  // arrives populated and the studio scrolls into view — the member
+  // just hits Generate. A fresh nonce re-fires for every trend.
+  useEffect(() => {
+    if (!prefill) return;
+    setTopic(prefill.topic);
+    rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [prefill]);
   const [style, setStyle] = useState("funny_meme");
   const [language, setLanguage] = useState("en");
   const [count, setCount] = useState(2);
@@ -80,7 +90,7 @@ export function MemeStudio() {
   }
 
   return (
-    <div>
+    <div ref={rootRef} id="meme-studio" className="scroll-mt-6">
       <SectionHeader
         eyebrow="Meme Studio"
         title="Built to be shared"

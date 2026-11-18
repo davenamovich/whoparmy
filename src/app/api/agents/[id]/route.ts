@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getWhopUser } from "@/lib/auth";
+import { isGrantExpired } from "@/lib/bot-grants";
 
 export const runtime = "nodejs";
 
@@ -17,6 +18,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!hire) return NextResponse.json({ error: "Bot not found." }, { status: 404 });
     if (hire.status === "DEPLETED" && body.status === "ACTIVE") {
       return NextResponse.json({ error: "This bot has used up its fuel for the month. It refills with your plan — or connect your own key (BYOK) to run uncapped." }, { status: 400 });
+    }
+    if (body.status === "ACTIVE" && isGrantExpired(hire)) {
+      await db.hiredAgent.update({ where: { id }, data: { status: "PAUSED" } });
+      return NextResponse.json({ error: "Your 24-hour referral bot has expired — refer another member and have them save their links to earn it again, or rent a bot on your plan." }, { status: 400 });
     }
     const updated = await db.hiredAgent.update({ where: { id }, data: { status: body.status } });
     return NextResponse.json({ hire: updated });

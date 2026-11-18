@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { grantReferralBot } from "@/lib/bot-grants";
 
 /**
  * ─── THE BRIDGE — build your own engine, step one ────────────────────
@@ -24,6 +25,11 @@ import { db } from "@/lib/db";
  * credits if they sign up and save their unique affiliate links."
  * Both sides of one verified first save earn 25; still exactly once
  * per member, ever, anchored on the same linksSavedAt flip.
+ *
+ * And the referrer's incentive grew a bot (Dave, later the same day):
+ * the same first save grants the REFERRER a Meme Smith for 24 hours
+ * with real job action behind it (lib/bot-grants.ts) — the +25
+ * generations are its fuel once the plan meter is spent.
  */
 
 export const LINK_SAVE_FREE_GENS = 25;
@@ -262,6 +268,7 @@ export type SaveBridgeResult =
       ok: true;
       firstSave: boolean;
       referrerPaid: boolean;
+      referrerBotGranted: boolean;
       saverPaid: boolean;
       placementsGranted: string[];
       state: BridgeState;
@@ -319,6 +326,7 @@ export async function saveBridgeLinks(
   });
   let firstSave = false;
   let referrerPaid = false;
+  let referrerBotGranted = false;
   let saverPaid = false;
   if (me && !me.linksSavedAt) {
     const remaining = await db.engineLink.count({ where: { userId } });
@@ -335,6 +343,14 @@ export async function saveBridgeLinks(
           data: { freeGenBalance: { increment: LINK_SAVE_FREE_GENS } },
         });
         referrerPaid = true;
+        // Dave, 2026-11-17: the referrer also gets a bot for 24 hours,
+        // with real action behind it — the +25 generations above are
+        // its fuel. A grant failure must never fail the link save.
+        try {
+          referrerBotGranted = Boolean(await grantReferralBot(me.referredById));
+        } catch {
+          referrerBotGranted = false;
+        }
       }
     }
   }
@@ -343,6 +359,7 @@ export async function saveBridgeLinks(
     ok: true,
     firstSave,
     referrerPaid,
+    referrerBotGranted,
     saverPaid,
     placementsGranted,
     state: await getBridgeState(userId),

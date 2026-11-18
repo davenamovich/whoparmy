@@ -75,6 +75,7 @@ export default function Home() {
   const [resultsCampaignId, setResultsCampaignId] = useState<string | null>(null);
   const [brandPrefill, setBrandPrefill] = useState<ProfileDTO | null>(null);
   const [brandPrefillName, setBrandPrefillName] = useState<string | null>(null);
+  const [memePrefill, setMemePrefill] = useState<{ topic: string; nonce: number } | null>(null);
   const { session, loading: sessionLoading, reload: reloadSession } = useWhopSession();
   const { toast } = useToast();
   const tNav = useTranslations("nav");
@@ -145,6 +146,14 @@ export default function Home() {
   function startWizardWithBrand(profile: ProfileDTO, name: string) {
     setBrandPrefill(profile);
     setBrandPrefillName(name);
+    setView("create");
+  }
+
+  // Trending → Create a Meme (Dave, 2026-11-17): the trend's brief
+  // lands in the Meme Studio topic field, ready to generate — the
+  // button never routes a member to a bot they can't use.
+  function startMemesFromTrend(topic: string) {
+    setMemePrefill({ topic, nonce: Date.now() });
     setView("create");
   }
 
@@ -229,7 +238,7 @@ export default function Home() {
           {view === "create" ? (
             <div className="space-y-12">
               <CreateWizard onCompleted={onWizardCompleted} initialProfile={brandPrefill} initialProfileName={brandPrefillName} />
-              <MemeStudio />
+              <MemeStudio prefill={memePrefill} />
               <VideoStudio />
             </div>
           ) : null}
@@ -247,7 +256,7 @@ export default function Home() {
             </div>
           ) : null}
           {view === "agents" ? <AgentsView /> : null}
-          {view === "trending" ? <TrendingView onGoAgents={() => setView("agents")} /> : null}
+          {view === "trending" ? <TrendingView onCreateMemes={startMemesFromTrend} /> : null}
           {view === "llm" && session?.admin ? <LlmConsole /> : null}
           {view === "account" ? <AccountView /> : null}
         </main>

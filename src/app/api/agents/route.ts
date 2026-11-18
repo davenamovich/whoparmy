@@ -6,6 +6,7 @@ import { getPlan } from "@/lib/plans";
 import { countMonthlyUsage } from "@/lib/usage-server";
 import { awardXp } from "@/lib/game";
 import { recordConversion } from "@/lib/referrals";
+import { expireReferralBots } from "@/lib/bot-grants";
 
 export const runtime = "nodejs";
 
@@ -15,6 +16,8 @@ export async function GET() {
   try {
     const user = await getWhopUser();
     const plan = getPlan(user.plan);
+    // Park referral bots whose 24h window closed before reading state.
+    await expireReferralBots(user.id);
     const [wallet, hires, jobs, memesUsed] = await Promise.all([
       getWalletState(user.id, user.plan),
       db.hiredAgent.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" } }),
@@ -28,7 +31,8 @@ export async function GET() {
         name: plan.name,
         price: plan.price,
         botSeats: plan.botSeats,
-        botsRented: hires.length,
+        // Referral-grant bots ride on top of the plan's seats.
+        botsRented: hires.filter((h) => h.source !== "REFERRAL").length,
         memesUsed,
         memesLimit: plan.monthlyItems,
       },
@@ -52,7 +56,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Pick a bot from the rental catalog." }, { status: 400 });
     }
     const plan = getPlan(user.plan);
-    const rented = await db.hiredAgent.count({ where: { userId: user.id } });
+    // Seats count rentals only — a referral-grant bot never blocks a seat
+    // and never counts as the member's first rental (conversion).
+    const rented = await db.hiredAgent.count({ where: { userId: user.id, source: "RENTAL" } });
     if (rented >= plan.botSeats) {
       return NextResponse.json(
         {

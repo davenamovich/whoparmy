@@ -4,7 +4,8 @@ import { getWhopUser } from "@/lib/auth";
 import { JOB_TIERS, tierCost } from "@/lib/agents";
 import { runAgentJob } from "@/lib/agent-runner";
 import { getPlan } from "@/lib/plans";
-import { countMonthlyUsage } from "@/lib/usage-server";
+import { countMonthlyUsage, getFreeGenBalance } from "@/lib/usage-server";
+import { isGrantExpired } from "@/lib/bot-grants";
 import { isSupportedLanguage } from "@/lib/languages";
 
 export const runtime = "nodejs";
@@ -35,6 +36,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const hire = await db.hiredAgent.findFirst({ where: { id, userId: user.id } });
     if (!hire) return NextResponse.json({ error: "Agent not found." }, { status: 404 });
+    // A referral bot whose 24 hours are up stops taking work.
+    if (isGrantExpired(hire)) {
+      await db.hiredAgent.update({ where: { id: hire.id }, data: { status: "PAUSED" } });
+      return NextResponse.json(
+        { error: "Your 24-hour referral bot has expired — refer another member and have them save their links to earn it again, or rent a bot on your plan." },
+        { status: 400 },
+      );
+    }
     if (hire.status !== "ACTIVE") {
       return NextResponse.json({ error: `Agent is ${hire.status.toLowerCase()} — resume it before ordering.` }, { status: 400 });
     }
@@ -54,9 +63,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           // plain-topic brief → a single 1-credit sitdown job
         }
       }
-      if (usedMemes + requested > plan.monthlyItems) {
+      // The free-generation pool stacks on the plan meter — it's what
+      // fuels a referral bot's work once the plan allowance is spent
+      // (successful runs draw it down via recordUsage → applyFreeGens).
+      const freeGens = await getFreeGenBalance(user.id);
+      const memeLimit = plan.monthlyItems + freeGens;
+      if (usedMemes + requested > memeLimit) {
         return NextResponse.json(
-          { error: `You're out of memes on the ${plan.name} plan this month (${plan.monthlyItems}/mo). Upgrade — or connect your own key (BYOK) and the meter lifts.` },
+          { error: `You're out of memes on the ${plan.name} plan this month (${memeLimit} including free generations). Upgrade — or connect your own key (BYOK) and the meter lifts.` },
           { status: 402 },
         );
       }

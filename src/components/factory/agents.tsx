@@ -19,6 +19,8 @@ interface Hire {
   tokenBudget: number;
   tokensUsed: number;
   status: string;
+  source?: string;
+  expiresAt?: string | null;
   agent37Ref: string | null;
 }
 
@@ -236,6 +238,11 @@ export function AgentsView() {
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <span className="font-bold">{h.name}</span>
                     <div className="flex items-center gap-2">
+                      {h.source === "REFERRAL" ? (
+                        <Badge className="bg-amber-500/15 text-amber-500 border-0 text-[10px]">
+                          REFERRAL BOT{h.expiresAt ? ` · until ${new Date(h.expiresAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : ""}
+                        </Badge>
+                      ) : null}
                       <Badge variant="outline" className="text-[10px]">{h.status}</Badge>
                       {h.status === "ACTIVE" ? (
                         <Button size="sm" variant="outline" disabled={busy} onClick={() => void act(() => fetch(`/api/agents/${h.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "PAUSED" }) }), "Agent paused")}>

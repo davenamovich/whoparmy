@@ -83,7 +83,7 @@
     "copyLink": "Copiar enlace",
     "earned": "Ganado (30%)",
     "freeGens": "Generaciones gratis",
-    "freeGensNote": "Además, recibes {count} generaciones gratis cuando un miembro que invitaste guarda sus enlaces en el puente: se usan automáticamente cuando se agotan los memes mensuales de tu plan.",
+    "freeGensNote": "Además, recibes {count} generaciones gratis y un bot Meme Smith por 24 horas cuando un miembro que invitaste guarda sus enlaces en el puente: las generaciones se usan automáticamente cuando se agotan los memes mensuales de tu plan, y el bot acepta trabajos reales mientras es tuyo.",
     "unlockNote": "Las comisiones se desbloquean con {need} registros confirmados ({have}/{need}). Empiezan con el registro que te desbloquea, y también se requerirá una clave de P&R conectada cuando llegue Connect.",
     "empty": "Aún no hay reclutados: tu enlace es tu arma más ruidosa. Compártelo donde se reúnen los dueños de negocios.",
     "joined": "Se unió",

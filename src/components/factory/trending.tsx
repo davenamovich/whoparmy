@@ -31,12 +31,11 @@ interface TrendTopic {
   hook: string;
 }
 
-export function TrendingView({ onGoAgents }: { onGoAgents: () => void }) {
+export function TrendingView({ onCreateMemes }: { onCreateMemes: (brief: string) => void }) {
   const locale = useLocale();
   const [topics, setTopics] = useState<TrendTopic[] | null>(null);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busyIdx, setBusyIdx] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
@@ -58,33 +57,13 @@ export function TrendingView({ onGoAgents }: { onGoAgents: () => void }) {
     void load();
   }, [load]);
 
-  async function createFromTrend(topic: TrendTopic, idx: number) {
-    setBusyIdx(idx);
-    try {
-      const res = await fetch("/api/agents", { cache: "no-store" });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Failed to load your bots");
-      const hire = (json.hires as { id: string; status: string }[]).find((h) => h.status === "ACTIVE");
-      if (!hire) {
-        toast.info("Rent a bot first — then every headline here is one-click creation.");
-        onGoAgents();
-        return;
-      }
-      const brief = `TRENDING NOW: "${topic.title}"${topic.traffic ? ` (${topic.traffic} searches today)` : ""}. Headline angle: ${topic.headline}${topic.hook ? `. Hook: ${topic.hook}` : ""}. Ride this trend for the business — timely, native, shareable.`;
-      const jobRes = await fetch(`/api/agents/${hire.id}/jobs`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: "MEME", brief, pieces: 3, language: locale }),
-      });
-      const jobJson = await jobRes.json();
-      if (!jobRes.ok) throw new Error(jobJson.error ?? "Job failed to start");
-      toast.success("Your bot is on it — memes from this headline are being created. Watch the Agents board.");
-      onGoAgents();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Creation failed");
-    } finally {
-      setBusyIdx(null);
-    }
+  // Dave, 2026-11-17: Create Memes populates Create a Meme — the
+  // trend's brief lands in the Meme Studio topic field, ready to
+  // generate. It never routes a member to a bot they can't use.
+  function createFromTrend(topic: TrendTopic) {
+    const brief = `TRENDING NOW: "${topic.title}"${topic.traffic ? ` (${topic.traffic} searches today)` : ""}. Headline angle: ${topic.headline}${topic.hook ? `. Hook: ${topic.hook}` : ""}. Ride this trend for my business — timely, native, shareable.`;
+    onCreateMemes(brief);
+    toast.success("Loaded in Create a Meme — Meme Studio is filled in for this headline. Hit Generate when you're ready.");
   }
 
   return (
@@ -96,9 +75,9 @@ export function TrendingView({ onGoAgents }: { onGoAgents: () => void }) {
             <Badge className="bg-red-500/15 text-red-500 border-0 text-[10px]">TODAY</Badge>
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            What's moving today, a viral headline written for each — and one click turns any of them into
-            memes from your bot. Today's topics are set once for the day, so every refresh shows the same
-            wire. A fresh set lands tomorrow.
+            What's moving today, a viral headline written for each — and one click loads any of them into
+            Create a Meme, ready to generate. Today's topics are set once for the day, so every refresh shows
+            the same wire. A fresh set lands tomorrow.
           </p>
         </div>
         <Button variant="outline" size="sm" className="ml-auto" disabled={refreshing} onClick={() => void load()}>
@@ -137,8 +116,8 @@ export function TrendingView({ onGoAgents }: { onGoAgents: () => void }) {
                 <p className="text-[13px] text-muted-foreground">{t.title}</p>
                 <p className="text-base font-black leading-snug">{t.headline}</p>
                 {t.hook ? <p className="text-xs text-muted-foreground">{t.hook}</p> : null}
-                <Button size="sm" className="w-full" disabled={busyIdx === i} onClick={() => void createFromTrend(t, i)}>
-                  {busyIdx === i ? <RefreshCcw className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Zap className="h-3.5 w-3.5 mr-1" />}
+                <Button size="sm" className="w-full" onClick={() => createFromTrend(t)}>
+                  <Zap className="h-3.5 w-3.5 mr-1" />
                   Create memes from this headline
                 </Button>
               </CardContent>

@@ -36,6 +36,7 @@ export async function PUT(req: NextRequest) {
       bridge: result.state,
       firstSave: result.firstSave,
       referrerPaid: result.referrerPaid,
+      referrerBotGranted: result.referrerBotGranted,
       saverPaid: result.saverPaid,
       placementsGranted: result.placementsGranted,
     });

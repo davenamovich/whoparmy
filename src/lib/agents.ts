@@ -82,7 +82,9 @@ export const JOB_TIERS: Record<string, (typeof MODEL_TIERS)[number]["key"]> = {
 
 export async function getWalletState(userId: string, planKey: string) {
   const allowance = walletForPlan(planKey);
-  const hires = await db.hiredAgent.findMany({ where: { userId } });
+  // Referral-grant bots (source REFERRAL) are not part of the member's
+  // wallet ledger — their fuel is the grant's own, not the plan's.
+  const hires = await db.hiredAgent.findMany({ where: { userId, source: "RENTAL" } });
   const allocated = hires.reduce((n, h) => n + h.tokenBudget, 0);
   const spent = hires.reduce((n, h) => n + h.tokensUsed, 0);
   const listings = await db.campaignListing.findMany({
