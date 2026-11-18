@@ -116,5 +116,17 @@ export async function mnemosSnapshot(person: string): Promise<string | null> {
   const nextSection = list.indexOf("\n## ");
   if (nextSection > 0) list = list.slice(0, nextSection).trim();
   if (list.length < 10) return null;
-  return list.slice(0, 1800);
+  // Member-facing polish: recall lines carry agent metadata
+  // ("- [words: a, b] Fact. id=engram_… kind=semantic confidence=…").
+  // Members get the facts, not the plumbing.
+  const clean = list
+    .split("\n")
+    .map((line) =>
+      line
+        .replace(/^-\s*\[(?:words:[^\]]*|linked)\]\s*/, "- ")
+        .replace(/\s+id=\S+\s+kind=\S+.*$/, "")
+        .trimEnd(),
+    )
+    .join("\n");
+  return clean.slice(0, 1800);
 }
