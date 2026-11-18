@@ -119,7 +119,7 @@ export function parseRecallFacts(raw: string): string[] {
     .split("\n")
     .map((line) =>
       line
-        .replace(/^-\s*\[(?:words:[^\]]*|linked)\]\s*/, "")
+        .replace(/^-\s*\[(?:words:[^\]]*|linked)\]\s*:?\s*/, "")
         .replace(/^\s*-\s*/, "")
         .replace(/\s+id=\S+\s+kind=\S+.*$/, "")
         .trim(),

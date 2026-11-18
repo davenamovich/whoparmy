@@ -5,6 +5,8 @@ import { countMonthlyUsage } from "@/lib/usage-server";
 import { getTrending } from "@/lib/trends";
 import { getLadder, starimgConfig } from "@/lib/llm-policy";
 import { mnemosCapture, mnemosPersonFor, mnemosRecall, mnemosSnapshot } from "@/lib/mnemos-bridge";
+import { BridgeError, assertBridgeEligible, bridgeOffer, getMemberEngineKey, mintBridgeCode } from "@/lib/muse-bridge";
+import { museWeekCommand } from "@/lib/muse-week-command";
 
 /**
  * ─── RALPH — the one-click dispatcher inside Whoparmy ───────────────
@@ -230,12 +232,54 @@ export async function ralphAction(userId: string, locale: string, actionId: Ralp
         actions: ["my_bots", "make_content", "my_claude"],
       };
     }
-    case "my_claude":
-      return {
-        text: "Your Muse connection lives on your Account page — that's where the /muse-week bridge command and your live P&R balance are. One command, pasted into your Muse, and it makes a week of content on the bridge. Taking you there.",
-        actions: ["my_plan", "make_content"],
-        nav: { view: "account" },
-      };
+    case "my_claude": {
+      // Mint on the spot (Dave, 2026-11-18): Ralph generates the
+      // bridge code right here and hands over the paste — no trip to
+      // the Account page. Same machinery as /api/bridge/code (the
+      // week offer), same gate: Operator + Agency only, and the
+      // member's engine link is proven before a code exists. The
+      // token the code issues is content-only (Dave's decision):
+      // publishing stays behind the in-app approve tap.
+      // Minting is tap-only, never from free text: a fresh code
+      // retires the member's older unused codes, so it must be a
+      // deliberate tap, not a conversational side effect.
+      const user = await db.user.findUnique({ where: { id: userId } });
+      if (!user) {
+        return { text: "I can't find your account to mint a command for. Try again from your Account page.", actions: ["my_plan"] };
+      }
+      try {
+        assertBridgeEligible(user);
+        await getMemberEngineKey(user);
+        const offer = bridgeOffer("week");
+        const minted = await mintBridgeCode(user.id, offer.budgetCredits);
+        const brand = await db.brandProfile.findFirst({
+          where: { userId, website: { not: null } },
+          orderBy: { createdAt: "asc" },
+          select: { website: true },
+        });
+        const businessUrl = brand?.website || "https://your-business-website.com";
+        const command = museWeekCommand(minted.code, businessUrl, minted.budgetCredits, "week");
+        return {
+          text:
+            `Minted just now — your code is inside the command, expires in 15 minutes, and works once. Copy the whole block into your Muse:\n\n${command}\n\n` +
+            `That's The Week (${minted.budgetCredits} credits, quoted to you before anything spends). Want The Taste or Week + Opener instead? The /muse-week page has all three — a fresh code there retires this one.`,
+          actions: ["my_plan", "make_content"],
+        };
+      } catch (err) {
+        if (err instanceof BridgeError && err.code === "NOT_ELIGIBLE") {
+          return {
+            text: "That one's not on your plan yet. The Muse bridge is a special offer for Operator and Agency members: one command, and your own Muse makes your week on your own credits. Upgrade in Whop and I'll mint your command on the spot.",
+            actions: ["my_plan", "make_content"],
+          };
+        }
+        const reason = err instanceof Error ? err.message : "the bridge is unreachable";
+        return {
+          text: `I couldn't mint your command just now — ${reason} The /muse-week page is the other door, and it shows your live balance too. Taking you to Account.`,
+          actions: ["my_plan", "make_content"],
+          nav: { view: "account" },
+        };
+      }
+    }
     case "campaigns":
       return {
         text: "Your campaigns — and their publishing state — live here. Taking you over.",
