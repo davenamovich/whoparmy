@@ -66,8 +66,6 @@ model User {
   earnings     ReferralEarning[] @relation("Earner")
   earnedFrom   ReferralEarning[] @relation("Recruit")
 
-  telegramLink      TelegramLink?
-  telegramPairCodes TelegramPairCode[]
 }
 
 // ─── Brand profiles (multiple allowed for agencies) ─────────────────
@@ -743,29 +741,3 @@ model AppSetting {
   updatedAt DateTime @updatedAt
 }
 
-// ─── Ralph on Telegram (Dave, 2026-11-18) ───────────────────────────
-// One house Ralph bot; a member pairs their Telegram chat to their
-// account with a one-time code (deep link), then Ralph serves them
-// there with the same brain + memory scope as the web chat.
-model TelegramLink {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  chatId    String   @unique
-  username  String?
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model TelegramPairCode {
-  id        String    @id @default(cuid())
-  userId    String
-  code      String    @unique
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime  @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-}
