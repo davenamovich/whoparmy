@@ -1,13 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
+import { MAX_BONUS_RATIO as GAME_MAX_BONUS_RATIO } from "./game.ts";
 import {
   CLIP_COGS_USD,
   CLIP_PACKS,
-  CREDITS_PER_CLIP,
   FREE_GRANT_CLIPS,
-  LIST_CREDIT_COST_USD,
+  LIST_CREDITS_PER_CLIP,
+  MAX_BONUS_RATIO,
   MIN_GROSS_MARGIN,
+  MP4_RENDER_COST_USD,
   grossMargin,
   laneCopy,
   marginAtMaxBonus,
@@ -15,10 +17,10 @@ import {
   pricePerClip,
 } from "./packs.ts";
 
-test("cogs: a house-lane clip is 25 list credits at the stated credit cost", () => {
-  assert.equal(CREDITS_PER_CLIP, 25);
-  assert.equal(LIST_CREDIT_COST_USD, 0.005);
-  assert.equal(CLIP_COGS_USD, 0.125);
+test("cogs: a clip costs the mp4, and 25 is a list price not a cost", () => {
+  assert.equal(MP4_RENDER_COST_USD, 0.005);
+  assert.equal(CLIP_COGS_USD, MP4_RENDER_COST_USD, "cost must not include list credits");
+  assert.equal(LIST_CREDITS_PER_CLIP, 25);
 });
 
 test("margin: every pack clears the floor even if the member takes the full bonus", () => {
@@ -65,4 +67,9 @@ test("copy: both lanes named, and the comparison is not computed for the member"
   assert.match(copy, /no keys, no setup/i);
   assert.match(copy, /own P&R key/i);
   assert.doesNotMatch(copy, /\d+\s*(x|times)\s*(cheaper|less)/i);
+});
+
+test("ceiling: pricing reads the same ratio the game pays out on", () => {
+  // Duplicated on purpose (see packs.ts) — this is the binding.
+  assert.equal(MAX_BONUS_RATIO, GAME_MAX_BONUS_RATIO);
 });

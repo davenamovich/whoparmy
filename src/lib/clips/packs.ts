@@ -13,13 +13,22 @@
  * trade-up is not a price, it is a hope.
  */
 
-/** What one list credit costs us. Dave, 2026-11-18. */
-export const LIST_CREDIT_COST_USD = 0.005;
+/**
+ * What a clip actually costs to produce: the MP4 (Dave, 2026-11-18).
+ *
+ * 25 is NOT a cost — it is the number of LIST credits the call consumes, i.e.
+ * the price the engine charges, useful only when comparing retail with the
+ * BYOK lane. Treating it as COGS overstated clip cost 25x and made the price
+ * look like it needed defending.
+ */
+export const MP4_RENDER_COST_USD = 0.005;
 
-/** A house-lane clip is 25 list credits (clipping-agent skill, "Cost"). */
-export const CREDITS_PER_CLIP = 25;
+/** The list-credit price of one clip — a comparison figure, never a cost. */
+export const LIST_CREDITS_PER_CLIP = 25;
+export const CREDIT_LIST_PRICE_USD = 0.01; // BYOK: 1 credit per engine call
 
-export const CLIP_COGS_USD = CREDITS_PER_CLIP * LIST_CREDIT_COST_USD; // $0.125
+/** Real COGS per delivered clip. */
+export const CLIP_COGS_USD = MP4_RENDER_COST_USD;
 
 export interface ClipPack {
   key: string;
@@ -62,9 +71,16 @@ export const CLIP_PACKS: ClipPack[] = [
 export const FREE_GRANT_CLIPS = 3;
 
 /** Below this, a pack is not worth selling — it is a subsidy. */
-export const MIN_GROSS_MARGIN = 0.6;
+export const MIN_GROSS_MARGIN = 0.9;
 
-/** Never let a pack fall under this margin once the trade-up is paid out. */
+/**
+ * Must equal MAX_BONUS_RATIO in game.ts.
+ *
+ * Not imported: Next compiles extensionless imports, Node (which runs the
+ * tests) needs an extension, and a .ts extension breaks the build. So the
+ * value is asserted equal by packs.test.ts instead of shared by an import —
+ * a duplicate the suite keeps honest.
+ */
 export const MAX_BONUS_RATIO = 0.5;
 
 export function packByKey(key: string): ClipPack | null {
@@ -84,6 +100,15 @@ export function marginAtMaxBonus(pack: ClipPack): number {
 
 export function pricePerClip(pack: ClipPack): number {
   return pack.priceUsd / pack.clips;
+}
+
+/**
+ * Retail per clip against what the same clip costs on a BYOK key. Useful
+ * internally when setting a price; never shown to the member as a computed
+ * comparison (see laneCopy).
+ */
+export function timesListPrice(pack: ClipPack): number {
+  return pricePerClip(pack) / (LIST_CREDITS_PER_CLIP * CREDIT_LIST_PRICE_USD);
 }
 
 /** The line the member sees. Both lanes, one sentence each, no sums done for them. */
