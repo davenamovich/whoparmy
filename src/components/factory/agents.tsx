@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Bot, Wallet, Pause, Play, Store, Briefcase, ListOrdered, Zap, Send } from "lucide-react";
+import { Bot, Wallet, Pause, Play, Store, Briefcase, ListOrdered, Zap, Send, Brain, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useTranslations, useLocale } from "next-intl";
 import { LANGUAGES, isSupportedLanguage } from "@/lib/languages";
 import type { AgentTemplate } from "@/lib/agents";
+import { BrandedBotCard } from "@/components/factory/branded-bot-card";
 
 interface Hire {
   id: string;
@@ -134,6 +135,30 @@ export function AgentsView() {
         </p>
       </div>
 
+      <BrandedBotCard />
+
+      {/* One-click memory export (Dave, 2026-11-18): members own
+          their memory — one click downloads everything the house
+          store holds for them as an Obsidian-ready markdown file. */}
+      <div className="rounded-2xl border bg-card p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+        <span className="w-10 h-10 rounded-xl bg-primary/12 text-primary grid place-items-center shrink-0">
+          <Brain className="h-5 w-5" />
+        </span>
+        <div className="flex-1 min-w-0">
+          <h2 className="font-semibold">Your memory is yours</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Everything your agents remember about your business, in one file — yours to keep, correct, and
+            take anywhere. It drops straight into Obsidian, and it&apos;s the seed for your own memory stack.
+          </p>
+        </div>
+        <a
+          href="/api/memory/export"
+          className="rounded-xl bg-primary text-primary-foreground px-4 py-2.5 text-sm font-semibold shrink-0 inline-flex items-center gap-1.5 justify-center"
+        >
+          <Download className="h-4 w-4" /> Export my memory
+        </a>
+      </div>
+
       {planInfo ? (
         <Card>
           <CardHeader className="pb-2">
@@ -232,7 +257,7 @@ export function AgentsView() {
           </CardHeader>
           <CardContent className="space-y-4">
             {hires.map((h) => {
-              const form = jobForms[h.id] ?? { kind: "MEME", brief: "", pieces: "1", language: defaultJobLanguage };
+              const form = jobForms[h.id] ?? { kind: h.templateKey === "assessor" ? "ASSESS" : "MEME", brief: "", pieces: "1", language: defaultJobLanguage };
               return (
                 <div key={h.id} className="rounded-lg border border-border/60 p-4 space-y-3">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -272,6 +297,7 @@ export function AgentsView() {
                         <option value="HOOK">Hooks (final)</option>
                         <option value="QA">Claude QA pass (quality)</option>
                         <option value="VIDEO">Video (engine — brief = topic, or JSON {"{format,…}"})</option>
+                        <option value="ASSESS">Assessment offer (bridge — your Muse makes the /before pack + $999 fit on your key)</option>
                       </select>
                       <select
                         className="h-9 rounded-md border border-input bg-background px-2 text-sm"
@@ -287,7 +313,7 @@ export function AgentsView() {
                       </select>
                       <Input
                         className="flex-1"
-                        placeholder="Brief — what should the agent make?"
+                        placeholder={form.kind === "ASSESS" ? "Your business website — the Assessor hands it to your Muse through the bridge" : "Brief — what should the agent make?"}
                         value={form.brief}
                         onChange={(e) => setJobForms((f) => ({ ...f, [h.id]: { ...form, brief: e.target.value } }))}
                       />

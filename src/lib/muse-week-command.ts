@@ -1,0 +1,50 @@
+/**
+ * ─── THE ONE COMMAND (single source) ────────────────────────────────
+ * The paste a member drops into their Muse to connect it to their
+ * Plunder & Riffle account through the bridge. Three surfaces render
+ * this exact text: the /muse-week page, Ralph chat (mint-on-the-spot,
+ * Dave 2026-11-18), and MEMBER-ONE-COMMAND.md at the workspace root.
+ * Change it here and update the doc — never fork the wording.
+ *
+ * The token the code issues is CONTENT-ONLY by Dave's decision
+ * (2026-11-18): it makes packs and reads the account; publishing is
+ * refused at the bridge, and posting happens only after the member's
+ * in-app approve tap. The command text says so to the member's Muse.
+ */
+
+export type MuseWeekOfferId = "taste" | "week" | "opener";
+
+export function museWeekCommand(code: string, businessUrl: string, budget: number, offer: MuseWeekOfferId): string {
+  const intro = `You are my content agent, connected to my Plunder & Riffle account through my bridge at whop.plunderandriffle.com. My credits are mine — never ask me for an API key; it stays on the engine side and I will never paste it anywhere.
+
+1. My bridge code is ${code} (one-time, expires in 15 minutes). Exchange it: POST https://whop.plunderandriffle.com/api/bridge/exchange with {"code": "${code}"}. You get a bridge token (7 days) and the MCP URL. Use the token as the Bearer credential for every MCP call. Never print the token back to me, and never store it past this week.
+2. My business is ${businessUrl}. Research it first through the bridge MCP (research_brand, then create_campaign_from_research) — both are free. Work only from what the research actually found about my business; invent nothing.`;
+
+  if (offer === "taste") {
+    return `Make my day of content
+
+${intro}
+3. Quote me the Taste before you spend anything: 1 day-pack (create_demo_pack — 5 memes, an iMessage, a Top 10 and a slideshow) built on my main offer from the research. The Taste is approved for up to ${budget} credits. Tell me the exact credit cost and my remaining balance (get_account through the bridge), and wait for my "go". No go, no spend.
+4. On my "go", make the pack through the bridge MCP, polling get_job_status until it's done. A failed piece refunds — if the whole pack fails, tell me and retry it once.
+5. Deliver the pack's share-page link and what's in it. End with the receipt: credits spent, credits remaining. Do not publish anything and do not render MP4s — I'll approve the pieces I want first.
+6. When the Taste is delivered or my token expires, stop. Next time I'll get a fresh code from whop.plunderandriffle.com/muse-week.`;
+  }
+
+  if (offer === "opener") {
+    return `Make my week of content — plus my Opener
+
+${intro}
+3. First, my Opener: quote me create_before_pitch for my business (a personalized pitch — a short audio monologue plus memes about my business), then the week below. The whole order — Opener plus the week — is approved for up to ${budget} credits. Tell me the exact credit cost and my remaining balance (get_account through the bridge), and wait for my "go". No go, no spend.
+4. On my "go", make the Opener first, then all 7 day-packs (create_demo_pack — 5 memes, an iMessage, a Top 10 and a slideshow per day), one for each day, each on a different angle from the research: Day 1 my offer · Day 2 my customer's pain · Day 3 proof · Day 4 one product · Day 5 me vs. the alternative · Day 6 questions customers ask · Day 7 best-of + call to action. Poll get_job_status until each is done. A failed piece refunds — if a whole pack fails, tell me and retry it once.
+5. Deliver my Opener's link first, then my week as a calendar: for each day, the pack's share-page link and what's in it. End with the receipt: credits spent, credits remaining. Do not publish anything and do not render MP4s — I'll approve the pieces I want first.
+6. When the week is delivered or my token expires, stop. Next week I'll get a fresh code from whop.plunderandriffle.com/muse-week.`;
+  }
+
+  return `Make my week of content
+
+${intro}
+3. Quote me the week before you spend anything: 7 day-packs (create_demo_pack — 5 memes, an iMessage, a Top 10 and a slideshow per day), one for each day, each on a different angle from the research: Day 1 my offer · Day 2 my customer's pain · Day 3 proof · Day 4 one product · Day 5 me vs. the alternative · Day 6 questions customers ask · Day 7 best-of + call to action. The week is approved for up to ${budget} credits. Tell me the exact credit cost and my remaining balance (get_account through the bridge), and wait for my "go". No go, no spend.
+4. On my "go", make all 7 packs through the bridge MCP, polling get_job_status until each is done. A failed piece refunds — if a whole pack fails, tell me and retry it once.
+5. Deliver my week as a calendar: for each day, the pack's share-page link and what's in it. End with the receipt: credits spent, credits remaining. Do not publish anything and do not render MP4s — I'll approve the pieces I want first.
+6. When the week is delivered or my token expires, stop. Next week I'll get a fresh code from whop.plunderandriffle.com/muse-week.`;
+}

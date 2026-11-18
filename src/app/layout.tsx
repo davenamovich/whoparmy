@@ -1,9 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
+import { getGateState, getSessionOperator } from "@/lib/site-gate";
 
 // Self-hosted Geist fonts (latin variable woff2, downloaded 2026-11-16 from
 // Google Fonts). next/font/google fetches at build time, which fails on
@@ -42,8 +45,28 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // ─── Site gate ────────────────────────────────────────────────────
+  // While the gate is ON, page routes are operators-only: anyone
+  // without a designated-operator session is redirected to /gate
+  // before any page renders. Route handlers (/api/*) never pass
+  // through this layout, so bridge endpoints, Whop OAuth and webhooks
+  // keep working; static assets bypass it too. The pathname arrives
+  // via the x-pathname header stamped in middleware.ts.
+  const pathname = (await headers()).get("x-pathname") ?? "/";
+  if (pathname !== "/gate") {
+    const gate = await getGateState();
+    if (gate.on && !(await getSessionOperator())) {
+      redirect("/gate");
+    }
+  }
+
   const locale = await getLocale();
-  const messages = await getMessages();
+  // The gate page must carry nothing member-facing — including the
+  // i18n dictionary, whose catalog contains member product copy
+  // (War Room strings etc.) and would otherwise be serialized into
+  // the gate page's payload by the provider below. The gate page
+  // itself uses no translations.
+  const messages = pathname === "/gate" ? {} : await getMessages();
   return (
     <html lang={locale} className="dark" suppressHydrationWarning>
       <body

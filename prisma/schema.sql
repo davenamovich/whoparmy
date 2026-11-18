@@ -369,6 +369,7 @@ CREATE TABLE "BridgeCode" (
     "userId" TEXT NOT NULL,
     "codeHash" TEXT NOT NULL,
     "budgetCredits" INTEGER NOT NULL,
+    "scope" TEXT NOT NULL DEFAULT 'week',
     "expiresAt" DATETIME NOT NULL,
     "usedAt" DATETIME,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -381,6 +382,7 @@ CREATE TABLE "BridgeToken" (
     "userId" TEXT NOT NULL,
     "tokenHash" TEXT NOT NULL,
     "budgetCredits" INTEGER NOT NULL,
+    "scope" TEXT NOT NULL DEFAULT 'week',
     "spentCredits" INTEGER NOT NULL DEFAULT 0,
     "expiresAt" DATETIME NOT NULL,
     "revokedAt" DATETIME,
@@ -683,3 +685,28 @@ CREATE UNIQUE INDEX "ClaimRedemption_nonce_key" ON "ClaimRedemption"("nonce");
 
 -- CreateIndex
 CREATE INDEX "ClaimRedemption_userId_idx" ON "ClaimRedemption"("userId");
+
+-- CreateTable
+CREATE TABLE "AppSetting" (
+    "key" TEXT NOT NULL PRIMARY KEY,
+    "value" TEXT NOT NULL,
+    "updatedAt" DATETIME NOT NULL
+);
+
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "TelegramPairCode" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "codeHash" TEXT NOT NULL,
+    "expiresAt" DATETIME NOT NULL,
+    "usedAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "TelegramPairCode_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX IF NOT EXISTS "TelegramPairCode_codeHash_key" ON "TelegramPairCode"("codeHash");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "TelegramPairCode_userId_idx" ON "TelegramPairCode"("userId");

@@ -55,6 +55,7 @@ export interface AgentTemplate {
 export const AGENT_CATALOG: AgentTemplate[] = [
   { key: "scout", name: "Trend Scout", role: "Watches trends and drafts angles for your niche, every day.", tierKey: "volume", minBudget: 10_000 },
   { key: "meme-smith", name: "Meme Smith", role: "Turns briefs into meme packs and captions on order.", tierKey: "mid", minBudget: 25_000 },
+  { key: "assessor", name: "The Assessor", role: "Bridge agent: hands your own Muse the Assessor command — it makes your free /before pack on your own credits and writes your $999 assessment offer.", tierKey: "mid", minBudget: 25_000 },
   { key: "hook-smith", name: "Hook Smith", role: "Writes the hooks and headlines that ship — flagship tier.", tierKey: "final", minBudget: 50_000 },
   { key: "qa-editor", name: "QA Editor", role: "Claude-grade quality pass on your best pieces. Rare and expensive by design.", tierKey: "quality", minBudget: 100_000 },
 ];
@@ -78,6 +79,12 @@ export const JOB_TIERS: Record<string, (typeof MODEL_TIERS)[number]["key"]> = {
   // the tier only satisfies kind validation — its order cost is 0
   // because video is accounted in VIDEO usage, not hire tokens.
   VIDEO: "mid",
+  // ASSESS is a bridge handoff (v2, Dave 2026-11-18): the runner
+  // returns a paste-ready bridge command and the member's OWN Muse
+  // makes the /before pack on the member's OWN credits — Whoparmy
+  // generates nothing, so the order cost is 0 and no plan meter is
+  // drawn. The tier only satisfies kind validation.
+  ASSESS: "mid",
 };
 
 export async function getWalletState(userId: string, planKey: string) {

@@ -1,21 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import dynamic from "next/dynamic";
 import {
   Sparkles,
   LayoutGrid,
   Library,
-  Fingerprint,
   Swords,
   UserRound,
-  Flame,
   Bot,
-  Cpu,
-  TrendingUp,
+  MessagesSquare,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import type { ProfileDTO } from "@/lib/types";
 import { CreateWizard, type WizardResult } from "@/components/factory/create-wizard";
@@ -25,14 +21,7 @@ import { VideoStudio } from "@/components/factory/video-studio";
 import { MemeArmy } from "@/components/factory/meme-army";
 import { WarRoom } from "@/components/factory/war-room";
 import { AgentsView } from "@/components/factory/agents";
-// LLM Control is operator-only (Dave, 2026-11-17): it is loaded
-// lazily so its code never even ships in the main bundle members
-// download — the nav item and the view are admin-gated below, and
-// the /api/llm-console route 403s non-operators server-side.
-const LlmConsole = dynamic(
-  () => import("@/components/factory/llm-console").then((m) => m.LlmConsole),
-  { ssr: false },
-);
+import { RalphChat, type RalphNavIntent } from "@/components/factory/ralph-chat";
 import { TrendingView } from "@/components/factory/trending";
 import { CampaignsView } from "@/components/factory/campaigns";
 import { LibraryView } from "@/components/factory/library";
@@ -46,37 +35,42 @@ import { LocaleSwitcher } from "@/components/factory/locale-switcher";
 
 type View =
   | "create"
+  | "ralph"
   | "results"
   | "campaigns"
   | "library"
-  | "brands"
-  | "publishing"
   | "army"
   | "agents"
-  | "trending"
-  | "llm"
   | "account";
 
-type NavKey = "create" | "campaigns" | "library" | "brands" | "publishing" | "army" | "agents" | "trending" | "llm" | "account";
+type NavKey = "create" | "ralph" | "campaigns" | "library" | "army" | "agents" | "account" | "admin";
 
 // Consolidated menu (Dave, 2026-11-17): fewer doors, same rooms.
 // Meme Studio folded into Create; the War Room folded into Meme
 // Army. The "studio" / "warroom" view keys no longer exist — the
 // components render inside their parent views below.
-const NAV: { key: View; labelKey: NavKey; icon: React.ComponentType<{ className?: string }>; badge?: string }[] = [
+//
+// Nav diet, phase 1 (Dave, 2026-11-18, UI audit): Brands, Trending
+// and Publishing lose their doors too — Brands and Trending are
+// inputs to Create (a brand feeds the wizard; a trend loads Create
+// a Meme) and Publishing is a property of Campaigns, so all three
+// render inside those views now. Permanent nav badges (PRO / NEW /
+// LIVE / OPS) are gone: badges are for state that clears, not
+// decoration (ui-ux-pro-max tab-badge rule).
+const NAV: { key: View; labelKey: NavKey; icon: React.ComponentType<{ className?: string }> }[] = [
   { key: "create", labelKey: "create", icon: Sparkles },
+  // Ralph chat (Dave, 2026-11-18): the one-click dispatcher door.
+  { key: "ralph", labelKey: "ralph", icon: MessagesSquare },
   { key: "campaigns", labelKey: "campaigns", icon: LayoutGrid },
   { key: "library", labelKey: "library", icon: Library },
-  { key: "brands", labelKey: "brands", icon: Fingerprint },
-  { key: "publishing", labelKey: "publishing", icon: Flame },
-  { key: "army", labelKey: "army", icon: Swords, badge: "PRO" },
-  { key: "agents", labelKey: "agents", icon: Bot, badge: "NEW" },
-  { key: "trending", labelKey: "trending", icon: TrendingUp, badge: "LIVE" },
-  { key: "llm", labelKey: "llm", icon: Cpu, badge: "OPS" },
+  { key: "army", labelKey: "army", icon: Swords },
+  { key: "agents", labelKey: "agents", icon: Bot },
   { key: "account", labelKey: "account", icon: UserRound },
 ];
 
-const MOBILE_NAV: View[] = ["create", "agents", "campaigns", "library", "army", "account"];
+// Mobile bottom bar: max 5 (ui-ux-pro-max bottom-nav-limit), the
+// same primary destinations as the sidebar minus Library.
+const MOBILE_NAV: View[] = ["create", "campaigns", "army", "agents", "account"];
 
 export default function Home() {
   const [view, setView] = useState<View>("create");
@@ -170,6 +164,16 @@ export default function Home() {
     setBrandPrefillName(null);
   }
 
+  // Ralph chat navigation intents: Ralph routes, the page moves.
+  // A meme topic rides the same prefill the Trending view uses.
+  function onRalphNavigate(intent: RalphNavIntent) {
+    if (intent.memeTopic) {
+      startMemesFromTrend(intent.memeTopic);
+      return;
+    }
+    setView(intent.view);
+  }
+
   function onWizardCompleted(result: WizardResult) {
     openResults(result.campaignId);
     clearBrandPrefill();
@@ -213,7 +217,7 @@ export default function Home() {
       <div className="flex-1 flex w-full mx-auto max-w-7xl">
         {/* sidebar — desktop */}
         <aside className="hidden lg:flex flex-col w-60 shrink-0 border-r border-border/60 px-3 py-5 gap-1 sticky top-14 self-start h-[calc(100vh-3.5rem)]">
-          {NAV.filter((n) => n.key !== "llm" || session?.admin).map((item) => (
+          {NAV.map((item) => (
             <button
               key={item.key}
               onClick={() => {
@@ -229,11 +233,22 @@ export default function Home() {
             >
               <item.icon className="h-4.5 w-4.5 shrink-0" />
               <span className="truncate">{tNav(item.labelKey)}</span>
-              {item.badge ? (
-                <Badge className="ml-auto bg-primary/15 text-primary border-0 text-[9px] px-1.5 py-0">{item.badge}</Badge>
-              ) : null}
             </button>
           ))}
+
+          {/* /admin door (Dave, 2026-11-18): shown only when an
+              admin/operator is logged in (same session.admin flag
+              that gates LLM Control). /admin is a real route that
+              404s for everyone else, so the link is safe to show. */}
+          {session?.admin ? (
+            <a
+              href="/admin"
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors text-left text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+            >
+              <ShieldCheck className="h-4.5 w-4.5 shrink-0" />
+              <span className="truncate">{tNav("admin")}</span>
+            </a>
+          ) : null}
 
           <div className="mt-auto rounded-xl border bg-card p-3.5">
             <div className="text-[11px] font-semibold uppercase tracking-wider text-primary mb-1">{tNav("taglineTitle")}</div>
@@ -245,18 +260,44 @@ export default function Home() {
         <main className="flex-1 min-w-0 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pb-24 lg:pb-12">
           {view === "create" ? (
             <div className="space-y-12">
+              {/* Ralph entry card: the button-first door, one tap
+                  from the room members land in. */}
+              <button
+                onClick={() => setView("ralph")}
+                className="w-full flex items-center gap-3 rounded-2xl border border-primary/30 bg-primary/8 px-4 py-3.5 text-left hover:bg-primary/12 transition-colors"
+              >
+                <span className="w-9 h-9 rounded-xl bg-primary grid place-items-center text-primary-foreground shrink-0">
+                  <MessagesSquare className="h-4.5 w-4.5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold tracking-tight">Ask Ralph — one tap, no typing</span>
+                  <span className="block text-xs text-muted-foreground truncate">Free content · free AI audit · he remembers your business</span>
+                </span>
+              </button>
+              {/* Nav diet phase 1: Brands lives here now — pick or
+                  research a brand, then the wizard below runs with it. */}
+              <BrandsView onUseInCampaign={startWizardWithBrand} />
               <CreateWizard onCompleted={onWizardCompleted} initialProfile={brandPrefill} initialProfileName={brandPrefillName} />
+              {/* Trending lives here too — its one action loads the
+                  meme studio directly below it. */}
+              <TrendingView onCreateMemes={startMemesFromTrend} />
               <MemeStudio prefill={memePrefill} />
               <VideoStudio />
             </div>
           ) : null}
+          {view === "ralph" ? <RalphChat onNavigate={onRalphNavigate} /> : null}
           {view === "results" && resultsCampaignId ? (
             <ResultsWorkspace campaignId={resultsCampaignId} onBack={() => setView("campaigns")} />
           ) : null}
-          {view === "campaigns" ? <CampaignsView onOpen={openResults} onNewCampaign={() => { clearBrandPrefill(); setView("create"); }} /> : null}
+          {view === "campaigns" ? (
+            <div className="space-y-12">
+              <CampaignsView onOpen={openResults} onNewCampaign={() => { clearBrandPrefill(); setView("create"); }} />
+              {/* Publishing folded in (nav diet phase 1): posting
+                  state is a property of the campaigns above. */}
+              <PublishingView />
+            </div>
+          ) : null}
           {view === "library" ? <LibraryView /> : null}
-          {view === "brands" ? <BrandsView onUseInCampaign={startWizardWithBrand} /> : null}
-          {view === "publishing" ? <PublishingView /> : null}
           {view === "army" ? (
             <div className="space-y-12">
               <MemeArmy />
@@ -264,8 +305,6 @@ export default function Home() {
             </div>
           ) : null}
           {view === "agents" ? <AgentsView /> : null}
-          {view === "trending" ? <TrendingView onCreateMemes={startMemesFromTrend} /> : null}
-          {view === "llm" && session?.admin ? <LlmConsole /> : null}
           {view === "account" ? <AccountView /> : null}
         </main>
       </div>
@@ -288,7 +327,7 @@ export default function Home() {
         className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border/60 bg-background/95 backdrop-blur-md pb-safe"
         aria-label="Primary"
       >
-        <div className="grid grid-cols-7">
+        <div className="grid grid-cols-5">
           {NAV.filter((n) => MOBILE_NAV.includes(n.key)).map((item) => (
             <button
               key={item.key}
@@ -303,7 +342,6 @@ export default function Home() {
             >
               <item.icon className="h-5 w-5" />
               <span className="max-w-full truncate px-0.5">{tNav(item.labelKey)}</span>
-              {item.badge ? <span className="absolute top-1.5 right-3 w-1.5 h-1.5 rounded-full bg-primary" /> : null}
             </button>
           ))}
         </div>

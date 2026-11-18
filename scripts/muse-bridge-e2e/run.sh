@@ -7,7 +7,11 @@
 # drains at 115), starts the app, and drives the whole journey:
 # account → code → exchange (single-use) → MCP tools/list (allowlist)
 # → free tools → publish refused → 7 packs settle at exactly 805 →
-# 8th refused pre-spend → revoke kills the token. 48 checks.
+# 8th refused pre-spend → revoke kills the token — plus the clips
+# lane: the same Starter member mints a clips code on their own
+# balance, runs create_sitdown at 25, and scope isolation is proven
+# both ways (clips token refused create_demo_pack; week token
+# refused create_sitdown). 63 checks.
 #
 # Usage: bash scripts/muse-bridge-e2e/run.sh
 set -euo pipefail
