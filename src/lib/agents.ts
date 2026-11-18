@@ -55,6 +55,7 @@ export interface AgentTemplate {
 export const AGENT_CATALOG: AgentTemplate[] = [
   { key: "scout", name: "Trend Scout", role: "Watches trends and drafts angles for your niche, every day.", tierKey: "volume", minBudget: 10_000 },
   { key: "meme-smith", name: "Meme Smith", role: "Turns briefs into meme packs and captions on order.", tierKey: "mid", minBudget: 25_000 },
+  { key: "assessor", name: "The Assessor", role: "Runs a free /before pack on your business, then tells you which $999 AI assessment fits — and what it would find.", tierKey: "mid", minBudget: 25_000 },
   { key: "hook-smith", name: "Hook Smith", role: "Writes the hooks and headlines that ship — flagship tier.", tierKey: "final", minBudget: 50_000 },
   { key: "qa-editor", name: "QA Editor", role: "Claude-grade quality pass on your best pieces. Rare and expensive by design.", tierKey: "quality", minBudget: 100_000 },
 ];
@@ -78,6 +79,12 @@ export const JOB_TIERS: Record<string, (typeof MODEL_TIERS)[number]["key"]> = {
   // the tier only satisfies kind validation — its order cost is 0
   // because video is accounted in VIDEO usage, not hire tokens.
   VIDEO: "mid",
+  // ASSESS runs on the engine's /before lane (agent-runner intercepts
+  // it, same pattern as VIDEO): the tier only satisfies kind validation
+  // and prices the offer write-up's LLM pass — the order cost is 0
+  // because the pack is accounted as 1 unit on the plan's monthly
+  // meter, not hire tokens.
+  ASSESS: "mid",
 };
 
 export async function getWalletState(userId: string, planKey: string) {

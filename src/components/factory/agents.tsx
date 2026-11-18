@@ -232,7 +232,7 @@ export function AgentsView() {
           </CardHeader>
           <CardContent className="space-y-4">
             {hires.map((h) => {
-              const form = jobForms[h.id] ?? { kind: "MEME", brief: "", pieces: "1", language: defaultJobLanguage };
+              const form = jobForms[h.id] ?? { kind: h.templateKey === "assessor" ? "ASSESS" : "MEME", brief: "", pieces: "1", language: defaultJobLanguage };
               return (
                 <div key={h.id} className="rounded-lg border border-border/60 p-4 space-y-3">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -272,6 +272,7 @@ export function AgentsView() {
                         <option value="HOOK">Hooks (final)</option>
                         <option value="QA">Claude QA pass (quality)</option>
                         <option value="VIDEO">Video (engine — brief = topic, or JSON {"{format,…}"})</option>
+                        <option value="ASSESS">Assessment offer (engine /before pack + $999 fit — brief = your business URL)</option>
                       </select>
                       <select
                         className="h-9 rounded-md border border-input bg-background px-2 text-sm"
@@ -287,7 +288,7 @@ export function AgentsView() {
                       </select>
                       <Input
                         className="flex-1"
-                        placeholder="Brief — what should the agent make?"
+                        placeholder={form.kind === "ASSESS" ? "Your business website — the Assessor builds your free /before pack from it" : "Brief — what should the agent make?"}
                         value={form.brief}
                         onChange={(e) => setJobForms((f) => ({ ...f, [h.id]: { ...form, brief: e.target.value } }))}
                       />

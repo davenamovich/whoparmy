@@ -25,7 +25,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const kind = (body.kind ?? "MEME").toUpperCase();
     if (!(kind in JOB_TIERS)) {
-      return NextResponse.json({ error: "Job kind must be SCOUT, MEME, HOOK, QA, CAMPAIGN or VIDEO." }, { status: 400 });
+      return NextResponse.json({ error: "Job kind must be SCOUT, MEME, HOOK, QA, CAMPAIGN, VIDEO or ASSESS." }, { status: 400 });
     }
     const brief = body.brief?.trim();
     if (!brief) return NextResponse.json({ error: "Give the agent a brief." }, { status: 400 });
@@ -50,7 +50,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // Meme output draws on the plan's monthly meme meter (house lane).
     // VIDEO draws on the same meter (1–3 units by format steps).
-    if (kind === "MEME" || kind === "CAMPAIGN" || kind === "VIDEO") {
+    // ASSESS draws 1 unit — one /before pack on the engine.
+    if (kind === "MEME" || kind === "CAMPAIGN" || kind === "VIDEO" || kind === "ASSESS") {
       const plan = getPlan(user.plan);
       const usedMemes = await countMonthlyUsage(user.id);
       let requested = pieces;
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
     }
 
-    const cost = kind === "VIDEO" ? 0 : tierCost(JOB_TIERS[kind]) * pieces;
+    const cost = kind === "VIDEO" || kind === "ASSESS" ? 0 : tierCost(JOB_TIERS[kind]) * pieces;
     const remaining = hire.tokenBudget - hire.tokensUsed;
     if (cost > remaining) {
       return NextResponse.json(
