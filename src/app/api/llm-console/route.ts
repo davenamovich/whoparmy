@@ -30,12 +30,12 @@ const USD_PER_TOKEN_PACK = 28 / 250_000_000;
 async function requireOperator() {
   const { user, mode, viaFallback } = await getWhopUserWithMode();
   if (mode !== "operator") throw new Error("OPERATOR_ONLY");
-  // The anonymous operator fallback is a dev convenience. In production
-  // it must not unlock this console for anyone who simply is not signed
-  // in: real operator access comes from a Whop login designated via
-  // OPERATOR_WHOP_IDS / OPERATOR_WHOP_USERNAMES, or an explicit
-  // ALLOW_OPERATOR_FALLBACK=1 in the environment (local dev).
-  if (viaFallback && process.env.NODE_ENV === "production" && process.env.ALLOW_OPERATOR_FALLBACK !== "1") {
+  // Admin means a designated operator, full stop (Dave, 2026-11-17:
+  // "llm control should not show to anyone except admin"). The
+  // anonymous fallback session never unlocks this console — in any
+  // environment — unless ALLOW_OPERATOR_FALLBACK=1 is set explicitly
+  // (local dev). This matches the session route's admin flag exactly.
+  if (viaFallback && process.env.ALLOW_OPERATOR_FALLBACK !== "1") {
     throw new Error("OPERATOR_ONLY");
   }
   return user;

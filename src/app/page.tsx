@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import {
   Sparkles,
   LayoutGrid,
@@ -24,7 +25,14 @@ import { VideoStudio } from "@/components/factory/video-studio";
 import { MemeArmy } from "@/components/factory/meme-army";
 import { WarRoom } from "@/components/factory/war-room";
 import { AgentsView } from "@/components/factory/agents";
-import { LlmConsole } from "@/components/factory/llm-console";
+// LLM Control is operator-only (Dave, 2026-11-17): it is loaded
+// lazily so its code never even ships in the main bundle members
+// download — the nav item and the view are admin-gated below, and
+// the /api/llm-console route 403s non-operators server-side.
+const LlmConsole = dynamic(
+  () => import("@/components/factory/llm-console").then((m) => m.LlmConsole),
+  { ssr: false },
+);
 import { TrendingView } from "@/components/factory/trending";
 import { CampaignsView } from "@/components/factory/campaigns";
 import { LibraryView } from "@/components/factory/library";
