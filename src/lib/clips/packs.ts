@@ -14,21 +14,39 @@
  */
 
 /**
- * What a clip actually costs to produce: the MP4 (Dave, 2026-11-18).
+ * What a clip actually costs: the render, as Agent37 charges for it
+ * (Dave, 2026-11-18: "llm calls are near free and the cost to render is what
+ * agent37 charges").
  *
- * 25 is NOT a cost — it is the number of LIST credits the call consumes, i.e.
- * the price the engine charges, useful only when comparing retail with the
- * BYOK lane. Treating it as COGS overstated clip cost 25x and made the price
- * look like it needed defending.
+ * LLM text is explicitly zero here, not "small" — modelling it twice is how a
+ * price gets defended against a cost that does not exist.
+ *
+ * 25 is NOT a cost either: it is the number of LIST credits a call consumes,
+ * i.e. the price the engine charges, kept only to compare retail with the BYOK
+ * lane. Treating it as COGS overstated clip cost 25x.
  */
-export const MP4_RENDER_COST_USD = 0.005;
+export const AGENT37_RENDER_COST_USD = 0.005;
+
+/** Text generation. Near-free, and counted once — here, at zero. */
+export const LLM_TEXT_COST_USD = 0;
 
 /** The list-credit price of one clip — a comparison figure, never a cost. */
 export const LIST_CREDITS_PER_CLIP = 25;
 export const CREDIT_LIST_PRICE_USD = 0.01; // BYOK: 1 credit per engine call
 
 /** Real COGS per delivered clip. */
-export const CLIP_COGS_USD = MP4_RENDER_COST_USD;
+export const CLIP_COGS_USD = AGENT37_RENDER_COST_USD + LLM_TEXT_COST_USD;
+
+/**
+ * The only thing that can wreck this model: turns.
+ *
+ * Agent37 charges for the compute a run uses, so a worker that loops, retries
+ * blindly or re-sends its whole context per step multiplies the render charge
+ * — the same failure that burned 800K tokens in one morning. The worker is
+ * therefore budgeted to a single pass per clip: claim, one create_sitdown, poll
+ * with backoff, report, exit. Over budget is a bug, not a tuning knob.
+ */
+export const MAX_TURNS_PER_CLIP = 3;
 
 export interface ClipPack {
   key: string;

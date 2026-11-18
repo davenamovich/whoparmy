@@ -9,7 +9,9 @@ import {
   LIST_CREDITS_PER_CLIP,
   MAX_BONUS_RATIO,
   MIN_GROSS_MARGIN,
-  MP4_RENDER_COST_USD,
+  AGENT37_RENDER_COST_USD,
+  LLM_TEXT_COST_USD,
+  MAX_TURNS_PER_CLIP,
   grossMargin,
   laneCopy,
   marginAtMaxBonus,
@@ -17,10 +19,16 @@ import {
   pricePerClip,
 } from "./packs.ts";
 
-test("cogs: a clip costs the mp4, and 25 is a list price not a cost", () => {
-  assert.equal(MP4_RENDER_COST_USD, 0.005);
-  assert.equal(CLIP_COGS_USD, MP4_RENDER_COST_USD, "cost must not include list credits");
-  assert.equal(LIST_CREDITS_PER_CLIP, 25);
+test("cogs: the render is the whole cost, counted once", () => {
+  assert.equal(AGENT37_RENDER_COST_USD, 0.005);
+  assert.equal(LLM_TEXT_COST_USD, 0, "text is near-free; counting it again is how a cost gets invented");
+  assert.equal(CLIP_COGS_USD, AGENT37_RENDER_COST_USD + LLM_TEXT_COST_USD);
+  assert.equal(LIST_CREDITS_PER_CLIP, 25, "25 is a list price, never a cost");
+});
+
+test("turns: the worker is budgeted to a single pass per clip", () => {
+  // Agent37 bills compute, so turns are the real exposure — not the render.
+  assert.equal(MAX_TURNS_PER_CLIP, 3);
 });
 
 test("margin: every pack clears the floor even if the member takes the full bonus", () => {
