@@ -116,5 +116,21 @@ check("revoke ok", r.json?.ok === true);
 r = await mcp(40, "tools/list", {});
 check("mcp after revoke 401", r.status === 401);
 
+// 11. The Taste: a 115-credit token funds exactly one pack.
+r = await call("POST", `${APP}/api/bridge/code`, { headers: auth, body: { offer: "taste" } });
+check("taste code budget 115", r.json?.budgetCredits === 115 && r.json?.offer === "taste", JSON.stringify(r.json).slice(0, 160));
+r = await call("POST", `${APP}/api/bridge/exchange`, { body: { code: r.json?.code } });
+check("taste exchange budget 115", r.json?.budget_credits === 115);
+const tasteBearer = { Authorization: `Bearer ${r.json?.bridge_token}` };
+const tasteMcp = (id, method, params) => call("POST", `${APP}/api/bridge/mcp`, { headers: tasteBearer, body: rpc(id, method, params) });
+r = await tasteMcp(50, "tools/call", { name: "create_demo_pack", arguments: { input: "https://example.com" } });
+check("taste pack 1 ok", r.json?.result?.isError !== true && !!r.json?.result?.structuredContent?.jobId);
+r = await tasteMcp(51, "tools/call", { name: "create_demo_pack", arguments: { input: "https://example.com" } });
+check("taste pack 2 refused (budget spent)", r.json?.result?.isError === true && /budget/i.test(JSON.stringify(r.json)));
+
+// 12. Week + Opener mints at 855 (7 packs + the 50-credit pitch reserve).
+r = await call("POST", `${APP}/api/bridge/code`, { headers: auth, body: { offer: "opener" } });
+check("opener code budget 855", r.json?.budgetCredits === 855 && r.json?.offer === "opener", JSON.stringify(r.json).slice(0, 160));
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

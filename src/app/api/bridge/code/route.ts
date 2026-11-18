@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getWhopUser } from "@/lib/auth";
-import { BridgeError, WEEK_BUDGET_CREDITS, assertBridgeEligible, getMemberEngineKey, mintBridgeCode } from "@/lib/muse-bridge";
+import { BridgeError, WEEK_BUDGET_CREDITS, assertBridgeEligible, bridgeOffer, getMemberEngineKey, mintBridgeCode } from "@/lib/muse-bridge";
 
 export const runtime = "nodejs";
 
@@ -16,11 +16,15 @@ export async function POST(req: NextRequest) {
     const user = await getWhopUser();
     assertBridgeEligible(user);
     await getMemberEngineKey(user);
-    const body = (await req.json().catch(() => ({}))) as { budgetCredits?: unknown };
-    const budget = typeof body.budgetCredits === "number" ? body.budgetCredits : WEEK_BUDGET_CREDITS;
+    const body = (await req.json().catch(() => ({}))) as { budgetCredits?: unknown; offer?: unknown };
+    // A named offer sets the budget server-side — the client never
+    // names its own price for an offer. The bare budgetCredits path
+    // stays for compatibility and is clamped inside mintBridgeCode.
+    const offer = typeof body.offer === "string" ? bridgeOffer(body.offer) : null;
+    const budget = offer ? offer.budgetCredits : typeof body.budgetCredits === "number" ? body.budgetCredits : WEEK_BUDGET_CREDITS;
     const minted = await mintBridgeCode(user.id, budget);
     return NextResponse.json(
-      { code: minted.code, expiresAt: minted.expiresAt, budgetCredits: minted.budgetCredits },
+      { code: minted.code, expiresAt: minted.expiresAt, budgetCredits: minted.budgetCredits, offer: offer?.id ?? null },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (err) {

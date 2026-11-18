@@ -57,6 +57,31 @@ export const BRIDGE_CODE_TTL_MS = 15 * 60_000; // copy → paste → Muse's firs
 export const WEEK_BUDGET_CREDITS = 7 * 115;
 export const MAX_BUDGET_CREDITS = 5000;
 
+// ─── The offers (Dave, 2026-11-17: add both variants) ───────────────
+// Three sizes of the same special offer, all Operator + Agency. The
+// token budget is the only enforcement difference between them; the
+// command text on /muse-week carries what the Muse makes. Budgets
+// are list-price reserves — calls settle at the actual charge.
+
+export interface BridgeOffer {
+  id: "taste" | "week" | "opener";
+  name: string;
+  budgetCredits: number;
+  blurb: string;
+}
+
+export const BRIDGE_OFFERS: BridgeOffer[] = [
+  { id: "taste", name: "The Taste", budgetCredits: 115, blurb: "One day-pack — run the whole flow once." },
+  { id: "week", name: "The Week", budgetCredits: WEEK_BUDGET_CREDITS, blurb: "Seven day-packs, one per day, seven angles." },
+  { id: "opener", name: "Week + Opener", budgetCredits: WEEK_BUDGET_CREDITS + 50, blurb: "The Week, plus a personalized /before pitch for your business." },
+];
+
+export const DEFAULT_OFFER_ID = "week";
+
+export function bridgeOffer(id: unknown): BridgeOffer {
+  return BRIDGE_OFFERS.find((o) => o.id === id) ?? BRIDGE_OFFERS.find((o) => o.id === DEFAULT_OFFER_ID)!;
+}
+
 const WHOP_USER_RE = /^user_[A-Za-z0-9]{4,64}$/;
 
 // ─── Plan mapping ───────────────────────────────────────────────────
@@ -477,6 +502,7 @@ export interface BridgeAccountView {
   brand: { name: string; website: string | null } | null;
   tokens: Array<{ id: string; budgetCredits: number; spentCredits: number; expiresAt: Date; active: boolean }>;
   weekBudgetCredits: number;
+  offers: BridgeOffer[];
   error: string | null;
   errorCode: string | null;
 }
@@ -509,6 +535,7 @@ export async function getBridgeAccountView(user: User): Promise<BridgeAccountVie
       active: !t.revokedAt && t.expiresAt.getTime() > Date.now(),
     })),
     weekBudgetCredits: WEEK_BUDGET_CREDITS,
+    offers: BRIDGE_OFFERS,
     error: null,
     errorCode: null,
   };

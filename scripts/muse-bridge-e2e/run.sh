@@ -7,7 +7,7 @@
 # drains at 115), starts the app, and drives the whole journey:
 # account → code → exchange (single-use) → MCP tools/list (allowlist)
 # → free tools → publish refused → 7 packs settle at exactly 805 →
-# 8th refused pre-spend → revoke kills the token. 43 checks.
+# 8th refused pre-spend → revoke kills the token. 48 checks.
 #
 # Usage: bash scripts/muse-bridge-e2e/run.sh
 set -euo pipefail
@@ -22,7 +22,13 @@ export PRISMA_QUERY_ENGINE_LIBRARY="$PWD/node_modules/@prisma/engines/libquery_e
 export PRISMA_SCHEMA_ENGINE_BINARY="$PWD/node_modules/@prisma/engines/schema-engine-debian-openssl-3.0.x"
 export CHECKPOINT_DISABLE=1
 
-rm -f /tmp/bridge-e2e.db
+# A previous run's next-server can survive its trap (npx spawns a child
+# that outlives the parent kill) and would hold the deleted DB file —
+# clear stale servers and SQLite sidecar files before rebuilding.
+pkill -f "next-server" 2>/dev/null || true
+pkill -f "mock-bot.mjs" 2>/dev/null || true
+sleep 1
+rm -f /tmp/bridge-e2e.db /tmp/bridge-e2e.db-journal /tmp/bridge-e2e.db-wal /tmp/bridge-e2e.db-shm
 npx prisma generate >/dev/null
 npx prisma db push --skip-generate >/dev/null
 node scripts/muse-bridge-e2e/seed.mjs
