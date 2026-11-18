@@ -46,11 +46,13 @@ const KIND_INSTRUCTIONS: Record<string, string> = {
 };
 
 /**
- * The Assessor's offer write-up (Dave, 2026-11-18): the free /before
- * pack is the lead magnet; this pass turns it into the $999 AI
- * Assessment offer, following Corey Ganim's playbook — sell the
+ * The Assessor's offer write-up spec (Dave, 2026-11-18): the free
+ * /before pack is the lead magnet; the write-up turns it into the $999
+ * AI Assessment offer, following Corey Ganim's playbook — sell the
  * OUTCOME, never the software. One free finding only; the rest stays
  * behind the $999, and the recurring option is pitched at delivery.
+ * In v2 this spec rides inside the bridge command, so the member's
+ * own Muse does the write-up from the pack it just made.
  */
 const ASSESS_OFFER_INSTRUCTIONS =
   "You are The Assessor agent for Plunder & Riffle's $999 AI Assessments. The business owner has just received a free /before pack made from their own website — a 30–50 second personalized audio monologue plus 5 memes about THEIR business. From the brief, write their assessment offer with exactly these parts:\n" +
@@ -205,21 +207,22 @@ export async function runAgentJob(jobId: string): Promise<void> {
     return;
   }
 
-  // ASSESS jobs (Dave, 2026-11-18) run on the engine's /before lane,
-  // not the plain LLM: the brief is the member's business (a URL, a
+  // ASSESS jobs — v2 is a BRIDGE HANDOFF (Dave, 2026-11-18: "just do a
+  // bridge — users will be using their own pages and keys"). Whoparmy
+  // generates nothing: the job returns a paste-ready bridge command,
+  // and the member's OWN Muse exchanges the member's bridge code,
+  // runs create_before_pitch through /api/bridge/mcp on the member's
+  // OWN P&R credits, reads the pack, and writes the $999 assessment
+  // offer — delivered by their Muse, on their own pages. No house
+  // key spend, no plan meter, no in-app LLM pass (v1's write-up drift
+  // dies with the lane). The brief is the member's business (a URL, a
   // link, or a sentence — or JSON {input, product, assessmentFit}).
-  // The runner submits create_before_pitch on the bridge key (1 credit,
-  // accounted as 1 unit on the plan meter at order time), polls the
-  // demo_pack job to its pack page, then makes one LLM pass that turns
-  // the pack into the $999 assessment offer. The hire's token charge is
-  // refunded like VIDEO — the pack is meter usage, not hire tokens.
   if (job.kind === "ASSESS") {
     const refund = db.hiredAgent.update({
       where: { id: hire.id },
       data: { tokensUsed: Math.max(0, hire.tokensUsed - job.tokenCost) },
     });
     try {
-      const { submitBeforePack, getEngineJobStatus } = await import("@/lib/engine");
       let input = job.brief.trim();
       let product: string | undefined;
       let assessmentFit: string | undefined;
@@ -236,42 +239,21 @@ export async function runAgentJob(jobId: string): Promise<void> {
       } catch {
         // plain-text brief → the business input itself, as defaulted above
       }
-      const { jobId: engineJobId } = await submitBeforePack({
-        input: input.slice(0, 1500),
-        ...(product ? { product } : {}),
-      });
-      // demo_pack generation measured ~2 minutes in the Engine Trial;
-      // poll every 15s for up to 10 minutes before calling it slow.
-      let pageUrl: string | null = null;
-      let engineError: string | null = null;
-      for (let i = 0; i < 40 && !pageUrl; i++) {
-        await new Promise((r) => setTimeout(r, 15_000));
-        const st = await getEngineJobStatus("demo_pack", engineJobId);
-        if (st.pageUrl) pageUrl = st.pageUrl;
-        else if (st.terminal) {
-          engineError = st.error ?? `Engine pack ended in phase "${st.phase ?? "unknown"}" without a page.`;
-          break;
-        }
-      }
-      if (!pageUrl) {
-        // create_before_pitch's job_id is a rebuild from the same input,
-        // so re-ordering the same brief picks the same pack back up.
-        throw new Error(
-          engineError ??
-            `Your /before pack is still generating on the engine (job ${engineJobId}). Order the same brief again in a few minutes and it will pick up the same pack. Nothing was charged.`,
-        );
-      }
-      const system =
-        ASSESS_OFFER_INSTRUCTIONS +
-        `\n\nOUTPUT LANGUAGE: Write ALL of your output in ${languageLabel(job.language)} (${job.language}), regardless of the language the brief is written in.`;
-      const user =
-        `Agent: ${hire.name} (${hire.templateKey})\nBusiness: ${input}\n` +
-        (product ? `Product/service to feature: ${product}\n` : "") +
-        (assessmentFit ? `The owner already leans toward: ${assessmentFit} — confirm or correct the fit, do not just agree.\n` : "") +
-        `Their free /before pack (live now): ${pageUrl}`;
-      const offer = await callStarimg(JOB_TIERS.ASSESS, system, user);
+      const command =
+        `You are my Assessor agent, connected to my Plunder & Riffle account through my bridge at whop.plunderandriffle.com. My credits are mine — never ask me for an API key; it stays on the engine side and I will never paste it anywhere. Work and answer in ${languageLabel(job.language)}.\n\n` +
+        `1. My bridge code is {BRIDGE_CODE} (one-time, expires in 15 minutes). Exchange it: POST https://whop.plunderandriffle.com/api/bridge/exchange with {"code": "{BRIDGE_CODE}"}. You get a bridge token (7 days) and the MCP URL. Use the token as the Bearer credential for every MCP call through https://whop.plunderandriffle.com/api/bridge/mcp. Never print the token back to me, and never store it past this run.\n` +
+        `2. My business is ${input.slice(0, 1500)}.${product ? ` The product/service to feature is: ${product}.` : ""}${assessmentFit ? ` I already lean toward the ${assessmentFit} assessment — confirm or correct the fit from the evidence, do not just agree.` : ""} Research it first through the bridge MCP (research_brand, then create_campaign_from_research) — both are free. Work only from what the research actually found about my business; invent nothing.\n` +
+        `3. Quote me the Assessor run before you spend anything: one create_before_pitch for my business — a personalized /before pack (a 30–50 second audio monologue plus 5 memes about MY business). It reserves 50 credits of my bridge budget and settles at the actual charge. Tell me the expected cost and my remaining balance (get_account through the bridge), and wait for my "go". No go, no spend.\n` +
+        `4. On my "go", run create_before_pitch through the bridge${product ? ` with the product pinned` : ""}, polling get_job_status (kind demo_pack) until it is done. Read the finished pack page and the research before writing anything.\n` +
+        `5. Write my assessment offer from the pack and the research. ${ASSESS_OFFER_INSTRUCTIONS}\n` +
+        `6. Deliver the pack link and the offer to me here; if I ask, put them on my own pages. Do not publish anything and do not render MP4s — I approve first. End with the receipt: credits spent, credits remaining.`;
       const text =
-        `Your free /before pack: ${pageUrl}\n(30–50s monologue + 5 memes about your business — the link expires in under 7 days, use it while it's alive.)\n\n${offer.text}`;
+        `THE ASSESSOR — BRIDGE HANDOFF\n` +
+        `Whoparmy doesn't make this one. Your own Muse makes it, through your bridge, on your own Plunder & Riffle credits, and delivers it on your own pages. Nothing spends on the house key and nothing is generated inside Whoparmy.\n\n` +
+        `1) Get your bridge code: open https://whop.plunderandriffle.com/muse-week (the Operator + Agency bridge), pick any offer — the Assessor run needs 50 credits of budget for one /before pack, so The Taste (115) covers it — and generate your command to reveal your one-time code.\n` +
+        `2) Paste the command below to your Muse, swapping {BRIDGE_CODE} for your fresh code (it expires in 15 minutes and works once).\n` +
+        `3) Your Muse quotes the run first and waits for your "go" before spending. The pack and the $999 offer come back from your Muse — approve them there.\n\n` +
+        `── PASTE TO YOUR CLAUDE ──\n${command}\n── END ──`;
       await db.$transaction([
         db.agentJob.update({
           where: { id: job.id },
@@ -280,17 +262,13 @@ export async function runAgentJob(jobId: string): Promise<void> {
             tokenCost: 0,
             result: JSON.stringify({
               text: text.slice(0, 20_000),
-              packLink: pageUrl,
-              engineJobId,
-              model: offer.model,
-              provider: "pr-engine+starimg",
+              provider: "bridge",
+              bridgeUrl: "https://whop.plunderandriffle.com/muse-week",
             }),
           },
         }),
         refund,
       ]);
-      await awardXp(job.userId, "PACK_GENERATED", `agent:${hire.name}`.slice(0, 80)).catch(() => {});
-      await recordUsage(job.userId, "TEXT", 1, "agent-job");
     } catch (err) {
       await db.$transaction([
         db.agentJob.update({
@@ -299,7 +277,7 @@ export async function runAgentJob(jobId: string): Promise<void> {
             status: "FAILED",
             result: JSON.stringify({
               error: err instanceof Error ? err.message.slice(0, 500) : "Assessment job failed",
-              provider: "pr-engine",
+              provider: "bridge",
             }),
           },
         }),

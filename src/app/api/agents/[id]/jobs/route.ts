@@ -50,8 +50,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // Meme output draws on the plan's monthly meme meter (house lane).
     // VIDEO draws on the same meter (1–3 units by format steps).
-    // ASSESS draws 1 unit — one /before pack on the engine.
-    if (kind === "MEME" || kind === "CAMPAIGN" || kind === "VIDEO" || kind === "ASSESS") {
+    // ASSESS is NOT metered: it's a bridge handoff — the member's own
+    // Muse makes the pack on the member's own credits (v2).
+    if (kind === "MEME" || kind === "CAMPAIGN" || kind === "VIDEO") {
       const plan = getPlan(user.plan);
       const usedMemes = await countMonthlyUsage(user.id);
       let requested = pieces;

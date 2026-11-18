@@ -272,7 +272,7 @@ export function AgentsView() {
                         <option value="HOOK">Hooks (final)</option>
                         <option value="QA">Claude QA pass (quality)</option>
                         <option value="VIDEO">Video (engine — brief = topic, or JSON {"{format,…}"})</option>
-                        <option value="ASSESS">Assessment offer (engine /before pack + $999 fit — brief = your business URL)</option>
+                        <option value="ASSESS">Assessment offer (bridge — your Muse makes the /before pack + $999 fit on your key)</option>
                       </select>
                       <select
                         className="h-9 rounded-md border border-input bg-background px-2 text-sm"
@@ -288,7 +288,7 @@ export function AgentsView() {
                       </select>
                       <Input
                         className="flex-1"
-                        placeholder={form.kind === "ASSESS" ? "Your business website — the Assessor builds your free /before pack from it" : "Brief — what should the agent make?"}
+                        placeholder={form.kind === "ASSESS" ? "Your business website — the Assessor hands it to your Muse through the bridge" : "Brief — what should the agent make?"}
                         value={form.brief}
                         onChange={(e) => setJobForms((f) => ({ ...f, [h.id]: { ...form, brief: e.target.value } }))}
                       />
