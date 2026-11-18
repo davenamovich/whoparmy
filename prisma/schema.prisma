@@ -859,3 +859,28 @@ model ClipPost {
 
   @@index([userId, postedAt])
 }
+
+// ─── The Box Trade (gamified clips) ─────────────────────────────────
+// Buy a pack; that count is the floor, permanently. Each round reveals two
+// upsides — extra clips or a brief — and the member takes one. Decline is
+// free. Offers are derived from `seed` + `round` (lib/clips/game.ts), so a
+// reload cannot fish for a better board: the same seed always deals the
+// same two options.
+model ClipGameSession {
+  id        String   @id @default(cuid())
+  userId    String
+  pageId    String
+  floor     Int // clips bought — the number that can never go down
+  bonus     Int      @default(0)
+  briefs    String   @default("[]") // json: BriefCard[]
+  round     Int      @default(0)
+  maxRounds Int      @default(3)
+  seed      Int
+  chosen    String   @default("[]") // json: 0 | 1 | -1 per round, for the audit trail
+  status    String   @default("open") // open | resolved | abandoned
+  resolvedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status])
+}
