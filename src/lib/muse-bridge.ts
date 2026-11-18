@@ -280,7 +280,8 @@ interface McpReply {
   error?: { code?: number; message?: string };
 }
 
-async function mcpCall(key: string, method: string, params: Record<string, unknown>): Promise<McpReply> {
+/** Exported so the clip dispatcher drives the same MCP path as the bridge. */
+export async function mcpCall(key: string, method: string, params: Record<string, unknown>): Promise<McpReply> {
   const res = await fetch(`${botBaseUrl()}/api/mcp`, {
     method: "POST",
     headers: {
