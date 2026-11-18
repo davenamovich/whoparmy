@@ -96,13 +96,6 @@ const HOW_IT_WORKS: string[] = [
   "The system tracks participation, referral clicks and conversions.",
 ];
 
-const MISSION_CHECKLIST: string[] = [
-  "Grab a meme from today's content pack.",
-  "Personalize it if you want.",
-  "Share it with your audience.",
-  "Submit your post or campaign link.",
-];
-
 const BOT_COMMANDS: { cmd: string; what: string }[] = [
   { cmd: "/start", what: "Register, pick a language and get the welcome pack." },
   { cmd: "/memes", what: "Grab today's ready-to-share memes." },
@@ -240,8 +233,17 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
 }
 
 // ─── phone mockup (upsell) ──────────────────────────────────────────
+// The phone plays a real video, served the way the /before experience
+// serves its phones (Dave, 2026-11-17): the MP4 lives on our own
+// infra at www.plunderandriffle.com/phones/, a poster stands in, and
+// nothing downloads until the visitor taps Play — then the src is
+// armed and it plays inline.
+
+const PHONE_VIDEO_SRC = "https://www.plunderandriffle.com/phones/home.mp4";
+const PHONE_VIDEO_POSTER = "/phone-army-poster.jpg";
 
 function PhoneMockup() {
+  const [armed, setArmed] = useState(false);
   return (
     <div className="hidden md:block">
       <div className="mx-auto w-[290px]">
@@ -264,43 +266,39 @@ function PhoneMockup() {
                 LIVE
               </span>
             </div>
-            {/* conversation */}
-            <div className="space-y-2.5 px-3 py-3 text-[11px] leading-relaxed">
-              <div className="space-y-1.5 rounded-2xl rounded-tl-md bg-[#182533] p-3 text-white/90">
-                <div className="text-[12px] font-bold" style={{ color: BRAND }}>
-                  {"🚀 Today's Mission: Spread the Word!"}
-                </div>
-                <p>Our new product just launched.</p>
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-white/60">Your mission:</div>
-                <ul className="space-y-1">
-                  {MISSION_CHECKLIST.map((item) => (
-                    <li key={item} className="flex items-start gap-1.5">
-                      <Check className="mt-0.5 h-3 w-3 shrink-0" style={{ color: BRAND }} aria-hidden />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="rounded-2xl rounded-tl-md bg-[#182533] p-3 text-white/90">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-white/60">
-                  {"Today's campaign — Rewards available"}
-                </div>
-                <div className="mt-1.5 text-[11px] font-semibold">Your Army Stats</div>
-                <div className="mt-1.5 grid grid-cols-3 gap-1 text-center">
-                  <div>
-                    <div className="text-sm font-bold" style={{ color: BRAND }}>248</div>
-                    <div className="text-[9px] text-white/50">Participants</div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-bold" style={{ color: BRAND }}>631</div>
-                    <div className="text-[9px] text-white/50">Shares submitted</div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-bold" style={{ color: BRAND }}>86</div>
-                    <div className="text-[9px] text-white/50">Referrals</div>
-                  </div>
-                </div>
-              </div>
+            {/* video — the /before phone pattern: poster + tap-to-play */}
+            <div className="relative bg-black">
+              <video
+                className="aspect-[9/16] w-full object-cover"
+                poster={PHONE_VIDEO_POSTER}
+                playsInline
+                preload="none"
+                controls={armed}
+                autoPlay={armed}
+                src={armed ? PHONE_VIDEO_SRC : undefined}
+                aria-label="A sit-down with Joe — the Plunder & Riffle house reel"
+              />
+              <span className="absolute left-2.5 top-2.5 rounded-full bg-black/60 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white/85">
+                Demo
+              </span>
+              {!armed ? (
+                <button
+                  type="button"
+                  onClick={() => setArmed(true)}
+                  className="absolute inset-0 grid w-full place-items-center bg-black/25 transition-colors hover:bg-black/10"
+                  aria-label="Play the house reel"
+                >
+                  <span className="grid h-14 w-14 place-items-center rounded-full text-white shadow-xl" style={{ background: BRAND }}>
+                    <Play className="ml-0.5 h-6 w-6" aria-hidden />
+                  </span>
+                </button>
+              ) : null}
+            </div>
+            <div className="px-3 py-2.5 text-[10px] leading-relaxed text-white/55">
+              Real stick-figure sit-down. House reel — the kind of cut your army ships.
+            </div>
+            {/* footer strip */}
+            <div className="space-y-2.5 px-3 pb-3">
               <div
                 className="rounded-xl py-2.5 text-center text-[11px] font-bold text-white"
                 style={{ background: BRAND }}
