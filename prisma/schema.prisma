@@ -30,6 +30,7 @@ model User {
   usageRecords UsageRecord[]
   bridgeConnection BridgeConnection?
   bridgeCodes  BridgeCode[]
+  telegramPairCodes TelegramPairCode[]
   bridgeTokens BridgeToken[]
   researchJobs ResearchJob[]
   videoJobs    VideoJob[]
@@ -741,3 +742,23 @@ model AppSetting {
   updatedAt DateTime @updatedAt
 }
 
+
+// ─── Telegram pairing (Dave, 2026-11-18) ─────────────────────────────
+// One-time codes that bind a member's Telegram account (in the
+// meme-loop-engine bot) to their Whoparmy account, so both surfaces
+// share one Mnemos memory scope (member-<userId>). Same discipline
+// as BridgeCode: only the SHA-256 hash is stored; the code is shown
+// once. The bot consumes it server-to-server via
+// POST /api/telegram/pair/verify behind TELEGRAM_PAIR_SECRET.
+model TelegramPairCode {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
