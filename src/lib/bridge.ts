@@ -59,7 +59,7 @@ export const BRIDGE_PARTNERS: BridgePartner[] = [
     key: "muse",
     name: "Muse",
     blurb: "Your own Muse agent — the workhouse that builds and runs it all with you.",
-    example: "https://plunderandriffle.com/muse-invite",
+    example: "https://www.plunderandriffle.com/muse-invite",
   },
   {
     key: "whop",

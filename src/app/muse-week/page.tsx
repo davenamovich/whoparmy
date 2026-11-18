@@ -191,7 +191,7 @@ export default function MuseWeekPage() {
             so does the member who invited you (join within 48 hours of the invite for it to count).
           </p>
           <Button variant="outline" asChild>
-            <a href="https://plunderandriffle.com/muse-invite" target="_blank" rel="noreferrer">
+            <a href="https://www.plunderandriffle.com/muse-invite" target="_blank" rel="noreferrer">
               Create your Muse
             </a>
           </Button>
