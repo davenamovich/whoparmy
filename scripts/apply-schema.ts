@@ -37,6 +37,8 @@ const ADDITIVE_COLUMNS: Array<{ table: string; column: string; ddl: string }> = 
   { table: "User", column: "linksSavedAt", ddl: 'ALTER TABLE "User" ADD COLUMN "linksSavedAt" DATETIME' },
   { table: "HiredAgent", column: "source", ddl: 'ALTER TABLE "HiredAgent" ADD COLUMN "source" TEXT NOT NULL DEFAULT \'RENTAL\'' },
   { table: "HiredAgent", column: "expiresAt", ddl: 'ALTER TABLE "HiredAgent" ADD COLUMN "expiresAt" DATETIME' },
+  { table: "BridgeCode", column: "scope", ddl: 'ALTER TABLE "BridgeCode" ADD COLUMN "scope" TEXT NOT NULL DEFAULT \'week\'' },
+  { table: "BridgeToken", column: "scope", ddl: 'ALTER TABLE "BridgeToken" ADD COLUMN "scope" TEXT NOT NULL DEFAULT \'week\'' },
 ];
 for (const { table, column, ddl } of ADDITIVE_COLUMNS) {
   const cols = db.query(`PRAGMA table_info("${table}")`).all() as Array<{ name: string }>;
