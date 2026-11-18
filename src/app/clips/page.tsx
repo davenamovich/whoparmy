@@ -43,7 +43,7 @@ interface ClipDTO {
 interface DeskState {
   pages: ClipPageDTO[];
   clips: ClipDTO[];
-  usage: { used: number; limit: number; plan: string };
+  usage: { used: number; limit: number; plan: string; paidLeft: number; byok: boolean };
 }
 
 const STATE_COPY: Record<string, string> = {
@@ -186,7 +186,9 @@ export default function ClipsPage() {
         </p>
         {usage ? (
           <p className="text-sm text-muted-foreground">
-            {usage.used} of {usage.limit} clips this month on {usage.plan}.
+            {usage.byok
+              ? "On your own key — no clip cap. You pay the engine per call."
+              : `${usage.used} of ${usage.limit} clips this month on ${usage.plan}${usage.paidLeft > 0 ? ` · ${usage.paidLeft} bought clips left (they never expire)` : ""}.`}
           </p>
         ) : null}
       </header>

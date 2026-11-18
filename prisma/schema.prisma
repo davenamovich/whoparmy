@@ -884,3 +884,36 @@ model ClipGameSession {
 
   @@index([userId, status])
 }
+
+// ─── Clip credits and feedback ──────────────────────────────────────
+// One visible balance, three sources. A grant is written when a pack is
+// paid for (Whop webhook), when a member is given free credits at signup,
+// or when a Box Trade resolves with bonus clips. Clips bought are never
+// taken back at a month rollover — only the plan lane resets.
+model ClipCreditGrant {
+  id        String    @id @default(cuid())
+  userId    String
+  amount    Int // clips granted
+  spent     Int       @default(0)
+  source    String // purchase | free_grant | game_bonus | referral
+  label     String? // what the member saw when it was granted
+  reference String? // whop payment id / session id, for the audit trail
+  expiresAt DateTime? // null = never expires
+  spentAt   DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, spentAt])
+}
+
+// What the member thought of a clip. This is opinion, not performance: it
+// feeds the brief library and mnemos, and it is never reported as a result.
+model ClipFeedback {
+  id        String   @id @default(cuid())
+  userId    String
+  clipId    String
+  verdict   String // good | meh | bad
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}

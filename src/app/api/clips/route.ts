@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getWhopUser } from "@/lib/auth";
 import { queueClipLinks, type IntakeLink } from "@/lib/clips/intake";
-import { countMonthlyClips } from "@/lib/clips/usage";
-import { getPlan } from "@/lib/plans";
+import { clipUsage } from "@/lib/clips/usage";
 
 export const runtime = "nodejs";
 
@@ -19,13 +18,11 @@ export const runtime = "nodejs";
 export async function GET() {
   try {
     const user = await getWhopUser();
-    const [pages, clips, used] = await Promise.all([
+    const [pages, clips, usage] = await Promise.all([
       db.clipPage.findMany({ where: { userId: user.id, archivedAt: null }, orderBy: { createdAt: "asc" } }),
       db.clipJob.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" }, take: 60 }),
-      countMonthlyClips(user.id),
+      clipUsage(user.id, user.plan),
     ]);
-
-    const plan = getPlan(user.plan);
 
     return NextResponse.json({
       pages: pages.map((p) => ({
@@ -54,7 +51,13 @@ export async function GET() {
         error: c.error,
         createdAt: c.createdAt.toISOString(),
       })),
-      usage: { used, limit: plan.monthlyClips, plan: plan.name },
+      usage: {
+        used: usage.planUsed,
+        limit: usage.planLimit,
+        plan: usage.planName,
+        paidLeft: usage.paidLeft,
+        byok: usage.byok,
+      },
     });
   } catch (err) {
     return NextResponse.json(
@@ -94,8 +97,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error: result.allowance.error,
-          used: result.allowance.used,
-          limit: result.allowance.limit,
+          used: result.allowance.planUsed,
+          limit: result.allowance.planLimit,
+          paidLeft: result.allowance.paidLeft,
           refused: result.refused,
         },
         { status: 402 },
@@ -109,6 +113,7 @@ export async function POST(req: NextRequest) {
       created: result.created.length,
       refused: result.refused,
       left: result.allowance ? Math.max(0, result.allowance.left - result.created.length) : null,
+      lane: result.allowance?.lane ?? null,
     });
   } catch (err) {
     return NextResponse.json(

@@ -16,6 +16,13 @@ import { assertClipAllowance, type ClipAllowance } from "./usage";
  * rows land as `queued` and Agent37 picks them up.
  */
 
+export interface IntakeUser {
+  id: string;
+  plan: string;
+  /** True when the member has connected their own P&R key. */
+  byok?: boolean;
+}
+
 export interface IntakeLink {
   url: string;
   credit?: string;
@@ -44,7 +51,7 @@ function reasonOf(err: unknown): { reason: string; code: string } {
 }
 
 export async function queueClipLinks(
-  user: { id: string; plan: string },
+  user: IntakeUser,
   pageId: string,
   links: IntakeLink[],
   defaultSeconds = 15,
@@ -68,7 +75,8 @@ export async function queueClipLinks(
 
   // Charge before any row is written: 25 links is 25 renders on the
   // member's key, and the allowance is the only thing that bounds it.
-  const allowance = await assertClipAllowance(user.id, user.plan, unique.length);
+  // BYOK members are uncapped here — their own key pays for the renders.
+  const allowance = await assertClipAllowance(user.id, user.plan, unique.length, user.byok === true);
   if (!allowance.ok) {
     return { ok: false, created: [], refused: [], allowance, error: allowance.error };
   }

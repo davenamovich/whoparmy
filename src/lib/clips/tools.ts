@@ -19,6 +19,8 @@ import { assertClipAllowance, countMonthlyClips } from "./usage";
 export interface ClipUser {
   id: string;
   plan: string;
+  /** Set when the member's own P&R key is connected (BYOK). */
+  byok?: boolean;
 }
 
 export interface McpToolDef {
@@ -317,8 +319,12 @@ async function batch(user: ClipUser, args: Args) {
       ? `${result.created.length} clip${result.created.length === 1 ? "" : "s"} queued. Agent37 renders them on the member's own key; each one waits for approval at /clips before anything is exported.`
       : "Nothing was queued.",
   );
-  if (result.allowance) {
-    lines.push(`Left this month: ${Math.max(0, result.allowance.left - result.created.length)} of ${result.allowance.limit}.`);
+  if (result.allowance && result.allowance.lane !== "byok") {
+    const left = Math.max(0, result.allowance.left);
+    const paid = result.allowance.paidLeft > 0 ? ` (${result.allowance.paidLeft} bought, rest on the plan)` : "";
+    lines.push(`Left after this batch: ${left}${paid}.`);
+  } else if (result.allowance?.lane === "byok") {
+    lines.push("You are on your own key, so nothing counts against a cap.");
   }
   if (result.refused.length) {
     lines.push(`\n${result.refused.length} refused:`);
