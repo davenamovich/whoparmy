@@ -71,42 +71,43 @@ export interface ClipPack {
 }
 
 /**
- * Priced as a product, not as compute plus a margin.
+ * TOP-UPS, not the price of clips.
  *
- * $0.005 is the cost of a render. It is not an argument for a cheap clip.
- * The anchor is what a member is replacing — a freelance edit at $15–40 a
- * clip — and the pack is sold as the replacement, not as the pixels. At these
- * prices a clip is a tenth of the cheapest freelance edit and roughly 99.8%
- * gross margin, which is what a product with a queue, approvals, credits and a
- * game in front of it should look like.
+ * Clips are included in the subscription (plans.ts `monthlyClips`): a Starter
+ * member already pays $29 and gets 20 clips, so charging $29 for ten more was
+ * selling the same thing twice. Packs exist for two cases only — someone who
+ * is not on a plan yet, and someone who has run past their month and does not
+ * want to upgrade.
  *
- * The trade-up is the only discount mechanism in the product. Nothing here is
- * marked down; the game is earned, not paid for.
+ * So they are priced as convenience, not as the product: under a dollar-three
+ * a clip, comfortably under any freelance edit, and cheap enough that nobody
+ * has to think about it. Nothing here is marked down; the trade-up is the only
+ * way to get more for the same money, and it is earned.
  */
 export const CLIP_PACKS: ClipPack[] = [
   {
     key: "starter",
     name: "10 clips",
     clips: 10,
-    priceUsd: 29,
+    priceUsd: 12,
     rounds: 2,
-    blurb: "One edited clip's worth of budget, ten clips you approve yourself.",
+    blurb: "A top-up for a week of posting.",
   },
   {
     key: "page",
     name: "30 clips",
     clips: 30,
-    priceUsd: 69,
+    priceUsd: 29,
     rounds: 3,
-    blurb: "A month of daily posting on one page.",
+    blurb: "A month on one page, past the plan's allowance.",
   },
   {
     key: "studio",
     name: "100 clips",
     clips: 100,
-    priceUsd: 179,
+    priceUsd: 79,
     rounds: 4,
-    blurb: "Two pages, most days, for a month.",
+    blurb: "When two pages run every day.",
   },
 ];
 
@@ -121,7 +122,7 @@ export const MIN_GROSS_MARGIN = 0.9;
  * turn a product into a commodity. Cost is $0.005; this floor is about
  * positioning, not margin.
  */
-export const MIN_PRICE_PER_CLIP_USD = 1.5;
+export const MIN_PRICE_PER_CLIP_USD = 0.75;
 
 /**
  * Must equal MAX_BONUS_RATIO in game.ts.
