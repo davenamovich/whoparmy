@@ -494,23 +494,6 @@ export function AccountView() {
             </p>
           </div>
 
-          {/* Whop integration note — honest state of the build */}
-          <div className="rounded-2xl border bg-card p-5 sm:p-6 mt-6">
-            <div className="flex items-start gap-3">
-              <div className="rounded-lg bg-secondary/60 p-2.5 shrink-0">
-                <ShieldCheck className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-sm">Whop integration</h3>
-                <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
-                  Sign-in uses Whop OAuth 2.1 + PKCE; plans flow from your Whop membership via signed webhooks and
-                  the API v1 access check. All Whop credentials stay server-side, and a single authorization anchor
-                  (<code className="text-xs bg-secondary/70 px-1 py-0.5 rounded">src/lib/auth.ts</code>) isolates every
-                  query by the authenticated Whop user ID.
-                </p>
-              </div>
-            </div>
-          </div>
         </>
       )}
     </div>
