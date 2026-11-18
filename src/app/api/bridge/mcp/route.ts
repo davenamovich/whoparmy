@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { BridgeError, proxyToolCall, proxyToolsList, verifyBridgeToken } from "@/lib/muse-bridge";
+import { CLIP_TOOLS, callClipTool, isClipTool } from "@/lib/clips/tools";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -12,6 +13,13 @@ export const maxDuration = 300;
  * derived agent key (fetched server-to-server from the bot's Whop
  * bridge, never exposed here). Allowlist + week budget are enforced in
  * lib/muse-bridge.ts. Publishing and MP4 tools are refused.
+ *
+ * The Clipper's own tool family (`clip_*`) is handled HERE, not forwarded:
+ * it writes ClipPage/ClipJob rows in this app, which are the single queue
+ * of record. Agent37 claims those rows and calls the engine on the
+ * member's key. Muse can set up a page, queue links, read the queue and
+ * revise a draft — it cannot approve, export or publish, because those
+ * tools do not exist on this endpoint.
  *
  * Works with any MCP client, including the published @plunderandriffle/mcp
  * stdio bridge: PLUNDER_MCP_URL=https://whop.plunderandriffle.com/api/bridge/mcp
@@ -72,13 +80,20 @@ export async function POST(req: NextRequest) {
 
   try {
     if (method === "tools/list") {
-      return rpcResult(id, await proxyToolsList(session));
+      // The member sees the engine's allowlisted tools plus the Clipper's
+      // local family — one list, so Muse does not need to know which side
+      // of the bridge a tool lives on.
+      const proxied = (await proxyToolsList(session)) as { tools?: unknown[] };
+      return rpcResult(id, { ...proxied, tools: [...(proxied.tools ?? []), ...CLIP_TOOLS] });
     }
     if (method === "tools/call") {
       const params = (body.params ?? {}) as { name?: unknown; arguments?: unknown };
       const name = typeof params.name === "string" ? params.name : "";
       if (!name) return rpcError(id, -32602, "Missing tool name");
       const args = (params.arguments && typeof params.arguments === "object" ? params.arguments : {}) as Record<string, unknown>;
+      if (isClipTool(name)) {
+        return rpcResult(id, await callClipTool(session.user, name, args));
+      }
       const { reply } = await proxyToolCall(session, name, args);
       if (reply.error) return rpcError(id, reply.error.code ?? -32603, reply.error.message ?? "Engine error");
       return rpcResult(id, reply.result ?? {});
