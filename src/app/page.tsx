@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import dynamic from "next/dynamic";
 import {
   Sparkles,
   LayoutGrid,
@@ -9,7 +8,6 @@ import {
   Swords,
   UserRound,
   Bot,
-  Cpu,
   MessagesSquare,
   ShieldCheck,
 } from "lucide-react";
@@ -24,14 +22,6 @@ import { MemeArmy } from "@/components/factory/meme-army";
 import { WarRoom } from "@/components/factory/war-room";
 import { AgentsView } from "@/components/factory/agents";
 import { RalphChat, type RalphNavIntent } from "@/components/factory/ralph-chat";
-// LLM Control is operator-only (Dave, 2026-11-17): it is loaded
-// lazily so its code never even ships in the main bundle members
-// download — the nav item and the view are admin-gated below, and
-// the /api/llm-console route 403s non-operators server-side.
-const LlmConsole = dynamic(
-  () => import("@/components/factory/llm-console").then((m) => m.LlmConsole),
-  { ssr: false },
-);
 import { TrendingView } from "@/components/factory/trending";
 import { CampaignsView } from "@/components/factory/campaigns";
 import { LibraryView } from "@/components/factory/library";
@@ -51,10 +41,9 @@ type View =
   | "library"
   | "army"
   | "agents"
-  | "llm"
   | "account";
 
-type NavKey = "create" | "ralph" | "campaigns" | "library" | "army" | "agents" | "llm" | "account" | "admin";
+type NavKey = "create" | "ralph" | "campaigns" | "library" | "army" | "agents" | "account" | "admin";
 
 // Consolidated menu (Dave, 2026-11-17): fewer doors, same rooms.
 // Meme Studio folded into Create; the War Room folded into Meme
@@ -76,7 +65,6 @@ const NAV: { key: View; labelKey: NavKey; icon: React.ComponentType<{ className?
   { key: "library", labelKey: "library", icon: Library },
   { key: "army", labelKey: "army", icon: Swords },
   { key: "agents", labelKey: "agents", icon: Bot },
-  { key: "llm", labelKey: "llm", icon: Cpu },
   { key: "account", labelKey: "account", icon: UserRound },
 ];
 
@@ -229,7 +217,7 @@ export default function Home() {
       <div className="flex-1 flex w-full mx-auto max-w-7xl">
         {/* sidebar — desktop */}
         <aside className="hidden lg:flex flex-col w-60 shrink-0 border-r border-border/60 px-3 py-5 gap-1 sticky top-14 self-start h-[calc(100vh-3.5rem)]">
-          {NAV.filter((n) => n.key !== "llm" || session?.admin).map((item) => (
+          {NAV.map((item) => (
             <button
               key={item.key}
               onClick={() => {
@@ -317,7 +305,6 @@ export default function Home() {
             </div>
           ) : null}
           {view === "agents" ? <AgentsView /> : null}
-          {view === "llm" && session?.admin ? <LlmConsole /> : null}
           {view === "account" ? <AccountView /> : null}
         </main>
       </div>

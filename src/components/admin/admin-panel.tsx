@@ -1,11 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { GrantCredits } from "@/components/admin/grant-credits";
 import type { GateState } from "@/lib/site-gate";
 import type { Stack, StackStatus } from "@/lib/stacks";
+
+// LLM Control lives in /admin now (Dave, 2026-11-18 — it left the
+// member app's sidebar). Loaded lazily, same as before; its API
+// route stays operator-gated server-side.
+const LlmConsole = dynamic(
+  () => import("@/components/factory/llm-console").then((m) => m.LlmConsole),
+  { ssr: false },
+);
 
 interface StackRow extends Stack {
   statusSource: "registry" | "dashboard";
@@ -116,6 +126,14 @@ export function AdminPanel({ gate, stacks }: { gate: GateState; stacks: StackRow
           <Button onClick={toggleGate} disabled={busy === "gate" || gateState.source === "env"} variant={gateState.on ? "secondary" : "destructive"}>
             {busy === "gate" ? "Working…" : gateState.on ? "Open the site" : "Close the site (gate on)"}
           </Button>
+        </CardContent>
+      </Card>
+
+      <GrantCredits />
+
+      <Card>
+        <CardContent className="pt-6">
+          <LlmConsole />
         </CardContent>
       </Card>
 
