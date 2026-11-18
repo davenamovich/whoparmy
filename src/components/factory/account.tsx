@@ -5,16 +5,12 @@ import { formatDistanceToNow } from "date-fns";
 import {
   AlertTriangle,
   Check,
-  Copy,
   Crown,
-  ExternalLink,
   FileCheck2,
   Languages,
   Loader2,
-  LogIn,
   LogOut,
   RefreshCcw,
-  ShieldCheck,
   Users,
   Zap,
 } from "lucide-react";
@@ -47,11 +43,6 @@ function WhopConnection() {
   const { toast } = useToast();
   const { session, loading, reload } = useWhopSession();
   const [syncing, setSyncing] = useState(false);
-  const [callbackUrl, setCallbackUrl] = useState("");
-
-  useEffect(() => {
-    setCallbackUrl(`${window.location.origin}/api/auth/whop/callback`);
-  }, []);
 
   async function syncEntitlements() {
     setSyncing(true);
@@ -79,11 +70,6 @@ function WhopConnection() {
     await fetch("/api/auth/whop/logout", { method: "POST" });
     await reload();
     toast({ title: "Signed out" });
-  }
-
-  function copyCallback() {
-    void navigator.clipboard.writeText(callbackUrl);
-    toast({ title: "Callback URL copied" });
   }
 
   if (loading) {
@@ -139,65 +125,11 @@ function WhopConnection() {
     );
   }
 
-  // Operator (sandbox) mode — honest setup state
-  return (
-    <div className="rounded-2xl border bg-card p-5 sm:p-6">
-      <div className="flex items-start gap-3">
-        <div className="rounded-lg bg-secondary/60 p-2.5 shrink-0">
-          <ShieldCheck className="h-5 w-5 text-primary" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h3 className="font-semibold text-sm">Whop connection</h3>
-          {session?.whop.oauthConfigured ? (
-            <>
-              <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
-                Whop OAuth is configured on this deployment. Sign in to bind this account to your verified Whop
-                identity — entitlements then flow from your Whop membership (webhooks + live access checks).
-              </p>
-              <Button asChild className="mt-4 bg-primary hover:bg-primary/90 font-semibold">
-                <a href="/api/auth/whop">
-                  <LogIn className="h-4 w-4 mr-1.5" /> Log in with Whop
-                </a>
-              </Button>
-            </>
-          ) : (
-            <>
-              <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
-                This deployment has no Whop OAuth app configured yet, so the studio runs on a local operator
-                account. To enable "Log in with Whop":
-              </p>
-              <ol className="list-decimal ml-4 mt-3 space-y-2 text-sm text-muted-foreground max-w-3xl">
-                <li>
-                  Create an app at{" "}
-                  <a className="text-primary underline underline-offset-2" href="https://whop.com/dashboard/developer" target="_blank" rel="noopener noreferrer">
-                    whop.com/dashboard/developer <ExternalLink className="inline h-3 w-3" />
-                  </a>{" "}
-                  and copy the <code className="text-xs bg-secondary/70 px-1 py-0.5 rounded">client_id</code> into{" "}
-                  <code className="text-xs bg-secondary/70 px-1 py-0.5 rounded">WHOP_APP_ID</code>.
-                </li>
-                <li>
-                  Add this exact-match redirect URI in the app&apos;s OAuth section:{" "}
-                  <button
-                    type="button"
-                    onClick={copyCallback}
-                    className="inline-flex items-center gap-1 text-xs bg-secondary/70 px-1.5 py-0.5 rounded font-mono text-foreground hover:text-primary transition-colors"
-                  >
-                    {callbackUrl || "/api/auth/whop/callback"} <Copy className="h-3 w-3" />
-                  </button>
-                </li>
-                <li>
-                  Optional but recommended: set <code className="text-xs bg-secondary/70 px-1 py-0.5 rounded">WHOP_API_KEY</code>,{" "}
-                  <code className="text-xs bg-secondary/70 px-1 py-0.5 rounded">WHOP_WEBHOOK_SECRET</code> and the{" "}
-                  <code className="text-xs bg-secondary/70 px-1 py-0.5 rounded">WHOP_PRODUCT_ID_*</code> mapping so plan
-                  changes arrive live via signed webhooks.
-                </li>
-              </ol>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  // No "Whop connection" card (Dave, 2026-11-17: deleted from Account
+  // & Usage). Signed-in members get the identity header above; anyone
+  // else signs in from the landing's Connect with Whop — this view
+  // shows nothing here.
+  return null;
 }
 
 export function AccountView() {

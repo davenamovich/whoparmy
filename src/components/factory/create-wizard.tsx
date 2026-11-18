@@ -27,6 +27,7 @@ import { FORMAT_CATALOG, FORMAT_MAP, OBJECTIVES, TONES, CATEGORY_LABELS, type Co
 import { LANGUAGES, LANGUAGE_MAP } from "@/lib/languages";
 import type { AnalyzeResponse, JobDTO, ProfileDTO, ResearchJobDTO } from "@/lib/types";
 import { LangChip } from "./shared";
+import { WaitExplainer, GENERATE_WAIT_SLIDES } from "./wait-explainer";
 
 const STEPS = ["Source", "Objective", "Formats", "Languages", "Tone", "Generate"] as const;
 
@@ -292,6 +293,25 @@ export function CreateWizard({
             <AlertTriangle className="h-3.5 w-3.5" /> {job.failed} failed so far — failed pieces are never charged.
           </div>
         ) : null}
+        {/* Walk the member through the wait (Dave, 2026-11-17):
+            what's happening, what memes do, what happens next. */}
+        <div className="mt-8">
+          <WaitExplainer slides={GENERATE_WAIT_SLIDES} />
+        </div>
+        <div className="mt-6 grid grid-cols-3 gap-2 text-[11px] text-muted-foreground" aria-label="What happens next">
+          <div className="rounded-lg bg-secondary/40 px-2 py-2.5">
+            <span className="block font-bold text-foreground text-xs">1 · The engine builds</span>
+            Your pack, every format × language
+          </div>
+          <div className="rounded-lg bg-secondary/40 px-2 py-2.5">
+            <span className="block font-bold text-foreground text-xs">2 · You review</span>
+            Preview, download, regenerate in the workspace
+          </div>
+          <div className="rounded-lg bg-secondary/40 px-2 py-2.5">
+            <span className="block font-bold text-foreground text-xs">3 · It spreads</span>
+            Post it, or hand it to your bots and your army
+          </div>
+        </div>
         <Button variant="ghost" className="mt-8" onClick={() => onCompleted({ campaignId: job.campaignId, jobId: job.id, name: campaignName })}>
           View workspace now
         </Button>

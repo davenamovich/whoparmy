@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { LANGUAGES } from "@/lib/languages";
 import type { AnalyzeResponse, BrandDTO, ProfileDTO, ResearchJobDTO, ResearchSummary } from "@/lib/types";
 import { EmptyState, LangChip, SectionHeader } from "./shared";
+import { WaitExplainer, RESEARCH_WAIT_SLIDES } from "./wait-explainer";
 
 interface BrandForm {
   name: string;
@@ -489,10 +490,13 @@ export function BrandsView({
                 </Button>
               </div>
               {researching ? (
-                <p className="text-sm text-muted-foreground">
-                  Deep research takes a minute or two and runs in the background — you can close this
-                  dialog and keep working. Come back to this brand and the results will be waiting.
-                </p>
+                <div className="grid gap-2">
+                  <WaitExplainer slides={RESEARCH_WAIT_SLIDES} />
+                  <p className="text-xs text-muted-foreground">
+                    It runs in the background — you can close this dialog and keep working. Come back to
+                    this brand and the results will be waiting.
+                  </p>
+                </div>
               ) : null}
               {research ? (
                 <div className="grid gap-2 text-sm">
