@@ -10,7 +10,7 @@ import {
   MAX_BONUS_RATIO,
   MIN_GROSS_MARGIN,
   MIN_PRICE_PER_CLIP_USD,
-  AGENT37_RENDER_COST_USD,
+  AGENT37_PER_CLIP_COST_USD,
   LLM_TEXT_COST_USD,
   MAX_TURNS_PER_CLIP,
   grossMargin,
@@ -20,10 +20,10 @@ import {
   pricePerClip,
 } from "./packs.ts";
 
-test("cogs: the render is the whole cost, counted once", () => {
-  assert.equal(AGENT37_RENDER_COST_USD, 0.005);
+test("cogs: compute is billed per clip, and the render is the whole cost", () => {
+  assert.equal(AGENT37_PER_CLIP_COST_USD, 0.005);
   assert.equal(LLM_TEXT_COST_USD, 0, "text is near-free; counting it again is how a cost gets invented");
-  assert.equal(CLIP_COGS_USD, AGENT37_RENDER_COST_USD + LLM_TEXT_COST_USD);
+  assert.equal(CLIP_COGS_USD, AGENT37_PER_CLIP_COST_USD + LLM_TEXT_COST_USD);
   assert.equal(LIST_CREDITS_PER_CLIP, 25, "25 is a list price, never a cost");
 });
 

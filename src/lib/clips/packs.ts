@@ -25,7 +25,19 @@
  * i.e. the price the engine charges, kept only to compare retail with the BYOK
  * lane. Treating it as COGS overstated clip cost 25x.
  */
-export const AGENT37_RENDER_COST_USD = 0.005;
+/**
+ * Agent37 bills compute PER CLIP — a flat charge for the render, not a rate
+ * multiplied by how long it took (Dave, 2026-11-18). So a 6-second clip and a
+ * 30-second clip cost the same to produce, and COGS per delivered clip is one
+ * number.
+ */
+export const AGENT37_PER_CLIP_COST_USD = 0.005;
+
+/**
+ * Not a cost input, a reliability limit: a render that runs past this is a
+ * stuck job, and it is failed and refunded rather than left to hold a worker.
+ */
+export const MAX_RENDER_SECONDS_PER_CLIP = 120;
 
 /** Text generation. Near-free, and counted once — here, at zero. */
 export const LLM_TEXT_COST_USD = 0;
@@ -35,7 +47,7 @@ export const LIST_CREDITS_PER_CLIP = 25;
 export const CREDIT_LIST_PRICE_USD = 0.01; // BYOK: 1 credit per engine call
 
 /** Real COGS per delivered clip. */
-export const CLIP_COGS_USD = AGENT37_RENDER_COST_USD + LLM_TEXT_COST_USD;
+export const CLIP_COGS_USD = AGENT37_PER_CLIP_COST_USD + LLM_TEXT_COST_USD;
 
 /**
  * The only thing that can wreck this model: turns.
@@ -126,10 +138,19 @@ export function packByKey(key: string): ClipPack | null {
 }
 
 /** Gross margin at a given extra-clip ratio (0 = no bonus taken). */
-export function grossMargin(pack: ClipPack, bonusRatio = 0): number {
+export function grossMargin(pack: ClipPack, bonusRatio = 0, perClipCost = CLIP_COGS_USD): number {
   const delivered = pack.clips * (1 + bonusRatio);
-  const cogs = delivered * CLIP_COGS_USD;
+  const cogs = delivered * perClipCost;
   return (pack.priceUsd - cogs) / pack.priceUsd;
+}
+
+/**
+ * Margin if every bonus in the pack is taken. Kept as a named case because it
+ * is the one that actually moves: with a flat per-clip charge there is no
+ * render-length exposure left to model.
+ */
+export function marginAtWorstCase(pack: ClipPack): number {
+  return grossMargin(pack, MAX_BONUS_RATIO, CLIP_COGS_USD);
 }
 
 export function marginAtMaxBonus(pack: ClipPack): number {
