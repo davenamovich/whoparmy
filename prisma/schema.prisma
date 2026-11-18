@@ -595,3 +595,20 @@ model RotatorPlacement {
   @@unique([userId, partner])
   @@index([date])
 }
+
+// ─── Trending: the day's default topics ─────────────────────────────
+// Dave's rule (2026-11-17): Trending settles on ONE default topic set
+// per ET day instead of reloading the wire on every refresh. The first
+// read of the day builds it (RSS topics + Starimg headlines in that
+// language) and stores it here; every refresh that day serves this
+// snapshot. One row per (ET day, language); the topic list itself is
+// shared across languages — the first snapshot of the day fixes it.
+model TrendDay {
+  id         String   @id @default(cuid())
+  date       String // ET calendar day, yyyy-mm-dd
+  lang       String // headline language (topics are shared across langs)
+  topicsJson String // JSON array of TrendTopic (headline + hook included)
+  createdAt  DateTime @default(now())
+
+  @@unique([date, lang])
+}

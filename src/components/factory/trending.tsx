@@ -9,14 +9,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 /**
- * TRENDING — the live wire.
+ * TRENDING — the day's default topics.
  *
- * Real-time topics (Google Trends + Google News) with a viral
- * headline written for each, refreshed on a short cache server-side.
- * One click creates: the headline becomes a meme job on the member's
- * first active bot. No bot yet → the click routes to the Army to
- * rent one. The viral3 Scout's weekly deep-scan batches (Video
- * Studio) stay the curated layer; this is the ticker.
+ * Topics (Google Trends + Google News) with a viral headline written
+ * for each, settled once per day server-side: the first read of the
+ * day builds the set and every refresh serves that same snapshot,
+ * so the wire never reloads under a member. One click creates: the
+ * headline becomes a meme job on the member's first active bot.
+ * No bot yet → the click routes to the Army to rent one. The viral3
+ * Scout's weekly deep-scan batches (Video Studio) stay the curated
+ * layer; this is the daily wire.
  */
 
 interface TrendTopic {
@@ -91,11 +93,12 @@ export function TrendingView({ onGoAgents }: { onGoAgents: () => void }) {
         <div>
           <h1 className="text-xl font-black flex items-center gap-2">
             <Flame className="h-6 w-6 text-primary" /> Trending now
-            <Badge className="bg-red-500/15 text-red-500 border-0 text-[10px]">LIVE</Badge>
+            <Badge className="bg-red-500/15 text-red-500 border-0 text-[10px]">TODAY</Badge>
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            What's moving right now, a viral headline written for each — and one click turns any of them into
-            memes from your bot. The wire refreshes through the day.
+            What's moving today, a viral headline written for each — and one click turns any of them into
+            memes from your bot. Today's topics are set once for the day, so every refresh shows the same
+            wire. A fresh set lands tomorrow.
           </p>
         </div>
         <Button variant="outline" size="sm" className="ml-auto" disabled={refreshing} onClick={() => void load()}>
@@ -103,7 +106,7 @@ export function TrendingView({ onGoAgents }: { onGoAgents: () => void }) {
         </Button>
       </div>
       {updatedAt ? (
-        <p className="text-[11px] text-muted-foreground">Wire updated {new Date(updatedAt).toLocaleTimeString()} · Sources: Google Trends + Google News · Headlines by the Scout tier</p>
+        <p className="text-[11px] text-muted-foreground">Today's topics set {new Date(updatedAt).toLocaleTimeString()} · Sources: Google Trends + Google News · Headlines by the Scout tier</p>
       ) : null}
 
       {error ? (
@@ -146,7 +149,7 @@ export function TrendingView({ onGoAgents }: { onGoAgents: () => void }) {
 
       <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
         <Bot className="h-3.5 w-3.5" />
-        Deeper cuts: the viral3 Scout's weekly trend batches feed the Video Studio — this wire is the real-time layer on top.
+        Deeper cuts: the viral3 Scout's weekly trend batches feed the Video Studio — this wire is the daily layer on top.
       </p>
     </div>
   );

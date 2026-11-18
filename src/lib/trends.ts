@@ -1,21 +1,30 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
+import { db } from "@/lib/db";
 import { starimgConfig, getLadder } from "@/lib/llm-policy";
 import { languageLabel } from "@/lib/languages";
 import { narrativePromptBlock } from "@/lib/narrative-hooks";
 
 /**
- * ─── TRENDING — the live wire ───────────────────────────────────────
+ * ─── TRENDING — the day's default topics ────────────────────────────
  *
- * Real-time topics from public RSS (Google Trends daily searches +
- * Google News top stories — no keys, no scraping), refreshed on a
- * short cache. Viral headlines are written per topic by the volume
- * tier on Starimg (the cheapest fuel there is), in the reader's
- * language, cached against the topic set so a page view never burns
- * a fresh call. If the headline call fails, the topic title itself
- * is the headline — the wire never goes blank.
+ * Dave's rule (2026-11-17): Trending settles on ONE default topic set
+ * per ET day instead of reloading the wire on every refresh. The
+ * first read of the day builds it — topics from public RSS (Google
+ * Trends daily searches + Google News top stories — no keys, no
+ * scraping) plus viral headlines written per topic by the volume
+ * tier on Starimg, in the reader's language — and stores it in the
+ * TrendDay table. Every refresh that day serves the stored snapshot:
+ * no fresh RSS pull, no fresh headline call, same topics all day.
+ * A new ET day builds a new set on first read. The topic list is
+ * shared across languages (the day's first snapshot fixes it); only
+ * the headlines are per language. If the day's build comes back
+ * empty (RSS down at day start), nothing is stored and the old
+ * short-cache live wire answers instead, so the surface never
+ * blanks and the snapshot retries on the next refresh.
  *
  * This complements the viral3 Scout's weekly curated trend batches
- * (Video Studio): that is the deep scan; this is the live ticker.
+ * (Video Studio): that is the deep scan; this is the daily wire.
  */
 
 export interface TrendTopic {
@@ -179,7 +188,139 @@ async function generateHeadlines(topics: RawTopic[], lang: string): Promise<Map<
   return byIndex;
 }
 
+// ─── The day's default topics (persisted snapshot) ──────────────────
+// Accessed with raw SQL on purpose: the TrendDay table is created by
+// the boot schema applier from prisma/schema.sql, and raw access
+// means this surface never depends on a regenerated Prisma client.
+
+interface DaySnapshot {
+  builtAt: string;
+  topics: TrendTopic[];
+}
+
+function etDayKey(now = new Date()): string {
+  // en-CA formats as yyyy-mm-dd; the app's calendar day is ET
+  // (same convention as RotatorDay).
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
+
+function parseSnapshot(topicsJson: string): DaySnapshot | null {
+  try {
+    const parsed = JSON.parse(topicsJson) as Partial<DaySnapshot>;
+    if (typeof parsed.builtAt === "string" && Array.isArray(parsed.topics) && parsed.topics.length > 0) {
+      return { builtAt: parsed.builtAt, topics: parsed.topics as TrendTopic[] };
+    }
+  } catch {
+    // a corrupt row is no snapshot; the day rebuilds below
+  }
+  return null;
+}
+
+async function readSnapshot(date: string, lang: string): Promise<DaySnapshot | null> {
+  try {
+    const rows = await db.$queryRaw<{ topicsJson: string }[]>`
+      SELECT "topicsJson" FROM "TrendDay" WHERE "date" = ${date} AND "lang" = ${lang} LIMIT 1
+    `;
+    return rows.length > 0 ? parseSnapshot(rows[0].topicsJson) : null;
+  } catch {
+    return null; // table missing (pre-boot-applier dev DB) — build live
+  }
+}
+
+async function readAnySnapshot(date: string): Promise<DaySnapshot | null> {
+  try {
+    const rows = await db.$queryRaw<{ topicsJson: string }[]>`
+      SELECT "topicsJson" FROM "TrendDay" WHERE "date" = ${date} LIMIT 1
+    `;
+    return rows.length > 0 ? parseSnapshot(rows[0].topicsJson) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function storeSnapshot(date: string, lang: string, snapshot: DaySnapshot): Promise<void> {
+  try {
+    await db.$executeRaw`
+      INSERT INTO "TrendDay" ("id", "date", "lang", "topicsJson")
+      VALUES (${randomUUID()}, ${date}, ${lang}, ${JSON.stringify(snapshot)})
+      ON CONFLICT("date", "lang") DO NOTHING
+    `;
+  } catch {
+    // persistence is the optimisation, not the product — serving the
+    // in-memory copy below is still correct for this process
+  }
+}
+
+const dayCache = new Map<string, DaySnapshot>();
+const dayInFlight = new Map<string, Promise<DaySnapshot | null>>();
+
+async function buildDaySnapshot(date: string, lang: string): Promise<DaySnapshot | null> {
+  // The topic list is the day's, whichever language asked first:
+  // reuse it from today's existing snapshot when there is one.
+  let raw: RawTopic[] | null = null;
+  const any = await readAnySnapshot(date);
+  if (any) {
+    raw = any.topics.map((t) => ({
+      title: t.title,
+      traffic: t.traffic,
+      source: t.source,
+      link: t.link,
+      publishedAt: t.publishedAt,
+    }));
+  }
+  if (!raw || raw.length === 0) {
+    const fetched = await getRawTopics();
+    if (fetched.length > 0) raw = fetched;
+  }
+  if (!raw || raw.length === 0) return null;
+
+  const headlines = await generateHeadlines(raw, lang);
+  const snapshot: DaySnapshot = {
+    builtAt: new Date().toISOString(),
+    topics: raw.map((t, i) => ({
+      ...t,
+      headline: headlines.get(i)?.headline ?? t.title,
+      hook: headlines.get(i)?.hook ?? "",
+    })),
+  };
+  await storeSnapshot(date, lang, snapshot);
+  return snapshot;
+}
+
 export async function getTrending(lang: string): Promise<{ topics: TrendTopic[]; updatedAt: string }> {
+  const date = etDayKey();
+  const cacheKey = `${date}:${lang}`;
+
+  const cached = dayCache.get(cacheKey);
+  if (cached) return { topics: cached.topics, updatedAt: cached.builtAt };
+
+  const stored = await readSnapshot(date, lang);
+  if (stored) {
+    dayCache.set(cacheKey, stored);
+    return { topics: stored.topics, updatedAt: stored.builtAt };
+  }
+
+  // First read of the day in this language: build once, even under
+  // a burst of simultaneous refreshes.
+  let inFlight = dayInFlight.get(cacheKey);
+  if (!inFlight) {
+    inFlight = buildDaySnapshot(date, lang).finally(() => dayInFlight.delete(cacheKey));
+    dayInFlight.set(cacheKey, inFlight);
+  }
+  const built = await inFlight;
+  if (built) {
+    dayCache.set(cacheKey, built);
+    return { topics: built.topics, updatedAt: built.builtAt };
+  }
+
+  // The day's build came back empty (RSS down at day start): store
+  // nothing and answer from the short-cache live wire, so the next
+  // refresh retries the snapshot instead of serving an empty day.
   const raw = await getRawTopics();
   const headlines = await generateHeadlines(raw, lang);
   return {

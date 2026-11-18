@@ -552,3 +552,15 @@ CREATE INDEX "RotatorPlacement_date_idx" ON "RotatorPlacement"("date");
 -- CreateIndex
 CREATE UNIQUE INDEX "RotatorPlacement_userId_partner_key" ON "RotatorPlacement"("userId", "partner");
 
+
+-- CreateTable
+CREATE TABLE "TrendDay" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "date" TEXT NOT NULL,
+    "lang" TEXT NOT NULL,
+    "topicsJson" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TrendDay_date_lang_key" ON "TrendDay"("date", "lang");

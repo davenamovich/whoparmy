@@ -5,10 +5,12 @@ import { isSupportedLanguage } from "@/lib/languages";
 
 export const runtime = "nodejs";
 
-/** The live wire: real-time trending topics with viral headlines.
- *  Any signed-in member can read it — it's the lobby that feeds
- *  one-click creation. Headlines come back in the requested content
- *  language (Dave's rule: selected language out). */
+/** The day's default topics: trending topics with viral headlines,
+ *  settled once per ET day (see lib/trends.ts) so refreshes serve
+ *  the same set instead of reloading the wire. Any signed-in member
+ *  can read it — it's the lobby that feeds one-click creation.
+ *  Headlines come back in the requested content language (Dave's
+ *  rule: selected language out). */
 export async function GET(req: NextRequest) {
   try {
     await getWhopUser();
