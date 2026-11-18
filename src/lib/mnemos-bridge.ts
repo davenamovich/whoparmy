@@ -95,12 +95,26 @@ export async function mnemosCapture(person: string, content: string, context: st
   return out !== null;
 }
 
-/** A short "what do I know about this member" snapshot for greetings.
- *  A fresh scope answers with Mnemos' first-session ONBOARDING text —
- *  that is boilerplate, not memory, so it reads as "nothing yet". */
+/**
+ * A short "what do I know about this member" snapshot, built from
+ * RECALL — never from mnemos_context. Context is the agent's private
+ * "waking up" digest (reflection prompts, tool ids, onboarding
+ * sections marked "never shown to the person"); showing it to a
+ * member would leak agent internals, and filtering it proved
+ * unreliable (a scope WITH memories still carries an ONBOARDING
+ * section). Recall returns the clean durable-memories list instead.
+ */
 export async function mnemosSnapshot(person: string): Promise<string | null> {
-  const text = await callTool(person, "mnemos_context", {});
-  if (!text) return null;
-  if (text.includes("ONBOARDING") || text.includes("first session with a fresh memory")) return null;
-  return text;
+  const raw = await callTool(person, "mnemos_recall", {
+    query: "business offer customers brand sell service product shop owner audience",
+  });
+  if (!raw) return null;
+  const marker = "Durable memories:";
+  const idx = raw.indexOf(marker);
+  if (idx < 0) return null;
+  let list = raw.slice(idx + marker.length).trim();
+  const nextSection = list.indexOf("\n## ");
+  if (nextSection > 0) list = list.slice(0, nextSection).trim();
+  if (list.length < 10) return null;
+  return list.slice(0, 1800);
 }
