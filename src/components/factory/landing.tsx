@@ -63,8 +63,8 @@ const RESULTS = [
   },
   {
     icon: Brain,
-    title: "Persistent memory",
-    line: "Your agents remember your business — every fact, every campaign, every lesson — in one memory they all share. Yours to keep, correct, and take with you.",
+    title: "Persistent memory — yours",
+    line: "Your agents remember your business — every fact, every campaign, every lesson — in a memory stack of your own. One click to deploy on your own infrastructure; we never hold your bots' memories, and you can take them with you.",
   },
 ];
 
