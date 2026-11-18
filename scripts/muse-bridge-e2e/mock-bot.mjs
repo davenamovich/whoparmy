@@ -7,7 +7,11 @@ const users = new Map(); // whopUserId -> { key, credits }
 let publishAttempts = 0;
 
 function keyFor(whopUserId) {
-  return "prl_agent_mock_" + Buffer.from(whopUserId).toString("hex").slice(0, 16);
+  // Full hex of the id — a 16-char slice is the first 8 characters,
+  // which made user_e2e12345 and user_e2e67890 share ONE key (the
+  // clips-lane checks caught it: the starter's sitdown charged the
+  // first user the mock had inserted under that shared key).
+  return "prl_agent_mock_" + Buffer.from(whopUserId).toString("hex");
 }
 
 const server = http.createServer((req, res) => {
@@ -50,6 +54,7 @@ const server = http.createServer((req, res) => {
             { name: "research_brand", description: "free", inputSchema: { type: "object" } },
             { name: "create_campaign_from_research", description: "free", inputSchema: { type: "object" } },
             { name: "create_demo_pack", description: "a day of posts", inputSchema: { type: "object" } },
+            { name: "create_sitdown", description: "clips lane only: a captioned clip from a source clip", inputSchema: { type: "object" } },
             { name: "get_job_status", description: "free", inputSchema: { type: "object" } },
             { name: "get_account", description: "free", inputSchema: { type: "object" } },
             { name: "publish_clip", description: "must be filtered out", inputSchema: { type: "object" } },
@@ -71,6 +76,11 @@ const server = http.createServer((req, res) => {
           if (u.credits < 115) return tool({ error: "Out of credits" }, true);
           u.credits -= 115;
           return tool({ jobId: "job_" + Math.random().toString(36).slice(2, 8), creditCost: 115, creditsRemaining: u.credits });
+        }
+        if (name === "create_sitdown") {
+          if (u.credits < 25) return tool({ error: "Out of credits" }, true);
+          u.credits -= 25;
+          return tool({ jobId: "clip_" + Math.random().toString(36).slice(2, 8), creditCost: 25, creditsRemaining: u.credits });
         }
         if (name === "publish_clip" || name === "request_mp4") { publishAttempts++; return tool({ ok: true }); }
         return tool({ error: "unknown tool" }, true);

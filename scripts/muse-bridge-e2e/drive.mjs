@@ -78,6 +78,7 @@ check("initialize ok", r.json?.result?.serverInfo?.name === "plunder-riffle-whop
 r = await mcp(2, "tools/list", {});
 const names = (r.json?.result?.tools ?? []).map((t) => t.name);
 check("tools/list has demo_pack", names.includes("create_demo_pack"));
+check("tools/list excludes create_sitdown (week scope)", !names.includes("create_sitdown"));
 check("tools/list excludes publish_clip", !names.includes("publish_clip"));
 check("tools/list excludes request_mp4", !names.includes("request_mp4"));
 
@@ -131,6 +132,41 @@ check("taste pack 2 refused (budget spent)", r.json?.result?.isError === true &&
 // 12. Week + Opener mints at 855 (7 packs + the 50-credit pitch reserve).
 r = await call("POST", `${APP}/api/bridge/code`, { headers: auth, body: { offer: "opener" } });
 check("opener code budget 855", r.json?.budgetCredits === 855 && r.json?.offer === "opener", JSON.stringify(r.json).slice(0, 160));
+
+// 13. Clips lane (Clip Factory): the SAME Starter member refused the
+// week offer in §0 mints a clips code on their own credits — any plan
+// with a linked account. The clips token runs create_sitdown at its
+// 25 list price and is refused the week offer's tools; a week token
+// is refused create_sitdown. Scope isolation holds both ways.
+if (starterCookie) {
+  const sauth = { Cookie: `pr_session=${starterCookie}` };
+  let sr = await call("POST", `${APP}/api/bridge/code`, { headers: sauth, body: { scope: "clips" } });
+  check("starter clips code 200", sr.status === 200, `${sr.status} ${sr.text.slice(0, 160)}`);
+  check("starter clips code scope clips", sr.json?.scope === "clips");
+  check("starter clips budget = own balance 1000", sr.json?.budgetCredits === 1000, JSON.stringify(sr.json).slice(0, 160));
+  sr = await call("POST", `${APP}/api/bridge/exchange`, { body: { code: sr.json?.code } });
+  check("starter clips exchange 200", sr.status === 200, sr.text.slice(0, 160));
+  check("clips exchange scope clips", sr.json?.scope === "clips" && sr.json?.purpose === "clips");
+  const clipsBearer = { Authorization: `Bearer ${sr.json?.bridge_token}` };
+  const clipsMcp = (id, method, params) => call("POST", `${APP}/api/bridge/mcp`, { headers: clipsBearer, body: rpc(id, method, params) });
+  let cr = await clipsMcp(60, "tools/list", {});
+  const cnames = (cr.json?.result?.tools ?? []).map((t) => t.name);
+  check("clips tools/list has create_sitdown", cnames.includes("create_sitdown"), cnames.join(","));
+  check("clips tools/list excludes create_demo_pack", !cnames.includes("create_demo_pack"));
+  cr = await clipsMcp(61, "tools/call", { name: "create_sitdown", arguments: { clip: "https://example.com/source.mp4", video_style: "captions" } });
+  check("clips create_sitdown ok", cr.json?.result?.isError !== true && !!cr.json?.result?.structuredContent?.jobId, JSON.stringify(cr.json).slice(0, 200));
+  cr = await clipsMcp(62, "tools/call", { name: "create_demo_pack", arguments: { input: "https://example.com" } });
+  check("clips token create_demo_pack refused", cr.json?.result?.isError === true, JSON.stringify(cr.json).slice(0, 200));
+  state = await (await fetch(`${BOT}/state`)).json();
+  check("starter bot balance 975 (1000-25 sitdown only)", state.users["user_e2e67890"] === 975, JSON.stringify(state.users));
+  sr = await call("GET", `${APP}/api/bridge/account`, { headers: sauth });
+  const ctok = (sr.json?.account?.tokens ?? [])[0];
+  check("clips token spent settled 25", ctok?.spentCredits === 25, JSON.stringify(ctok));
+  check("clips token scope recorded", ctok?.scope === "clips", JSON.stringify(ctok));
+  check("starter account clipsEligible true", sr.json?.account?.clipsEligible === true, JSON.stringify(sr.json?.account).slice(0, 200));
+  const wr = await tasteMcp(63, "tools/call", { name: "create_sitdown", arguments: { clip: "https://example.com/source.mp4" } });
+  check("week token create_sitdown refused", wr.json?.result?.isError === true, JSON.stringify(wr.json).slice(0, 200));
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

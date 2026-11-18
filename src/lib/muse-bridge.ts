@@ -118,6 +118,41 @@ export function assertBridgeEligible(user: Pick<User, "plan" | "whopId" | "whopU
   }
 }
 
+// ─── Bridge scopes ──────────────────────────────────────────────────
+// A bridge code/token carries ONE scope, set at mint and inherited at
+// exchange. "week" is the original /muse-week special offer above.
+// "clips" is the Clip Factory (Dave, 2026-11-18): a SEPARATE product
+// with its own eligibility and allowlist (below). Scopes never mix:
+// the MCP route enforces the token's own scope on every call.
+
+export type BridgeScope = "week" | "clips";
+
+export function normalizeScope(raw: unknown): BridgeScope {
+  return raw === "clips" ? "clips" : "week";
+}
+
+// ─── Clips eligibility — any member spending their own credits ──────
+// Dave, 2026-11-18: the Clip Factory is open to ANY signed-in member
+// whose account is linked to a P&R credit account (their derived
+// engine key); plan is irrelevant — they spend their own credits.
+// "Linked" is the same test getMemberEngineKey applies: a real Whop
+// user id. The anonymous operator fallback has none, so it cannot
+// use the clips lane either (same rule as the claim bridge).
+
+export function hasLinkedCreditAccount(user: Pick<User, "whopId">): boolean {
+  return WHOP_USER_RE.test(user.whopId?.trim() ?? "");
+}
+
+export function assertClipsEligible(user: Pick<User, "whopId">): void {
+  if (!hasLinkedCreditAccount(user)) {
+    throw new BridgeError(
+      403,
+      "NOT_LINKED",
+      "The Clip Factory works on your own Plunder & Riffle credits, and this account isn't linked to a credit account yet. Sign in with Whop so your account carries its Whop user id, then try again.",
+    );
+  }
+}
+
 // ─── Tool allowlist ─────────────────────────────────────────────────
 // Free tools never touch the budget. Generating tools reserve their
 // LIST cost (from the bot MCP's own tool descriptions) and settle at
@@ -134,6 +169,7 @@ export const BRIDGE_FREE_TOOLS = new Set([
   "list_services",
 ]);
 
+/** Week-scope generating tools (the /muse-week offer's allowlist). */
 export const BRIDGE_GENERATING_COSTS: Record<string, number> = {
   create_demo_pack: 115,
   create_before_pitch: 50,
@@ -141,17 +177,43 @@ export const BRIDGE_GENERATING_COSTS: Record<string, number> = {
   generate_multilanguage_ads: 60,
 };
 
-export function bridgeToolAllowed(name: string): boolean {
-  return BRIDGE_FREE_TOOLS.has(name) || name in BRIDGE_GENERATING_COSTS;
+/**
+ * Clips-scope generating tools — deliberately a SEPARATE table, never
+ * merged into the week's. A clips token must not be able to call the
+ * week offer's generating tools, or any plan could walk around the
+ * Operator + Agency gate through the clips lane; and a week token
+ * must not gain create_sitdown, which belongs to the Clip Factory.
+ * create_sitdown list cost is 25 (the engine's own tool table).
+ */
+export const CLIPS_GENERATING_COSTS: Record<string, number> = {
+  create_sitdown: 25,
+};
+
+export function generatingCostsForScope(scope: BridgeScope): Record<string, number> {
+  return scope === "clips" ? CLIPS_GENERATING_COSTS : BRIDGE_GENERATING_COSTS;
 }
 
-export function estimateToolCost(name: string, args: Record<string, unknown>): number {
-  const base = BRIDGE_GENERATING_COSTS[name] ?? 0;
+export function bridgeToolAllowedForScope(scope: BridgeScope, name: string): boolean {
+  return BRIDGE_FREE_TOOLS.has(name) || name in generatingCostsForScope(scope);
+}
+
+/** Week-scope check (the original behavior, kept for existing callers). */
+export function bridgeToolAllowed(name: string): boolean {
+  return bridgeToolAllowedForScope("week", name);
+}
+
+export function estimateToolCostForScope(scope: BridgeScope, name: string, args: Record<string, unknown>): number {
+  const base = generatingCostsForScope(scope)[name] ?? 0;
   if (name === "generate_multilanguage_ads" && Array.isArray(args.languages)) {
     // List pricing is per language; reserve for every language asked for.
     return base * Math.max(1, Math.min(10, args.languages.length));
   }
   return base;
+}
+
+/** Week-scope estimate (the original behavior, kept for existing callers). */
+export function estimateToolCost(name: string, args: Record<string, unknown>): number {
+  return estimateToolCostForScope("week", name, args);
 }
 
 // ─── The member's derived engine key (memory cache only) ────────────
@@ -332,30 +394,40 @@ function newBridgeCode(): string {
   return `${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 12)}-${raw.slice(12, 16)}`;
 }
 
-export async function mintBridgeCode(userId: string, budgetCredits: number): Promise<{ code: string; expiresAt: Date; budgetCredits: number }> {
+export async function mintBridgeCode(
+  userId: string,
+  budgetCredits: number,
+  scope: BridgeScope = "week",
+): Promise<{ code: string; expiresAt: Date; budgetCredits: number; scope: BridgeScope }> {
   const budget = Math.max(1, Math.min(MAX_BUDGET_CREDITS, Math.trunc(budgetCredits) || WEEK_BUDGET_CREDITS));
   const code = newBridgeCode();
   const expiresAt = new Date(Date.now() + BRIDGE_CODE_TTL_MS);
   // A fresh code retires every unused one before it: only one live code
-  // per member, so a code left on an old page can never be exchanged.
+  // per member (across BOTH scopes), so a code left on an old page can
+  // never be exchanged.
   await db.bridgeCode.updateMany({ where: { userId, usedAt: null }, data: { usedAt: new Date() } });
-  await db.bridgeCode.create({ data: { userId, codeHash: sha256(code), budgetCredits: budget, expiresAt } });
-  return { code, expiresAt, budgetCredits: budget };
+  await db.bridgeCode.create({ data: { userId, codeHash: sha256(code), budgetCredits: budget, expiresAt, scope } });
+  return { code, expiresAt, budgetCredits: budget, scope };
 }
 
-export async function exchangeBridgeCode(rawCode: string): Promise<{ token: string; expiresAt: Date; budgetCredits: number; userId: string }> {
+export async function exchangeBridgeCode(rawCode: string): Promise<{ token: string; expiresAt: Date; budgetCredits: number; userId: string; scope: BridgeScope }> {
   const code = (rawCode ?? "").trim().toUpperCase();
   if (!code) throw new BridgeError(400, "BAD_CODE", "That bridge code isn't valid.");
   const row = await db.bridgeCode.findUnique({ where: { codeHash: sha256(code) } });
   if (!row || row.usedAt) throw new BridgeError(400, "BAD_CODE", "That bridge code isn't valid.");
-  if (row.expiresAt.getTime() <= Date.now()) throw new BridgeError(400, "BAD_CODE", "That bridge code expired. Generate a fresh one on /muse-week.");
-  // Eligibility is re-checked at exchange: a member downgraded after
-  // minting holds a code that no longer opens the offer. The code is
-  // NOT consumed by this refusal — it works again if they upgrade
-  // inside its 15 minutes.
+  const scope = normalizeScope(row.scope);
+  if (row.expiresAt.getTime() <= Date.now()) {
+    throw new BridgeError(400, "BAD_CODE", `That bridge code expired. Generate a fresh one ${scope === "clips" ? "in the Clip Factory" : "on /muse-week"}.`);
+  }
+  // Eligibility is re-checked at exchange, PER SCOPE: a member
+  // downgraded after minting holds a week code that no longer opens
+  // the offer; a clips code re-checks the linked-account test instead
+  // (plan never enters it). The code is NOT consumed by this refusal —
+  // it works again if eligibility returns inside its 15 minutes.
   const owner = await db.user.findUnique({ where: { id: row.userId } });
   if (!owner) throw new BridgeError(400, "BAD_CODE", "That bridge code isn't valid.");
-  assertBridgeEligible(owner);
+  if (scope === "clips") assertClipsEligible(owner);
+  else assertBridgeEligible(owner);
   // Single-use: claim it before minting, so a raced double exchange fails.
   const claimed = await db.bridgeCode.updateMany({
     where: { id: row.id, usedAt: null },
@@ -365,9 +437,9 @@ export async function exchangeBridgeCode(rawCode: string): Promise<{ token: stri
   const token = BRIDGE_TOKEN_PREFIX + randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + BRIDGE_TOKEN_TTL_MS);
   await db.bridgeToken.create({
-    data: { userId: row.userId, tokenHash: sha256(token), budgetCredits: row.budgetCredits, expiresAt },
+    data: { userId: row.userId, tokenHash: sha256(token), budgetCredits: row.budgetCredits, expiresAt, scope },
   });
-  return { token, expiresAt, budgetCredits: row.budgetCredits, userId: row.userId };
+  return { token, expiresAt, budgetCredits: row.budgetCredits, userId: row.userId, scope };
 }
 
 export interface BridgeSession {
@@ -376,6 +448,7 @@ export interface BridgeSession {
   budgetCredits: number;
   spentCredits: number;
   expiresAt: Date;
+  scope: BridgeScope;
 }
 
 export async function verifyBridgeToken(raw: string | null): Promise<BridgeSession | null> {
@@ -383,7 +456,14 @@ export async function verifyBridgeToken(raw: string | null): Promise<BridgeSessi
   const row = await db.bridgeToken.findUnique({ where: { tokenHash: sha256(raw) }, include: { user: true } });
   if (!row || row.revokedAt || row.expiresAt.getTime() <= Date.now()) return null;
   await db.bridgeToken.update({ where: { id: row.id }, data: { lastUsedAt: new Date() } }).catch(() => undefined);
-  return { tokenId: row.id, user: row.user, budgetCredits: row.budgetCredits, spentCredits: row.spentCredits, expiresAt: row.expiresAt };
+  return {
+    tokenId: row.id,
+    user: row.user,
+    budgetCredits: row.budgetCredits,
+    spentCredits: row.spentCredits,
+    expiresAt: row.expiresAt,
+    scope: normalizeScope(row.scope),
+  };
 }
 
 export async function revokeBridgeToken(tokenId: string, userId: string): Promise<boolean> {
@@ -413,28 +493,45 @@ export async function proxyToolCall(session: BridgeSession, name: string, args: 
     charged: 0,
   });
 
-  if (!bridgeToolAllowed(name)) {
+  // The token's OWN scope decides the allowlist — this is the check
+  // that keeps the clips lane from becoming a side door into the
+  // week offer (and the week offer out of the Clip Factory's tool).
+  const costs = generatingCostsForScope(session.scope);
+  if (!bridgeToolAllowedForScope(session.scope, name)) {
     return toolError(
-      `The Muse bridge cannot call ${name}. It runs research and content generation on the member's own credits; publishing and MP4 rendering stay with the member's approval inside Whoparmy. Allowed: ${[...BRIDGE_FREE_TOOLS, ...Object.keys(BRIDGE_GENERATING_COSTS)].join(", ")}.`,
+      session.scope === "clips"
+        ? `This clips connection cannot call ${name}. A Clip Factory connection runs create_sitdown plus research and account tools on the member's own credits; the week offer's content tools need their own /muse-week connection, and publishing and MP4 rendering stay with the member's approval inside Whoparmy. Allowed: ${[...BRIDGE_FREE_TOOLS, ...Object.keys(costs)].join(", ")}.`
+        : `The Muse bridge cannot call ${name}. It runs research and content generation on the member's own credits; publishing and MP4 rendering stay with the member's approval inside Whoparmy. Allowed: ${[...BRIDGE_FREE_TOOLS, ...Object.keys(costs)].join(", ")}.`,
     );
   }
 
-  if (!bridgeEligible(session.user)) {
+  // Eligibility re-check on every call, per scope: the week offer
+  // re-checks its plan gate (a downgrade kills a live token); the
+  // clips lane re-checks only the linked-account test, never plan.
+  if (session.scope === "clips") {
+    if (!hasLinkedCreditAccount(session.user)) {
+      return toolError(
+        "This clips connection's account is no longer linked to a Plunder & Riffle credit account. Nothing was charged. The member can re-link by signing in with Whop.",
+      );
+    }
+  } else if (!bridgeEligible(session.user)) {
     return toolError(
       "The Muse bridge is a special offer for Operator and Agency members, and this connection's plan no longer includes it. Nothing was charged. The member can re-open the offer by upgrading in Whop.",
     );
   }
 
   const member = await getMemberEngineKey(session.user);
-  const generating = name in BRIDGE_GENERATING_COSTS;
-  const reserve = generating ? estimateToolCost(name, args) : 0;
+  const generating = name in costs;
+  const reserve = generating ? estimateToolCostForScope(session.scope, name, args) : 0;
 
   if (generating) {
     const current = await db.bridgeToken.findUnique({ where: { id: session.tokenId } });
     const spent = current?.spentCredits ?? session.spentCredits;
     if (spent + reserve > session.budgetCredits) {
       return toolError(
-        `This ${name} call would exceed the week's approved budget (${session.budgetCredits} credits, ${spent} already spent). Nothing was charged. The member can approve a new week budget on /muse-week.`,
+        session.scope === "clips"
+          ? `This ${name} call would exceed this connection's approved budget (${session.budgetCredits} credits — the member's own balance when the connection was approved, ${spent} already spent). Nothing was charged. The member can approve a new clips connection in Whoparmy.`
+          : `This ${name} call would exceed the week's approved budget (${session.budgetCredits} credits, ${spent} already spent). Nothing was charged. The member can approve a new week budget on /muse-week.`,
       );
     }
   }
@@ -486,7 +583,7 @@ export async function proxyToolsList(session: BridgeSession): Promise<unknown> {
   const reply = await mcpCall(member.key, "tools/list", {});
   const tools = (reply.result as unknown as { tools?: Array<{ name?: string }> } | undefined)?.tools;
   if (!Array.isArray(tools)) return reply.result ?? { tools: [] };
-  return { tools: tools.filter((t) => typeof t.name === "string" && bridgeToolAllowed(t.name)) };
+  return { tools: tools.filter((t) => typeof t.name === "string" && bridgeToolAllowedForScope(session.scope, t.name)) };
 }
 
 // ─── Member-facing account view ─────────────────────────────────────
@@ -495,12 +592,14 @@ export interface BridgeAccountView {
   connected: boolean;
   /** Operator + Agency only (Dave, 2026-11-17) — see bridgeEligible. */
   eligible: boolean;
+  /** Clip Factory: any member with a linked credit account, any plan. */
+  clipsEligible: boolean;
   botPlan: BotPlan;
   credits: number | null;
   granted: number;
   period: string | null;
   brand: { name: string; website: string | null } | null;
-  tokens: Array<{ id: string; budgetCredits: number; spentCredits: number; expiresAt: Date; active: boolean }>;
+  tokens: Array<{ id: string; budgetCredits: number; spentCredits: number; expiresAt: Date; active: boolean; scope: BridgeScope }>;
   weekBudgetCredits: number;
   offers: BridgeOffer[];
   error: string | null;
@@ -517,11 +616,12 @@ export async function getBridgeAccountView(user: User): Promise<BridgeAccountVie
     where: { userId: user.id },
     orderBy: { createdAt: "desc" },
     take: 5,
-    select: { id: true, budgetCredits: true, spentCredits: true, expiresAt: true, revokedAt: true },
+    select: { id: true, budgetCredits: true, spentCredits: true, expiresAt: true, revokedAt: true, scope: true },
   });
   const view: BridgeAccountView = {
     connected: false,
     eligible: bridgeEligible(user),
+    clipsEligible: hasLinkedCreditAccount(user),
     botPlan: botPlanFor(user),
     credits: null,
     granted: 0,
@@ -533,6 +633,7 @@ export async function getBridgeAccountView(user: User): Promise<BridgeAccountVie
       spentCredits: t.spentCredits,
       expiresAt: t.expiresAt,
       active: !t.revokedAt && t.expiresAt.getTime() > Date.now(),
+      scope: normalizeScope(t.scope),
     })),
     weekBudgetCredits: WEEK_BUDGET_CREDITS,
     offers: BRIDGE_OFFERS,

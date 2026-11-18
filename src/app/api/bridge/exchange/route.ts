@@ -22,7 +22,11 @@ export async function POST(req: NextRequest) {
         expires_in: Math.floor(BRIDGE_TOKEN_TTL_MS / 1000),
         expires_at: out.expiresAt,
         budget_credits: out.budgetCredits,
-        scope: "connected",
+        // Week tokens keep the historical "connected" label; a clips
+        // token says what it is. `purpose` carries the raw scope for
+        // clients that want it unmapped.
+        scope: out.scope === "clips" ? "clips" : "connected",
+        purpose: out.scope,
         mcp_url: "https://whop.plunderandriffle.com/api/bridge/mcp",
       },
       { headers: { "Cache-Control": "no-store" } },
