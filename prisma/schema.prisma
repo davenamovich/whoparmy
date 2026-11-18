@@ -712,3 +712,18 @@ model KeyBid {
   @@unique([auctionId, userId])
   @@index([auctionId, points])
 }
+
+// ─── Static-page claim bridge ───────────────────────────────────────
+// A win on a static page (no account there) arrives as a signed token
+// (lib/claims.ts). Redemption is recorded once per token nonce — the
+// unique nonce is the single-use lock — and pays free generations.
+model ClaimRedemption {
+  id        String   @id @default(cuid())
+  nonce     String   @unique // the win token's one-time nonce
+  userId    String // the member who claimed it
+  amount    Int // free generations paid
+  source    String // where the win happened (e.g. doors-static)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}

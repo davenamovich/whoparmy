@@ -668,3 +668,18 @@ CREATE INDEX "KeyBid_auctionId_points_idx" ON "KeyBid"("auctionId", "points");
 -- CreateIndex
 CREATE UNIQUE INDEX "KeyBid_auctionId_userId_key" ON "KeyBid"("auctionId", "userId");
 
+-- CreateTable
+CREATE TABLE "ClaimRedemption" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "nonce" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "amount" INTEGER NOT NULL,
+    "source" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ClaimRedemption_nonce_key" ON "ClaimRedemption"("nonce");
+
+-- CreateIndex
+CREATE INDEX "ClaimRedemption_userId_idx" ON "ClaimRedemption"("userId");

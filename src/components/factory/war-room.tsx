@@ -183,6 +183,17 @@ export function WarRoom() {
 
       <DoorsGame />
 
+      {/* Static-page claim bridge (Dave, 2026-11-17): wins earned on
+          the open game pages arrive as claim codes — this is the door
+          back to where they pay out. */}
+      <p className="text-xs text-muted-foreground text-center">
+        Won free generations on a game page outside the app?{" "}
+        <a href="/claim" className="text-primary underline underline-offset-2">
+          Claim your win here
+        </a>{" "}
+        — paste the code and it lands in your balance.
+      </p>
+
       {referrals ? (
         <Card>
           <CardHeader className="pb-2">
