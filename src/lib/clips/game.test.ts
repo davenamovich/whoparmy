@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   briefToPrompt,
   declineRound,
+  maxBonusFor,
   resolve,
   roundFor,
   sessionSeed,
@@ -135,4 +136,23 @@ test("briefToPrompt: the brief is the only thing that reaches Muse", () => {
   assert.match(prompt, /Page niche: GTA 6 news and nostalgia/);
   assert.match(prompt, /credit/i);
   assert.match(prompt, /approval/);
+});
+
+test("bonus ceiling: trades can never hand out more than half the pack", () => {
+  for (let seed = 0; seed < 200; seed++) {
+    const floor = 2 + (seed % 40);
+    let state = startSession({ floor, seed, maxRounds: 8 });
+    // greedily take every clips option offered
+    for (let i = 0; i < 8; i++) {
+      const round = roundFor(state);
+      const clipsIndex = round.options.findIndex((o) => o.kind === "bonus_clips") as 0 | 1;
+      state = takeUpside(state, clipsIndex);
+    }
+    const out = resolve(state);
+    assert.ok(
+      out.extraClips <= maxBonusFor(floor),
+      `seed ${seed} floor ${floor}: bonus ${out.extraClips} exceeds ceiling ${maxBonusFor(floor)}`,
+    );
+    assert.ok(out.clips >= floor);
+  }
 });

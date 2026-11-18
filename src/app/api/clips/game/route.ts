@@ -151,19 +151,62 @@ export async function PATCH(req: NextRequest) {
     }
 
     const done = next.round >= next.maxRounds;
-    const updated = await db.clipGameSession.update({
-      where: { id: row.id },
+
+    if (!done) {
+      const updated = await db.clipGameSession.update({
+        where: { id: row.id },
+        data: {
+          bonus: next.bonus,
+          briefs: JSON.stringify(next.briefs),
+          round: next.round,
+          chosen: JSON.stringify(next.chosen),
+        },
+      });
+      return NextResponse.json({ id: updated.id, ...view(next) });
+    }
+
+    // Resolving is the one moment that pays out, so it happens exactly once:
+    // claim the transition with a conditional update, and only the caller that
+    // won it writes the grant. A double-tap cannot mint clips twice.
+    const claimed = await db.clipGameSession.updateMany({
+      where: { id: row.id, status: "open" },
       data: {
         bonus: next.bonus,
         briefs: JSON.stringify(next.briefs),
         round: next.round,
         chosen: JSON.stringify(next.chosen),
-        status: done ? "resolved" : "open",
-        resolvedAt: done ? new Date() : null,
+        status: "resolved",
+        resolvedAt: new Date(),
       },
     });
 
-    return NextResponse.json({ id: updated.id, ...view(next) });
+    if (claimed.count === 0) {
+      return NextResponse.json({ id: row.id, ...view(next), note: "That board was already settled." });
+    }
+
+    let granted = 0;
+    if (next.bonus > 0) {
+      await db.clipCreditGrant.create({
+        data: {
+          userId: user.id,
+          amount: next.bonus,
+          source: "game_bonus",
+          label: `Box Trade bonus on a ${next.floor}-clip pack`,
+          reference: row.id,
+        },
+      });
+      granted = next.bonus;
+    }
+
+    const resolution = resolve(next);
+    return NextResponse.json({
+      id: row.id,
+      ...view(next),
+      granted,
+      note: granted
+        ? `${resolution.note} ${granted} bonus clips are on your balance now.`
+        : resolution.note,
+    });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "That move did not go through." },

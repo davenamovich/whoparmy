@@ -65,6 +65,14 @@ export interface Resolution {
   note: string;
 }
 
+/**
+ * Total bonus is capped at half the pack. Without a ceiling, four good
+ * rounds hand out more clips than were bought, and the pack price stops
+ * meaning anything — the trade becomes the product, which is exactly the
+ * kind of quiet breakage that shows up as a support thread later.
+ */
+export const MAX_BONUS_RATIO = 0.5;
+
 const BRIEFS: BriefCard[] = [
   {
     angle: "then vs now",
@@ -152,6 +160,10 @@ export function sessionSeed(userId: string, pageId: string, now: Date = new Date
   return h >>> 0;
 }
 
+export function maxBonusFor(floor: number): number {
+  return Math.ceil(Math.max(0, floor) * MAX_BONUS_RATIO);
+}
+
 function bonusFor(roll: number, floor: number): number {
   // Upside only, and small: a trade adds a tenth to a half of the pack.
   const step = Math.max(1, Math.round(floor * 0.1));
@@ -223,7 +235,10 @@ export function takeUpside(state: GameState, index: 0 | 1): GameState {
   const upside = round.options[index];
   if (!upside) return state;
 
-  const bonus = upside.kind === "bonus_clips" ? state.bonus + (upside.amount ?? 0) : state.bonus;
+  const bonus =
+    upside.kind === "bonus_clips"
+      ? Math.min(maxBonusFor(state.floor), state.bonus + (upside.amount ?? 0))
+      : state.bonus;
   const briefs =
     upside.kind === "brief" && upside.brief ? [...state.briefs, upside.brief] : state.briefs;
 
@@ -250,7 +265,9 @@ export function resolve(state: GameState): Resolution {
   const extraClips = Math.max(0, state.bonus);
   const clips = Math.max(state.floor, state.floor + extraClips);
   const notes: string[] = [`${clips} clips — your pack was ${state.floor}, and the floor stands.`];
-  if (extraClips > 0) notes.push(`${extraClips} came from trades.`);
+  if (extraClips > 0) {
+    notes.push(`${extraClips} came from trades and are yours — they do not expire at month end.`);
+  }
   if (state.briefs.length > 0) {
     notes.push(
       `${state.briefs.length} brief${state.briefs.length === 1 ? "" : "s"} attached — these reach Muse when you queue the batch.`,
