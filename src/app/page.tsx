@@ -10,6 +10,7 @@ import {
   UserRound,
   Bot,
   Cpu,
+  MessagesSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -21,6 +22,7 @@ import { VideoStudio } from "@/components/factory/video-studio";
 import { MemeArmy } from "@/components/factory/meme-army";
 import { WarRoom } from "@/components/factory/war-room";
 import { AgentsView } from "@/components/factory/agents";
+import { RalphChat, type RalphNavIntent } from "@/components/factory/ralph-chat";
 // LLM Control is operator-only (Dave, 2026-11-17): it is loaded
 // lazily so its code never even ships in the main bundle members
 // download — the nav item and the view are admin-gated below, and
@@ -42,6 +44,7 @@ import { LocaleSwitcher } from "@/components/factory/locale-switcher";
 
 type View =
   | "create"
+  | "ralph"
   | "results"
   | "campaigns"
   | "library"
@@ -50,7 +53,7 @@ type View =
   | "llm"
   | "account";
 
-type NavKey = "create" | "campaigns" | "library" | "army" | "agents" | "llm" | "account";
+type NavKey = "create" | "ralph" | "campaigns" | "library" | "army" | "agents" | "llm" | "account";
 
 // Consolidated menu (Dave, 2026-11-17): fewer doors, same rooms.
 // Meme Studio folded into Create; the War Room folded into Meme
@@ -66,6 +69,8 @@ type NavKey = "create" | "campaigns" | "library" | "army" | "agents" | "llm" | "
 // decoration (ui-ux-pro-max tab-badge rule).
 const NAV: { key: View; labelKey: NavKey; icon: React.ComponentType<{ className?: string }> }[] = [
   { key: "create", labelKey: "create", icon: Sparkles },
+  // Ralph chat (Dave, 2026-11-18): the one-click dispatcher door.
+  { key: "ralph", labelKey: "ralph", icon: MessagesSquare },
   { key: "campaigns", labelKey: "campaigns", icon: LayoutGrid },
   { key: "library", labelKey: "library", icon: Library },
   { key: "army", labelKey: "army", icon: Swords },
@@ -170,6 +175,16 @@ export default function Home() {
     setBrandPrefillName(null);
   }
 
+  // Ralph chat navigation intents: Ralph routes, the page moves.
+  // A meme topic rides the same prefill the Trending view uses.
+  function onRalphNavigate(intent: RalphNavIntent) {
+    if (intent.memeTopic) {
+      startMemesFromTrend(intent.memeTopic);
+      return;
+    }
+    setView(intent.view);
+  }
+
   function onWizardCompleted(result: WizardResult) {
     openResults(result.campaignId);
     clearBrandPrefill();
@@ -242,6 +257,20 @@ export default function Home() {
         <main className="flex-1 min-w-0 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pb-24 lg:pb-12">
           {view === "create" ? (
             <div className="space-y-12">
+              {/* Ralph entry card: the button-first door, one tap
+                  from the room members land in. */}
+              <button
+                onClick={() => setView("ralph")}
+                className="w-full flex items-center gap-3 rounded-2xl border border-primary/30 bg-primary/8 px-4 py-3.5 text-left hover:bg-primary/12 transition-colors"
+              >
+                <span className="w-9 h-9 rounded-xl bg-primary grid place-items-center text-primary-foreground shrink-0">
+                  <MessagesSquare className="h-4.5 w-4.5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold tracking-tight">Ask Ralph — one tap, no typing</span>
+                  <span className="block text-xs text-muted-foreground truncate">Free content · free AI audit · he remembers your business</span>
+                </span>
+              </button>
               {/* Nav diet phase 1: Brands lives here now — pick or
                   research a brand, then the wizard below runs with it. */}
               <BrandsView onUseInCampaign={startWizardWithBrand} />
@@ -253,6 +282,7 @@ export default function Home() {
               <VideoStudio />
             </div>
           ) : null}
+          {view === "ralph" ? <RalphChat onNavigate={onRalphNavigate} /> : null}
           {view === "results" && resultsCampaignId ? (
             <ResultsWorkspace campaignId={resultsCampaignId} onBack={() => setView("campaigns")} />
           ) : null}
