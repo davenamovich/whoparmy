@@ -9,6 +9,7 @@ import {
   LIST_CREDITS_PER_CLIP,
   MAX_BONUS_RATIO,
   MIN_GROSS_MARGIN,
+  MIN_PRICE_PER_CLIP_USD,
   AGENT37_RENDER_COST_USD,
   LLM_TEXT_COST_USD,
   MAX_TURNS_PER_CLIP,
@@ -80,4 +81,25 @@ test("copy: both lanes named, and the comparison is not computed for the member"
 test("ceiling: pricing reads the same ratio the game pays out on", () => {
   // Duplicated on purpose (see packs.ts) — this is the binding.
   assert.equal(MAX_BONUS_RATIO, GAME_MAX_BONUS_RATIO);
+});
+
+test("positioning: no pack is priced like a commodity", () => {
+  // Cost is $0.005 a clip. Price is not derived from cost — this floor exists
+  // so a later "let's discount it" is a decision someone makes, not a drift.
+  for (const pack of CLIP_PACKS) {
+    assert.ok(
+      pricePerClip(pack) >= MIN_PRICE_PER_CLIP_USD,
+      `${pack.name} is $${pricePerClip(pack).toFixed(2)} a clip, under the $${MIN_PRICE_PER_CLIP_USD} floor`,
+    );
+  }
+});
+
+test("positioning: the entry pack undercuts one freelance edit, not the compute", () => {
+  const cheapestEdit = 15; // a freelance short-form edit, conservatively
+  const entry = [...CLIP_PACKS].sort((a, b) => a.clips - b.clips)[0];
+  assert.ok(
+    pricePerClip(entry) < cheapestEdit,
+    "a clip must still be cheaper than the cheapest freelance edit, or there is no offer",
+  );
+  assert.ok(pricePerClip(entry) > 1, "and never priced at a fraction of a dollar");
 });

@@ -58,30 +58,43 @@ export interface ClipPack {
   blurb: string;
 }
 
+/**
+ * Priced as a product, not as compute plus a margin.
+ *
+ * $0.005 is the cost of a render. It is not an argument for a cheap clip.
+ * The anchor is what a member is replacing — a freelance edit at $15–40 a
+ * clip — and the pack is sold as the replacement, not as the pixels. At these
+ * prices a clip is a tenth of the cheapest freelance edit and roughly 99.8%
+ * gross margin, which is what a product with a queue, approvals, credits and a
+ * game in front of it should look like.
+ *
+ * The trade-up is the only discount mechanism in the product. Nothing here is
+ * marked down; the game is earned, not paid for.
+ */
 export const CLIP_PACKS: ClipPack[] = [
   {
     key: "starter",
     name: "10 clips",
     clips: 10,
-    priceUsd: 9,
+    priceUsd: 29,
     rounds: 2,
-    blurb: "A week of posting, to see whether it holds up.",
+    blurb: "One edited clip's worth of budget, ten clips you approve yourself.",
   },
   {
     key: "page",
     name: "30 clips",
     clips: 30,
-    priceUsd: 19,
+    priceUsd: 69,
     rounds: 3,
-    blurb: "One a day for a month.",
+    blurb: "A month of daily posting on one page.",
   },
   {
     key: "studio",
     name: "100 clips",
     clips: 100,
-    priceUsd: 49,
+    priceUsd: 179,
     rounds: 4,
-    blurb: "Two pages, most days.",
+    blurb: "Two pages, most days, for a month.",
   },
 ];
 
@@ -90,6 +103,13 @@ export const FREE_GRANT_CLIPS = 3;
 
 /** Below this, a pack is not worth selling — it is a subsidy. */
 export const MIN_GROSS_MARGIN = 0.9;
+
+/**
+ * A floor on price per clip, so a future "let's discount it" cannot quietly
+ * turn a product into a commodity. Cost is $0.005; this floor is about
+ * positioning, not margin.
+ */
+export const MIN_PRICE_PER_CLIP_USD = 1.5;
 
 /**
  * Must equal MAX_BONUS_RATIO in game.ts.
