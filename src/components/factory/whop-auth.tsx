@@ -110,9 +110,18 @@ export function WhopAccountBadge({
     }
   }
 
-  if (session?.mode === "whop") {
+  // Signed in = a REAL session resolved (session.connected): a Whop member
+  // (mode "whop") OR a designated operator on their real Whop login (mode
+  // "operator", viaFallback false). Gating this on mode alone hid the
+  // signed-in state from designated operators — Dave's report, 2026-11-17:
+  // "the login button does not show logged in even though i got permission."
+  // The anonymous fallback session has connected=false and keeps the
+  // login button below.
+  if (session?.connected) {
     const u = session.user;
-    const display = u.whopUsername ?? u.name ?? "Whop User";
+    const display = u.name ?? u.whopUsername ?? "Whop User";
+    const firstName = u.name?.trim().split(/\s+/)[0] || u.whopUsername || null;
+    const greeting = firstName ? `Welcome ${firstName}` : "Welcome";
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -123,7 +132,7 @@ export function WhopAccountBadge({
             <span className="w-6 h-6 rounded-full bg-primary grid place-items-center text-primary-foreground text-[11px] font-black shrink-0">
               {display.slice(0, 1).toUpperCase()}
             </span>
-            <span className="hidden sm:block text-xs font-semibold truncate max-w-28">{display}</span>
+            <span className="hidden sm:block text-xs font-semibold truncate max-w-36">{greeting}</span>
             <Badge className="bg-primary text-primary-foreground border-0 text-[9px] px-1.5 py-0 font-bold hidden md:inline-flex">
               {u.planName}
             </Badge>
@@ -165,7 +174,7 @@ export function WhopAccountBadge({
     );
   }
 
-  // Operator (sandbox/dev) mode
+  // Not signed in (anonymous fallback session): offer the Whop login.
   if (session?.whop.oauthConfigured) {
     return (
       <Button asChild size="sm" className="h-8 bg-primary hover:bg-primary/90 font-semibold text-xs">
