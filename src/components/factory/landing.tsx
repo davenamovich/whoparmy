@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Brain, ChevronLeft, ChevronRight, Coins, Link2, Lock, MousePointerClick, ScanSearch, Sparkles } from "lucide-react";
 import { stashRefFromUrl } from "@/lib/ref-stash";
 import type { BridgePartner } from "@/lib/bridge";
+import { BrandedBotCard } from "@/components/factory/branded-bot-card";
 
 /**
  * ─── THE LANDING PAGE ────────────────────────────────────────────────
@@ -134,6 +135,8 @@ export function LandingPage() {
             ))}
           </div>
         </section>
+
+        <BrandedBotCard />
 
         <section id="how" className="space-y-4 scroll-mt-8">
           <h2 className="text-sm font-bold text-center uppercase tracking-widest text-muted-foreground">

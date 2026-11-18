@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useTranslations, useLocale } from "next-intl";
 import { LANGUAGES, isSupportedLanguage } from "@/lib/languages";
 import type { AgentTemplate } from "@/lib/agents";
+import { BrandedBotCard } from "@/components/factory/branded-bot-card";
 
 interface Hire {
   id: string;
@@ -133,6 +134,8 @@ export function AgentsView() {
           learn, no AI math — just memes. Owner approves — bots create.
         </p>
       </div>
+
+      <BrandedBotCard />
 
       {planInfo ? (
         <Card>
