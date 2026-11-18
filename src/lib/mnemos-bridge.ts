@@ -104,29 +104,70 @@ export async function mnemosCapture(person: string, content: string, context: st
  * unreliable (a scope WITH memories still carries an ONBOARDING
  * section). Recall returns the clean durable-memories list instead.
  */
+/** Parse one recall payload into cleaned fact lines (no "- " prefix).
+ *  Member-facing polish: recall lines carry agent metadata
+ *  ("- [words: a, b] Fact. id=engram_… kind=semantic confidence=…").
+ *  Members get the facts, not the plumbing. */
+export function parseRecallFacts(raw: string): string[] {
+  const marker = "Durable memories:";
+  const idx = raw.indexOf(marker);
+  if (idx < 0) return [];
+  let list = raw.slice(idx + marker.length).trim();
+  const nextSection = list.indexOf("\n## ");
+  if (nextSection > 0) list = list.slice(0, nextSection).trim();
+  return list
+    .split("\n")
+    .map((line) =>
+      line
+        .replace(/^-\s*\[(?:words:[^\]]*|linked)\]\s*/, "")
+        .replace(/^\s*-\s*/, "")
+        .replace(/\s+id=\S+\s+kind=\S+.*$/, "")
+        .trim(),
+    )
+    .filter((line) => line.length > 3);
+}
+
 export async function mnemosSnapshot(person: string): Promise<string | null> {
   const raw = await callTool(person, "mnemos_recall", {
     query: "business offer customers brand sell service product shop owner audience",
   });
   if (!raw) return null;
-  const marker = "Durable memories:";
-  const idx = raw.indexOf(marker);
-  if (idx < 0) return null;
-  let list = raw.slice(idx + marker.length).trim();
-  const nextSection = list.indexOf("\n## ");
-  if (nextSection > 0) list = list.slice(0, nextSection).trim();
-  if (list.length < 10) return null;
-  // Member-facing polish: recall lines carry agent metadata
-  // ("- [words: a, b] Fact. id=engram_… kind=semantic confidence=…").
-  // Members get the facts, not the plumbing.
-  const clean = list
-    .split("\n")
-    .map((line) =>
-      line
-        .replace(/^-\s*\[(?:words:[^\]]*|linked)\]\s*/, "- ")
-        .replace(/\s+id=\S+\s+kind=\S+.*$/, "")
-        .trimEnd(),
-    )
-    .join("\n");
-  return clean.slice(0, 1800);
+  const facts = parseRecallFacts(raw);
+  if (facts.length === 0) return null;
+  return facts.map((f) => `- ${f}`).join("\n").slice(0, 1800);
+}
+
+/**
+ * One-click export (Dave, 2026-11-18): everything the store holds
+ * for this person, as cleaned fact lines. Mnemos has no list-all
+ * tool — recall is the only read path — so the export unions
+ * recalls over a battery of broad business queries and dedupes.
+ * A fact phrased unusually enough to dodge every query can be
+ * missed; the export file says so honestly.
+ */
+const EXPORT_QUERIES = [
+  "business offer customers",
+  "brand website links social",
+  "content memes campaigns posts",
+  "audience niche market competitors",
+  "prices plans products services",
+  "goals decisions plans preferences",
+  "team staff location hours contact",
+  "lessons results performance reviews",
+];
+
+export async function mnemosExport(person: string): Promise<string[]> {
+  const raws = await Promise.all(EXPORT_QUERIES.map((q) => mnemosRecall(person, q)));
+  const seen = new Set<string>();
+  const facts: string[] = [];
+  for (const raw of raws) {
+    if (!raw) continue;
+    for (const fact of parseRecallFacts(raw)) {
+      const key = fact.toLowerCase().replace(/\s+/g, " ").slice(0, 140);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      facts.push(fact);
+    }
+  }
+  return facts;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Bot, Wallet, Pause, Play, Store, Briefcase, ListOrdered, Zap, Send } from "lucide-react";
+import { Bot, Wallet, Pause, Play, Store, Briefcase, ListOrdered, Zap, Send, Brain, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -136,6 +136,28 @@ export function AgentsView() {
       </div>
 
       <BrandedBotCard />
+
+      {/* One-click memory export (Dave, 2026-11-18): members own
+          their memory — one click downloads everything the house
+          store holds for them as an Obsidian-ready markdown file. */}
+      <div className="rounded-2xl border bg-card p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+        <span className="w-10 h-10 rounded-xl bg-primary/12 text-primary grid place-items-center shrink-0">
+          <Brain className="h-5 w-5" />
+        </span>
+        <div className="flex-1 min-w-0">
+          <h2 className="font-semibold">Your memory is yours</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Everything your agents remember about your business, in one file — yours to keep, correct, and
+            take anywhere. It drops straight into Obsidian, and it&apos;s the seed for your own memory stack.
+          </p>
+        </div>
+        <a
+          href="/api/memory/export"
+          className="rounded-xl bg-primary text-primary-foreground px-4 py-2.5 text-sm font-semibold shrink-0 inline-flex items-center gap-1.5 justify-center"
+        >
+          <Download className="h-4 w-4" /> Export my memory
+        </a>
+      </div>
 
       {planInfo ? (
         <Card>
