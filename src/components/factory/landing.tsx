@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowRight, ChevronLeft, ChevronRight, Coins, Link2, Lock, MousePointerClick, Sparkles } from "lucide-react";
+import { ArrowRight, Brain, ChevronLeft, ChevronRight, Coins, Link2, Lock, MousePointerClick, ScanSearch, Sparkles } from "lucide-react";
 import { stashRefFromUrl } from "@/lib/ref-stash";
 import type { BridgePartner } from "@/lib/bridge";
 
@@ -11,7 +11,10 @@ import type { BridgePartner } from "@/lib/bridge";
  * ─── THE LANDING PAGE ────────────────────────────────────────────────
  * Dave's direction (2026-11-17): borrow the Global Content Factory
  * page (his Lovable build) as Whoparmy's front door, gated with Whop
- * connection. Anonymous visitors get this teaser; the working parts
+ * connection. Reworked 2026-11-18 (Dave): sell the END RESULTS —
+ * free content, a free AI audit, persistent memory — and stop
+ * forcing the offers; the offer slider moved to the bottom as an
+ * optional "under the hood" strip. Anonymous visitors get this teaser; the working parts
  * (saving your links, free-generation rewards, the app itself) unlock
  * only after Connect with Whop — any membership, the free Trial
  * included. Attribution (?ref=) is captured here, before connect,
@@ -33,13 +36,34 @@ const STEPS = [
   },
   {
     icon: Link2,
-    title: "Save your links",
-    line: "Drop in your own referral links for the tools below. That first save earns you 25 free generations.",
+    title: "Drop your website",
+    line: "Ralph researches your business — your offer, your customers, your competitors — and learns it. That research powers everything after.",
   },
   {
     icon: Sparkles,
-    title: "Build your engine",
-    line: "Generate memes and content packs in 23 languages, carrying the links that pay you.",
+    title: "Get the results",
+    line: "Your free content and your free audit land, made from what the research found. Your agents remember all of it for next time.",
+  },
+];
+
+// The front door sells END RESULTS, not offers (Dave, 2026-11-18):
+// free content, a free AI audit, persistent memory. The offer stack
+// still exists — it sits at the bottom now, unforced.
+const RESULTS = [
+  {
+    icon: Sparkles,
+    title: "Free content",
+    line: "A week of memes and posts for your business, in your customers' languages — made by bots Ralph dispatches with one tap. You approve; nothing posts itself.",
+  },
+  {
+    icon: ScanSearch,
+    title: "A free AI audit",
+    line: "We deep-research your business and hand you a real pack: your site, your offer, the gaps costing you customers — and the fix list a full assessment would execute.",
+  },
+  {
+    icon: Brain,
+    title: "Persistent memory",
+    line: "Your agents remember your business — every fact, every campaign, every lesson — in one memory they all share. Yours to keep, correct, and take with you.",
   },
 ];
 
@@ -69,14 +93,15 @@ export function LandingPage() {
             Plunder &amp; Riffle — The Global Content Factory
           </p>
           <h1 className="text-4xl sm:text-5xl font-black leading-tight">
-            Don&apos;t just make content.
+            Your business, marketed
             <br />
-            Build a business around it.
+            while you run it.
           </h1>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            One stack of AI tools runs your content — an agent workforce, voices, your own Muse,
-            your storefront. Save <b className="text-foreground">your</b> referral links for each
-            one and every meme you make can carry the links that pay you.
+            Start with three things, all free: <b className="text-foreground">a week of content</b> made
+            for your business, <b className="text-foreground">an AI audit</b> of what&apos;s costing you
+            customers, and <b className="text-foreground">agents that remember your business</b> — so
+            every week starts smarter than the last.
           </p>
           <div className="flex items-center justify-center gap-3 flex-wrap pt-1">
             <Button asChild size="lg">
@@ -93,56 +118,21 @@ export function LandingPage() {
           </p>
         </header>
 
-        <section className="space-y-3">
-          <div className="flex items-center justify-center gap-3">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
-              The stack you&apos;ll own
-            </h2>
-            <div className="flex gap-1">
-              <button
-                onClick={() => slide(-1)}
-                aria-label="Previous offers"
-                className="rounded-full border border-border p-1.5 text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => slide(1)}
-                aria-label="Next offers"
-                className="rounded-full border border-border p-1.5 text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-          {/* The offer slider (Dave, 2026-11-17): one compact card per
-              offer — name, a one-line highlight, and the locked link
-              teaser — in a horizontal snap slider instead of a tall
-              list, so the front door stays short. */}
-          <div
-            ref={sliderRef}
-            className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2 [scrollbar-width:thin]"
-          >
-            {partners.map((p) => (
-              <div
-                key={p.key}
-                className="snap-start shrink-0 w-[248px] rounded-xl border border-border bg-card p-4 space-y-2.5"
-              >
-                <p className="font-bold text-sm">{p.name}</p>
-                <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">{p.blurb}</p>
-                <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground pt-0.5">
-                  <Lock className="h-3.5 w-3.5 shrink-0 text-primary" />
-                  Your link here once you connect
-                </p>
-              </div>
+        <section className="space-y-4">
+          <h2 className="text-sm font-bold text-center uppercase tracking-widest text-muted-foreground">
+            What you get — free
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-3">
+            {RESULTS.map((r) => (
+              <Card key={r.title}>
+                <CardContent className="py-5 space-y-2">
+                  <r.icon className="h-5 w-5 text-primary" />
+                  <p className="font-bold">{r.title}</p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{r.line}</p>
+                </CardContent>
+              </Card>
             ))}
           </div>
-          <p className="text-center text-xs text-muted-foreground">
-            <a href="/api/auth/whop" className="text-primary underline underline-offset-2">
-              Connect with Whop
-            </a>{" "}
-            to save yours — your first save earns 25 free generations.
-          </p>
         </section>
 
         <section id="how" className="space-y-4 scroll-mt-8">
@@ -192,7 +182,59 @@ export function LandingPage() {
           </div>
         </section>
 
-        <footer className="text-center space-y-2 pt-4 border-t border-border/60">
+<section className="space-y-3">
+          <div className="flex items-center justify-center gap-3">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
+              Under the hood — the tools, when you want them
+            </h2>
+            <div className="flex gap-1">
+              <button
+                onClick={() => slide(-1)}
+                aria-label="Previous offers"
+                className="rounded-full border border-border p-1.5 text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => slide(1)}
+                aria-label="Next offers"
+                className="rounded-full border border-border p-1.5 text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+          {/* The offer slider (Dave, 2026-11-17): one compact card per
+              offer — name, a one-line highlight, and the locked link
+              teaser — in a horizontal snap slider instead of a tall
+              list, so the front door stays short. */}
+          <div
+            ref={sliderRef}
+            className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2 [scrollbar-width:thin]"
+          >
+            {partners.map((p) => (
+              <div
+                key={p.key}
+                className="snap-start shrink-0 w-[248px] rounded-xl border border-border bg-card p-4 space-y-2.5"
+              >
+                <p className="font-bold text-sm">{p.name}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">{p.blurb}</p>
+                <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground pt-0.5">
+                  <Lock className="h-3.5 w-3.5 shrink-0 text-primary" />
+                  Your link here once you connect
+                </p>
+              </div>
+            ))}
+          </div>
+          <p className="text-center text-xs text-muted-foreground">
+            <a href="/api/auth/whop" className="text-primary underline underline-offset-2">
+              Connect with Whop
+            </a>{" "}
+            to put your own links on the tools you use — entirely optional, and your first save earns 25 free generations.
+          </p>
+        </section>
+
+                <footer className="text-center space-y-2 pt-4 border-t border-border/60">
           <p className="text-[11px] text-muted-foreground">
             Each referral program has its own terms and payout structure. Commissions aren&apos;t guaranteed.
           </p>
