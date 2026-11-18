@@ -685,3 +685,10 @@ CREATE UNIQUE INDEX "ClaimRedemption_nonce_key" ON "ClaimRedemption"("nonce");
 
 -- CreateIndex
 CREATE INDEX "ClaimRedemption_userId_idx" ON "ClaimRedemption"("userId");
+
+-- CreateTable
+CREATE TABLE "AppSetting" (
+    "key" TEXT NOT NULL PRIMARY KEY,
+    "value" TEXT NOT NULL,
+    "updatedAt" DATETIME NOT NULL
+);

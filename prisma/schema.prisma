@@ -729,3 +729,13 @@ model ClaimRedemption {
 
   @@index([userId])
 }
+
+// ─── App settings (operator-flippable, no redeploy) ─────────────────
+// Tiny key-value store backing the site gate and per-stack status
+// overrides (lib/site-gate.ts, lib/stacks.ts). Keys are namespaced
+// strings ("site:gate", "stack:<id>:status"); values are plain text.
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
