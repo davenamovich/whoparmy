@@ -23,7 +23,16 @@ import { BrandedBotCard } from "@/components/factory/branded-bot-card";
  * through ONE week, beat by beat, before it ever lists a feature:
  * a cold visitor should be able to picture their own Sunday night
  * by the second screen. Dana is an illustrative example, labeled
- * as one — not a testimonial. The three free results stay, framed
+ * as one — not a testimonial.
+ *
+ * Offer correction (Dave, same evening): "We are not giving every
+ * user a week of content — they can get a free before." The free
+ * thing is the /before pack: a spoken pitch + memes personalized
+ * to the visitor's own business, built from the research. A week
+ * of content is the member rhythm (plans / the bridge), never the
+ * universal freebie — the copy says so.
+ *
+ * The three free results stay, framed
  * as what lands in the owner's lap; the machinery stays under the
  * hood at the bottom. Anonymous visitors get this page; the working
  * parts unlock only after Connect with Whop — any membership, the
@@ -47,8 +56,8 @@ const STORY = [
   {
     icon: Sunrise,
     when: "Monday · 7:00 am",
-    title: "A week of content is waiting",
-    line: "Seven days of posts are ready: her muddy-paws special, a before-and-after, the five-star review she can brag about — in English and Spanish, because that's who books her chairs. Dana taps approve over coffee. Nothing ever posts without her tap.",
+    title: "Her free Before pack is waiting",
+    line: "This is the free part, and it's the fun part: a Before pack made about HER shop — a pitchman pitching Dana's grooming like it's the greatest thing on television, plus five memes built from her services, her prices, her reviews. She watches her own business sold back to her, over coffee. That's the sample. No card, no commitment.",
   },
   {
     icon: ScanSearch,
@@ -58,9 +67,9 @@ const STORY = [
   },
   {
     icon: TrendingUp,
-    when: "Next Monday",
-    title: "It starts smarter",
-    line: "The special that booked out last week? Remembered. The post nobody clicked? Retired. Every week starts from everything the last one learned — that's the memory doing its job, quietly, in the background.",
+    when: "If Dana stays",
+    title: "Then the rhythm starts",
+    line: "The Before is what convinces her — and members run on a rhythm: a week of content at a time, approved with one tap, in her customers' languages. The special that booked out last week? Remembered. The post nobody clicked? Retired. Every week starts from everything the last one learned — that's the memory doing its job.",
   },
 ];
 
@@ -72,8 +81,8 @@ const OWNER_JOBS = ["Drop your website", "Tap approve", "Run your business"];
 const RESULTS = [
   {
     icon: Sparkles,
-    title: "Free content",
-    line: "A week of memes and posts for your business, in your customers' languages — made by bots Ralph dispatches with one tap. You approve; nothing posts itself.",
+    title: "A free Before pack",
+    line: "A spoken pitch and memes made about your business — your offer, your prices, your reviews — built from the research. It's the sample that shows you the whole machine, pointed at you. Free for every owner who drops a website.",
   },
   {
     icon: ScanSearch,
@@ -128,10 +137,10 @@ export function LandingPage() {
             Marketing is the job that never makes the to-do list. Here&apos;s the fix: tonight you drop
             your website — <b className="text-foreground">that&apos;s the whole job</b> — and a crew of AI
             bots that learn your business goes to work. By morning there&apos;s{" "}
-            <b className="text-foreground">a week of content</b> waiting for your approval,{" "}
-            <b className="text-foreground">a free audit</b> of what&apos;s costing you customers, and a
-            crew that <b className="text-foreground">remembers your business</b> — so every week starts
-            smarter than the last.
+            <b className="text-foreground">a free Before pack</b> waiting — a pitch and memes made about{" "}
+            <i>your</i> business — plus <b className="text-foreground">a free audit</b> of what&apos;s
+            costing you customers, from a crew that <b className="text-foreground">remembers your
+            business</b> for next time.
           </p>
           <div className="flex items-center justify-center gap-3 flex-wrap pt-1">
             <Button asChild size="lg">
@@ -234,10 +243,11 @@ export function LandingPage() {
         </section>
 
         <section className="rounded-2xl bg-primary text-primary-foreground px-6 py-8 text-center space-y-3">
-          <p className="text-2xl font-black leading-snug">Your first week is free.</p>
+          <p className="text-2xl font-black leading-snug">Your Before pack is free.</p>
           <p className="text-sm opacity-90 max-w-xl mx-auto leading-relaxed">
-            Drop your website tonight, approve your content over tomorrow&apos;s coffee. If the audit
-            doesn&apos;t find something worth fixing, you&apos;ve lost an evening you weren&apos;t using anyway.
+            Drop your website tonight, hear your own business pitched back to you over tomorrow&apos;s
+            coffee. If the audit doesn&apos;t find something worth fixing, you&apos;ve lost an evening
+            you weren&apos;t using anyway.
           </p>
           <Button asChild size="lg" variant="secondary">
             <a href="/api/auth/whop">
