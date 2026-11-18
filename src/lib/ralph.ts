@@ -251,7 +251,7 @@ You may offer ONLY these actions (ids): make_content (open Create), free_audit (
 
 Answer using the member's brand facts and remembered facts below when relevant, and say plainly when you're using something you remembered. Keep replies under 120 words. Reply in the member's language.
 
-Return STRICT JSON only: {"reply": "...", "actions": ["id", ...up to 3], "remember": "one durable business fact the member just told you, or null"}. No markdown fences.`;
+Return STRICT JSON only: {"reply": "...", "actions": ["id", ...up to 3], "remember": "one durable business fact the member just told you, or null"}. No markdown fences. If the member states a durable fact about their business (what they sell, where, who buys, their offer), you MUST put it in "remember" — telling them you'll remember it without setting the field is a lie, and Ralph doesn't lie.`;
 
 export async function ralphFreeText(userId: string, locale: string, text: string, history: { role: string; text: string }[]): Promise<RalphReply> {
   const person = mnemosPersonFor(userId);
@@ -282,7 +282,11 @@ export async function ralphFreeText(userId: string, locale: string, text: string
         if (!reply) continue;
         const actions = (parsed.actions ?? []).filter((a): a is RalphActionId => (RALPH_MENU as string[]).includes(a)).slice(0, 3);
         if (parsed.remember && parsed.remember.trim().length > 3) {
-          void mnemosCapture(person, parsed.remember.trim().slice(0, 500), "Fact the member told Ralph in chat");
+          // Awaited, not fire-and-forget: an un-awaited promise can be
+          // cut when the route response completes, and then Ralph has
+          // told the member "I'll remember" about a fact that never
+          // landed. The capture is quick; honesty is worth the second.
+          await mnemosCapture(person, parsed.remember.trim().slice(0, 500), "Fact the member told Ralph in chat");
         }
         return { text: reply, actions: actions.length ? actions : ["make_content", "free_audit", "memory"] };
       } catch {

@@ -37,6 +37,24 @@ async function callTool(
 ): Promise<string | null> {
   const cfg = bridgeConfig();
   if (!cfg) return null;
+  // One retry: the bridge occasionally drops a connection mid-response
+  // (observed 2026-11-18); a single retry masks it without hiding a
+  // real outage.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const out = await callToolOnce(cfg, person, name, args, timeoutMs);
+    if (out !== null) return out;
+    if (attempt === 0) await new Promise((r) => setTimeout(r, 800));
+  }
+  return null;
+}
+
+async function callToolOnce(
+  cfg: { url: string; token: string },
+  person: string,
+  name: string,
+  args: Record<string, unknown>,
+  timeoutMs: number,
+): Promise<string | null> {
   try {
     const res = await fetch(cfg.url, {
       method: "POST",
