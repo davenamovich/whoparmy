@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "./db";
 import { runBrandAnalysis } from "./brand-research";
+import { mnemosCapture, mnemosPersonFor } from "./mnemos-bridge";
 import type { AnalyzeResponse } from "./types";
 
 /**
@@ -95,6 +96,28 @@ export async function startResearchJob(params: {
         where: { id: job.id },
         data: { status: "done", resultJson: JSON.stringify(result) },
       });
+      // Learn from the deep dive (Dave, 2026-11-18): the distilled
+      // research lands in the member's Mnemos scope, so Ralph, the
+      // bots and the AI assessment all work from the same findings
+      // instead of re-deriving them. Awaited inside this detached
+      // block; a memory outage never fails the research itself.
+      if (result.researched && result.research) {
+        const r = result.research;
+        const lines = [
+          `Deep research on ${params.brandName} (${params.website}):`,
+          r.analysisSummary ? `Summary: ${r.analysisSummary}` : null,
+          r.offer ? `Offer: ${r.offer}` : null,
+          r.audience ? `Audience: ${r.audience}` : null,
+          r.pains.length ? `Customer pains: ${r.pains.join("; ")}` : null,
+          r.angles.length ? `Content angles: ${r.angles.join("; ")}` : null,
+          r.competitors.length ? `Competitors: ${r.competitors.join(", ")}` : null,
+        ].filter(Boolean);
+        await mnemosCapture(
+          mnemosPersonFor(params.userId),
+          lines.join("\n").slice(0, 1800),
+          `Brand deep research for ${params.brandName}`,
+        ).catch(() => false);
+      }
     } catch (err) {
       await db.researchJob
         .update({

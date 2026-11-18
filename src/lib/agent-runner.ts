@@ -239,10 +239,47 @@ export async function runAgentJob(jobId: string): Promise<void> {
       } catch {
         // plain-text brief → the business input itself, as defaulted above
       }
+      // Same data for the assessment (Dave, 2026-11-18): if the house
+      // deep dive already researched this member's brand, the handoff
+      // carries those findings — the member's Muse starts from the
+      // SAME evidence the content engine learned from, and only fills
+      // gaps instead of re-deriving everything.
+      let priorResearch = "";
+      try {
+        const brand = await db.brandProfile.findFirst({
+          where: { userId: job.userId, researchJson: { not: null } },
+          orderBy: { updatedAt: "desc" },
+        });
+        if (brand?.researchJson) {
+          const r = JSON.parse(brand.researchJson) as {
+            analysisSummary?: string;
+            offer?: string;
+            audience?: string;
+            pains?: string[];
+            angles?: string[];
+            competitors?: string[];
+          };
+          const lines = [
+            r.analysisSummary ? `Summary: ${r.analysisSummary}` : null,
+            r.offer ? `Offer: ${r.offer}` : null,
+            r.audience ? `Audience: ${r.audience}` : null,
+            r.pains?.length ? `Customer pains: ${r.pains.join("; ")}` : null,
+            r.angles?.length ? `Content angles: ${r.angles.join("; ")}` : null,
+            r.competitors?.length ? `Competitors: ${r.competitors.join(", ")}` : null,
+          ].filter(Boolean);
+          if (lines.length) {
+            priorResearch =
+              `\n\nOur house deep dive already researched my business — start from THESE findings (they are the same data my content runs on):\n${lines.join("\n")}\n` +
+              `Run research_brand only to fill gaps or verify; do not contradict these findings without fresh evidence.`;
+          }
+        }
+      } catch {
+        // no stored research — the command's own research step covers it
+      }
       const command =
         `You are my Assessor agent, connected to my Plunder & Riffle account through my bridge at whop.plunderandriffle.com. My credits are mine — never ask me for an API key; it stays on the engine side and I will never paste it anywhere. Work and answer in ${languageLabel(job.language)}.\n\n` +
         `1. My bridge code is {BRIDGE_CODE} (one-time, expires in 15 minutes). Exchange it: POST https://whop.plunderandriffle.com/api/bridge/exchange with {"code": "{BRIDGE_CODE}"}. You get a bridge token (7 days) and the MCP URL. Use the token as the Bearer credential for every MCP call through https://whop.plunderandriffle.com/api/bridge/mcp. Never print the token back to me, and never store it past this run.\n` +
-        `2. My business is ${input.slice(0, 1500)}.${product ? ` The product/service to feature is: ${product}.` : ""}${assessmentFit ? ` I already lean toward the ${assessmentFit} assessment — confirm or correct the fit from the evidence, do not just agree.` : ""} Research it first through the bridge MCP (research_brand, then create_campaign_from_research) — both are free. Work only from what the research actually found about my business; invent nothing.\n` +
+        `2. My business is ${input.slice(0, 1500)}.${product ? ` The product/service to feature is: ${product}.` : ""}${assessmentFit ? ` I already lean toward the ${assessmentFit} assessment — confirm or correct the fit from the evidence, do not just agree.` : ""} Research it first through the bridge MCP (research_brand, then create_campaign_from_research) — both are free. Work only from what the research actually found about my business; invent nothing.${priorResearch}\n` +
         `3. Quote me the Assessor run before you spend anything: one create_before_pitch for my business — a personalized /before pack (a 30–50 second audio monologue plus 5 memes about MY business). It reserves 50 credits of my bridge budget and settles at the actual charge. Tell me the expected cost and my remaining balance (get_account through the bridge), and wait for my "go". No go, no spend.\n` +
         `4. On my "go", run create_before_pitch through the bridge${product ? ` with the product pinned` : ""}, polling get_job_status (kind demo_pack) until it is done. Read the finished pack page and the research before writing anything.\n` +
         `5. Write my assessment offer from the pack and the research. ${ASSESS_OFFER_INSTRUCTIONS}\n` +
