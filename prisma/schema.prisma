@@ -46,6 +46,10 @@ model User {
   hiredAgents  HiredAgent[]
   agentJobs    AgentJob[]
   listings     CampaignListing[]
+  doorsSessions DoorsSession[]
+  bidPointEvents BidPointEvent[]
+  keyBids      KeyBid[]
+  keyAuctionWins KeyAuction[] @relation("KeyWins")
 
   // Referral program (30%): every member gets a code; attribution is
   // set once, never overwritten. Earnings accrue in ReferralEarning.
@@ -613,4 +617,98 @@ model TrendDay {
   createdAt  DateTime @default(now())
 
   @@unique([date, lang])
+}
+
+// ─── Who's Calling? Doors — daily doors game (SPEC + Addenda v2/v3) ─────────
+// One session per member per game day (America/New_York, 05:00 ET rollover).
+// The prize assignment is server-only until the game finishes; commitmentHash
+// is shown to the player from the moment they pick their keeper door.
+model DoorsSession {
+  id              String    @id @default(cuid())
+  userId          String
+  gameDate        String // YYYY-MM-DD (ET game day)
+  language        String   @default("en")
+  caller          String // joe | grandma | grandpa | young-mom | college-kid | shop-owner-mike
+  keeperDoor      Int
+  assignment      Json // door index -> prize (server-only until finished)
+  commitmentHash  String
+  state           String   @default("opening") // opening | banker1 | opening2 | banker2 | finished
+  opened          Json     @default("[]") // door indices, in open order
+  offers          Json     @default("[]") // {round, amount, decision}
+  streak          Int      @default(0)
+  bestStreak      Int      @default(0)
+  peeksBanked     Int      @default(0)
+  peeksUsed       Json     @default("[]") // door indices whose band was peeked
+  sweatArmed      Boolean  @default(false) // Banker Sweat earned, applies to next offer
+  calls           Json     @default("[]") // {door, band, correct} — Call It results
+  readGuess       String? // keeper band guessed in Read the Banker
+  result          Json? // {type: deal|keeper|dud, amount, gensAwarded, readBonus}
+  prizeGensAwarded Int     @default(0)
+  createdAt       DateTime @default(now())
+  finishedAt      DateTime?
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, gameDate])
+  @@index([gameDate])
+}
+
+// The day's reveal set per language — generated once per language per day
+// through the P&R engine (or the starter bank), never per player.
+model DoorsDailySet {
+  id        String   @id @default(cuid())
+  gameDate  String
+  language  String
+  memes     Json // [{door, imageUrl, alt, caption, format}]
+  status    String   @default("live") // live | starter | rerun
+  createdAt DateTime @default(now())
+
+  @@unique([gameDate, language])
+}
+
+// Append-only Bid Points ledger (auction currency). Balance = SUM(points).
+// Kinds: REF_FINISH | REF_3DAYS | REF_CLAIM | BID_STAKE | BID_REFUND | BID_BURN
+model BidPointEvent {
+  id        String   @id @default(cuid())
+  userId    String // the earner / bidder
+  points    Int // signed
+  kind      String
+  refUserId String? // the referred member who triggered the event
+  auctionId String?
+  meta      String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([kind, refUserId])
+}
+
+// Weekly auction for one 10,000,000-token OpenAI-compatible key.
+model KeyAuction {
+  id         String    @id @default(cuid())
+  weekKey    String    @unique // e.g. 2026-W47
+  prizeLabel String
+  opensAt    DateTime
+  closesAt   DateTime
+  status     String    @default("OPEN") // OPEN | CLOSED
+  winnerId   String?
+  winningBid Int?
+  closedAt   DateTime?
+  fulfilledAt DateTime? // manual key mint (Addendum v2 §A4)
+  createdAt  DateTime  @default(now())
+  winner     User?     @relation("KeyWins", fields: [winnerId], references: [id], onDelete: SetNull)
+  bids       KeyBid[]
+}
+
+model KeyBid {
+  id        String   @id @default(cuid())
+  auctionId String
+  userId    String
+  points    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  auction   KeyAuction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([auctionId, userId])
+  @@index([auctionId, points])
 }

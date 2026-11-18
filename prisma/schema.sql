@@ -428,6 +428,93 @@ CREATE TABLE "RotatorPlacement" (
     CONSTRAINT "RotatorPlacement_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
+-- CreateTable
+CREATE TABLE "TrendDay" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "date" TEXT NOT NULL,
+    "lang" TEXT NOT NULL,
+    "topicsJson" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- CreateTable
+CREATE TABLE "DoorsSession" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "gameDate" TEXT NOT NULL,
+    "language" TEXT NOT NULL DEFAULT 'en',
+    "caller" TEXT NOT NULL,
+    "keeperDoor" INTEGER NOT NULL,
+    "assignment" JSONB NOT NULL,
+    "commitmentHash" TEXT NOT NULL,
+    "state" TEXT NOT NULL DEFAULT 'opening',
+    "opened" JSONB NOT NULL DEFAULT [],
+    "offers" JSONB NOT NULL DEFAULT [],
+    "streak" INTEGER NOT NULL DEFAULT 0,
+    "bestStreak" INTEGER NOT NULL DEFAULT 0,
+    "peeksBanked" INTEGER NOT NULL DEFAULT 0,
+    "peeksUsed" JSONB NOT NULL DEFAULT [],
+    "sweatArmed" BOOLEAN NOT NULL DEFAULT false,
+    "calls" JSONB NOT NULL DEFAULT [],
+    "readGuess" TEXT,
+    "result" JSONB,
+    "prizeGensAwarded" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "finishedAt" DATETIME,
+    CONSTRAINT "DoorsSession_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "DoorsDailySet" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "gameDate" TEXT NOT NULL,
+    "language" TEXT NOT NULL,
+    "memes" JSONB NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'live',
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- CreateTable
+CREATE TABLE "BidPointEvent" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "points" INTEGER NOT NULL,
+    "kind" TEXT NOT NULL,
+    "refUserId" TEXT,
+    "auctionId" TEXT,
+    "meta" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "BidPointEvent_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "KeyAuction" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "weekKey" TEXT NOT NULL,
+    "prizeLabel" TEXT NOT NULL,
+    "opensAt" DATETIME NOT NULL,
+    "closesAt" DATETIME NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'OPEN',
+    "winnerId" TEXT,
+    "winningBid" INTEGER,
+    "closedAt" DATETIME,
+    "fulfilledAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "KeyAuction_winnerId_fkey" FOREIGN KEY ("winnerId") REFERENCES "User" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "KeyBid" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "auctionId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "points" INTEGER NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "KeyBid_auctionId_fkey" FOREIGN KEY ("auctionId") REFERENCES "KeyAuction" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "KeyBid_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_whopId_key" ON "User"("whopId");
 
@@ -554,15 +641,30 @@ CREATE INDEX "RotatorPlacement_date_idx" ON "RotatorPlacement"("date");
 -- CreateIndex
 CREATE UNIQUE INDEX "RotatorPlacement_userId_partner_key" ON "RotatorPlacement"("userId", "partner");
 
-
--- CreateTable
-CREATE TABLE "TrendDay" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "date" TEXT NOT NULL,
-    "lang" TEXT NOT NULL,
-    "topicsJson" TEXT NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
 -- CreateIndex
 CREATE UNIQUE INDEX "TrendDay_date_lang_key" ON "TrendDay"("date", "lang");
+
+-- CreateIndex
+CREATE INDEX "DoorsSession_gameDate_idx" ON "DoorsSession"("gameDate");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "DoorsSession_userId_gameDate_key" ON "DoorsSession"("userId", "gameDate");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "DoorsDailySet_gameDate_language_key" ON "DoorsDailySet"("gameDate", "language");
+
+-- CreateIndex
+CREATE INDEX "BidPointEvent_userId_idx" ON "BidPointEvent"("userId");
+
+-- CreateIndex
+CREATE INDEX "BidPointEvent_kind_refUserId_idx" ON "BidPointEvent"("kind", "refUserId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "KeyAuction_weekKey_key" ON "KeyAuction"("weekKey");
+
+-- CreateIndex
+CREATE INDEX "KeyBid_auctionId_points_idx" ON "KeyBid"("auctionId", "points");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "KeyBid_auctionId_userId_key" ON "KeyBid"("auctionId", "userId");
+

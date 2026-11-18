@@ -50,6 +50,8 @@ export const XP_VALUES = {
   BOT_RENTED: 75,
   REFERRAL_JOINED: 50,
   REFERRAL_CONVERTED: 150,
+  DOORS_PLAYED: 50,
+  DOORS_JACKPOT: 200,
 } as const;
 
 export type XpKind = keyof typeof XP_VALUES;

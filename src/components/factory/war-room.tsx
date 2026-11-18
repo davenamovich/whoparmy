@@ -10,6 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import type { GameState } from "@/lib/game";
 import type { ReferralState } from "@/lib/referrals";
 import { useTranslations } from "next-intl";
+import { DoorsGame } from "./doors-game";
 
 /**
  * WAR ROOM — the gamified Bifrost layer (HQ screen).
@@ -179,6 +180,8 @@ export function WarRoom() {
           ))}
         </CardContent>
       </Card>
+
+      <DoorsGame />
 
       {referrals ? (
         <Card>
