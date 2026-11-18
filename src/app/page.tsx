@@ -6,16 +6,12 @@ import {
   Sparkles,
   LayoutGrid,
   Library,
-  Fingerprint,
   Swords,
   UserRound,
-  Flame,
   Bot,
   Cpu,
-  TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import type { ProfileDTO } from "@/lib/types";
 import { CreateWizard, type WizardResult } from "@/components/factory/create-wizard";
@@ -49,34 +45,38 @@ type View =
   | "results"
   | "campaigns"
   | "library"
-  | "brands"
-  | "publishing"
   | "army"
   | "agents"
-  | "trending"
   | "llm"
   | "account";
 
-type NavKey = "create" | "campaigns" | "library" | "brands" | "publishing" | "army" | "agents" | "trending" | "llm" | "account";
+type NavKey = "create" | "campaigns" | "library" | "army" | "agents" | "llm" | "account";
 
 // Consolidated menu (Dave, 2026-11-17): fewer doors, same rooms.
 // Meme Studio folded into Create; the War Room folded into Meme
 // Army. The "studio" / "warroom" view keys no longer exist — the
 // components render inside their parent views below.
-const NAV: { key: View; labelKey: NavKey; icon: React.ComponentType<{ className?: string }>; badge?: string }[] = [
+//
+// Nav diet, phase 1 (Dave, 2026-11-18, UI audit): Brands, Trending
+// and Publishing lose their doors too — Brands and Trending are
+// inputs to Create (a brand feeds the wizard; a trend loads Create
+// a Meme) and Publishing is a property of Campaigns, so all three
+// render inside those views now. Permanent nav badges (PRO / NEW /
+// LIVE / OPS) are gone: badges are for state that clears, not
+// decoration (ui-ux-pro-max tab-badge rule).
+const NAV: { key: View; labelKey: NavKey; icon: React.ComponentType<{ className?: string }> }[] = [
   { key: "create", labelKey: "create", icon: Sparkles },
   { key: "campaigns", labelKey: "campaigns", icon: LayoutGrid },
   { key: "library", labelKey: "library", icon: Library },
-  { key: "brands", labelKey: "brands", icon: Fingerprint },
-  { key: "publishing", labelKey: "publishing", icon: Flame },
-  { key: "army", labelKey: "army", icon: Swords, badge: "PRO" },
-  { key: "agents", labelKey: "agents", icon: Bot, badge: "NEW" },
-  { key: "trending", labelKey: "trending", icon: TrendingUp, badge: "LIVE" },
-  { key: "llm", labelKey: "llm", icon: Cpu, badge: "OPS" },
+  { key: "army", labelKey: "army", icon: Swords },
+  { key: "agents", labelKey: "agents", icon: Bot },
+  { key: "llm", labelKey: "llm", icon: Cpu },
   { key: "account", labelKey: "account", icon: UserRound },
 ];
 
-const MOBILE_NAV: View[] = ["create", "agents", "campaigns", "library", "army", "account"];
+// Mobile bottom bar: max 5 (ui-ux-pro-max bottom-nav-limit), the
+// same primary destinations as the sidebar minus Library.
+const MOBILE_NAV: View[] = ["create", "campaigns", "army", "agents", "account"];
 
 export default function Home() {
   const [view, setView] = useState<View>("create");
@@ -229,9 +229,6 @@ export default function Home() {
             >
               <item.icon className="h-4.5 w-4.5 shrink-0" />
               <span className="truncate">{tNav(item.labelKey)}</span>
-              {item.badge ? (
-                <Badge className="ml-auto bg-primary/15 text-primary border-0 text-[9px] px-1.5 py-0">{item.badge}</Badge>
-              ) : null}
             </button>
           ))}
 
@@ -245,7 +242,13 @@ export default function Home() {
         <main className="flex-1 min-w-0 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pb-24 lg:pb-12">
           {view === "create" ? (
             <div className="space-y-12">
+              {/* Nav diet phase 1: Brands lives here now — pick or
+                  research a brand, then the wizard below runs with it. */}
+              <BrandsView onUseInCampaign={startWizardWithBrand} />
               <CreateWizard onCompleted={onWizardCompleted} initialProfile={brandPrefill} initialProfileName={brandPrefillName} />
+              {/* Trending lives here too — its one action loads the
+                  meme studio directly below it. */}
+              <TrendingView onCreateMemes={startMemesFromTrend} />
               <MemeStudio prefill={memePrefill} />
               <VideoStudio />
             </div>
@@ -253,10 +256,15 @@ export default function Home() {
           {view === "results" && resultsCampaignId ? (
             <ResultsWorkspace campaignId={resultsCampaignId} onBack={() => setView("campaigns")} />
           ) : null}
-          {view === "campaigns" ? <CampaignsView onOpen={openResults} onNewCampaign={() => { clearBrandPrefill(); setView("create"); }} /> : null}
+          {view === "campaigns" ? (
+            <div className="space-y-12">
+              <CampaignsView onOpen={openResults} onNewCampaign={() => { clearBrandPrefill(); setView("create"); }} />
+              {/* Publishing folded in (nav diet phase 1): posting
+                  state is a property of the campaigns above. */}
+              <PublishingView />
+            </div>
+          ) : null}
           {view === "library" ? <LibraryView /> : null}
-          {view === "brands" ? <BrandsView onUseInCampaign={startWizardWithBrand} /> : null}
-          {view === "publishing" ? <PublishingView /> : null}
           {view === "army" ? (
             <div className="space-y-12">
               <MemeArmy />
@@ -264,7 +272,6 @@ export default function Home() {
             </div>
           ) : null}
           {view === "agents" ? <AgentsView /> : null}
-          {view === "trending" ? <TrendingView onCreateMemes={startMemesFromTrend} /> : null}
           {view === "llm" && session?.admin ? <LlmConsole /> : null}
           {view === "account" ? <AccountView /> : null}
         </main>
@@ -288,7 +295,7 @@ export default function Home() {
         className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border/60 bg-background/95 backdrop-blur-md pb-safe"
         aria-label="Primary"
       >
-        <div className="grid grid-cols-7">
+        <div className="grid grid-cols-5">
           {NAV.filter((n) => MOBILE_NAV.includes(n.key)).map((item) => (
             <button
               key={item.key}
@@ -303,7 +310,6 @@ export default function Home() {
             >
               <item.icon className="h-5 w-5" />
               <span className="max-w-full truncate px-0.5">{tNav(item.labelKey)}</span>
-              {item.badge ? <span className="absolute top-1.5 right-3 w-1.5 h-1.5 rounded-full bg-primary" /> : null}
             </button>
           ))}
         </div>
