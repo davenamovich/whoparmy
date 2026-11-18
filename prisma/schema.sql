@@ -692,3 +692,36 @@ CREATE TABLE "AppSetting" (
     "value" TEXT NOT NULL,
     "updatedAt" DATETIME NOT NULL
 );
+
+-- CreateTable
+CREATE TABLE "TelegramLink" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "chatId" TEXT NOT NULL,
+    "username" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "TelegramLink_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TelegramLink_userId_key" ON "TelegramLink"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TelegramLink_chatId_key" ON "TelegramLink"("chatId");
+
+-- CreateTable
+CREATE TABLE "TelegramPairCode" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "code" TEXT NOT NULL,
+    "expiresAt" DATETIME NOT NULL,
+    "usedAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "TelegramPairCode_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TelegramPairCode_code_key" ON "TelegramPairCode"("code");
+
+-- CreateIndex
+CREATE INDEX "TelegramPairCode_userId_idx" ON "TelegramPairCode"("userId");

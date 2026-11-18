@@ -25,6 +25,7 @@ import type { UsageSummaryDTO } from "@/lib/types";
 import { useWhopSession, WhopCheckoutButton, type WhopCheckoutUrls } from "./whop-auth";
 import { useTranslations } from "next-intl";
 import { SectionHeader, StatCard } from "./shared";
+import { TelegramLinkCard } from "./telegram-link";
 
 const KIND_LABELS: Record<string, string> = {
   TEXT: "Text generations",
@@ -227,6 +228,8 @@ export function AccountView() {
       />
 
       <WhopConnection />
+
+      <TelegramLinkCard />
 
       {usage === null ? (
         <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground">
