@@ -9,6 +9,8 @@ import { BridgeError, assertBridgeEligible, bridgeOffer, getMemberEngineKey, min
 import { redactBridgeSecrets } from "@/lib/bridge-redact";
 import { museWeekCommand } from "@/lib/muse-week-command";
 import { draftBlueprint, getBlueprint } from "@/lib/blueprint";
+import { dailyBriefing } from "@/lib/briefing";
+import { craftSetupPrompt } from "@/lib/setup-prompt";
 
 /**
  * ─── RALPH — the one-click dispatcher inside Whoparmy ───────────────
@@ -27,6 +29,8 @@ export type RalphActionId =
   | "make_content"
   | "free_audit"
   | "build_system"
+  | "daily_brief"
+  | "day_one"
   | "memory"
   | "trending"
   | "my_bots"
@@ -52,6 +56,8 @@ const LABELS: Record<string, Record<RalphActionId, string>> = {
     make_content: "Make my free content",
     free_audit: "Run my free AI audit",
     build_system: "Build my AI system",
+    daily_brief: "Manager briefing",
+    day_one: "Day-1 setup prompt",
     memory: "What do you remember about my business?",
     trending: "What's trending today?",
     my_bots: "My bots & jobs",
@@ -63,6 +69,8 @@ const LABELS: Record<string, Record<RalphActionId, string>> = {
     make_content: "Crear mi contenido gratis",
     free_audit: "Haz mi auditoría de IA gratis",
     build_system: "Crear mi sistema de IA",
+    daily_brief: "Informe del gerente",
+    day_one: "Prompt de instalación día 1",
     memory: "¿Qué recuerdas de mi negocio?",
     trending: "¿Qué es tendencia hoy?",
     my_bots: "Mis bots y trabajos",
@@ -74,6 +82,8 @@ const LABELS: Record<string, Record<RalphActionId, string>> = {
     make_content: "無料コンテンツを作る",
     free_audit: "無料AI監査を受ける",
     build_system: "AIシステムを作る",
+    daily_brief: "マネージャー報告",
+    day_one: "初日セットアップ",
     memory: "私のビジネスの何を覚えていますか？",
     trending: "今日のトレンドは？",
     my_bots: "マイbotとジョブ",
@@ -85,6 +95,8 @@ const LABELS: Record<string, Record<RalphActionId, string>> = {
     make_content: "Сделать бесплатный контент",
     free_audit: "Запустить бесплатный AI-аудит",
     build_system: "Собрать мою AI-систему",
+    daily_brief: "Сводка менеджера",
+    day_one: "Промпт запуска — день 1",
     memory: "Что ты помнишь о моём бизнесе?",
     trending: "Что сегодня в тренде?",
     my_bots: "Мои боты и задачи",
@@ -98,6 +110,8 @@ export const RALPH_MENU: RalphActionId[] = [
   "make_content",
   "free_audit",
   "build_system",
+  "daily_brief",
+  "day_one",
   "memory",
   "trending",
   "my_bots",
@@ -319,6 +333,49 @@ export async function ralphAction(userId: string, locale: string, actionId: Ralp
         nav: { view: "system" },
       };
     }
+    case "daily_brief": {
+      // The manager briefing (Slice 2): real last-24h activity,
+      // failures named, one recommendation. Read-only.
+      const user = await db.user.findUnique({
+        where: { id: userId },
+        select: { plan: true, whopId: true },
+      });
+      const b = await dailyBriefing({ id: userId, plan: user?.plan ?? "FREE", whopId: user?.whopId ?? null });
+      const lines = [
+        `Last 24 hours: ${b.jobsDone} agent jobs done${b.jobsFailed ? `, ${b.jobsFailed} FAILED` : ""}${b.jobsRunning ? `, ${b.jobsRunning} running or queued` : ""}.`,
+        `${b.assetsMade} assets made, ${b.generations} generations used, ${b.researchDone} research runs finished.`,
+        b.attention.length ? `Needs attention: ${b.attention[0]}` : "Nothing needs attention.",
+        `My recommendation: ${b.recommendation}`,
+      ];
+      return {
+        text: lines.join("\n"),
+        actions: ["build_system", "make_content", "my_bots"],
+        nav: { view: "system" },
+      };
+    }
+    case "day_one": {
+      // Day-1 setup (Dave, 2026-11-19): Ralph crafts the master
+      // prompt + fresh bridge link; the member pastes it to their
+      // own Muse, which builds their agent management UI in
+      // their stack. The full prompt lives in My AI System (too
+      // long for chat); here Ralph hands over the link + summary.
+      // Minting is tap-only — this is a button, never free text.
+      const user = await db.user.findUnique({
+        where: { id: userId },
+        select: { plan: true, whopId: true },
+      });
+      const s = await craftSetupPrompt({ id: userId, plan: user?.plan ?? "FREE", whopId: user?.whopId ?? null });
+      const lines = [
+        "Your Day-1 setup prompt is crafted — it's in My AI System, ready to copy.",
+        "Paste it to your Muse (or any agent you run): it connects through your bridge link, researches your business, builds your agent management UI in your own stack, and wires the workforce from your blueprint. Operating from day 1.",
+      ];
+      if (s.link) {
+        lines.push(`Your fresh connect link (also inside the prompt): ${s.link}`);
+      } else {
+        lines.push("Connect links mint on Operator and Agency — the prompt includes the one step to get yours; everything else in it works today.");
+      }
+      return { text: lines.join("\n\n"), actions: ["build_system", "daily_brief"], nav: { view: "system" } };
+    }
     case "campaigns":
       return {
         text: "Your campaigns — and their publishing state — live here. Taking you over.",
@@ -330,7 +387,7 @@ export async function ralphAction(userId: string, locale: string, actionId: Ralp
 
 const RALPH_SYSTEM = `You are Ralph, the floor manager inside Plunder & Riffle's Whoparmy app. You talk to a small-business owner who rents AI bots that make their marketing content. You are brisk, warm, concrete — a good foreman, not a chatbot. You route work; you never publish, send, or spend anything yourself, and you never promise earnings.
 
-You may offer ONLY these actions (ids): make_content (open Create), free_audit (the free AI audit via The Assessor bot), build_system (their AI-system blueprint — draft it or open My AI System), memory (show what you remember), trending (today's trends), my_bots, my_plan, my_claude (their Muse bridge, on the Account page), campaigns.
+You may offer ONLY these actions (ids): make_content (open Create), free_audit (the free AI audit via The Assessor bot), build_system (their AI-system blueprint — draft it or open My AI System), daily_brief (the manager briefing: last 24h of system activity + one recommendation), day_one (craft the Day-1 setup prompt + bridge link their own Muse uses to build their management UI), memory (show what you remember), trending (today's trends), my_bots, my_plan, my_claude (their Muse bridge, on the Account page), campaigns.
 
 Answer using the member's brand facts and remembered facts below when relevant, and say plainly when you're using something you remembered. Keep replies under 120 words. Reply in the member's language.
 

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getWhopUser } from "@/lib/auth";
 import { getBlueprint, draftBlueprint, approveBlueprint, systemSummary } from "@/lib/blueprint";
+import { launchReport, dailyBriefing } from "@/lib/briefing";
+import { craftSetupPrompt } from "@/lib/setup-prompt";
 
 export const runtime = "nodejs";
 
@@ -14,8 +16,13 @@ export const runtime = "nodejs";
 export async function GET() {
   try {
     const user = await getWhopUser();
-    const [blueprint, summary] = await Promise.all([getBlueprint(user.id), systemSummary(user)]);
-    return NextResponse.json({ blueprint, summary });
+    const [blueprint, summary, report, briefing] = await Promise.all([
+      getBlueprint(user.id),
+      systemSummary(user),
+      launchReport(user),
+      dailyBriefing(user),
+    ]);
+    return NextResponse.json({ blueprint, summary, report, briefing });
   } catch (err) {
     if (err instanceof Error && err.name === "UnauthorizedError") {
       return NextResponse.json({ error: "Sign in required" }, { status: 401 });
@@ -28,6 +35,12 @@ export async function POST(req: NextRequest) {
   try {
     const user = await getWhopUser();
     const body = (await req.json().catch(() => ({}))) as { action?: unknown };
+    if (body.action === "setup") {
+      // Day-1 setup (Dave): Ralph crafts the master prompt + a fresh
+      // bridge connect link; minting retires older unused codes, so
+      // this only ever runs on the member's explicit tap.
+      return NextResponse.json(await craftSetupPrompt(user));
+    }
     if (body.action === "draft") {
       const blueprint = await draftBlueprint(user);
       return NextResponse.json({ blueprint });

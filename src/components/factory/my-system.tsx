@@ -41,20 +41,51 @@ interface Summary {
   generationsLimit: number;
   attention: string[];
 }
+interface Report {
+  systemName: string;
+  objective: string;
+  agents: { name: string; role: string; state: string }[];
+  workflows: { name: string; flow: string }[];
+  schedules: { agent: string; schedule: string }[];
+  autonomy: string;
+  outstanding: string[];
+  costs: string;
+  howTo: string[];
+}
+interface Briefing {
+  jobsDone: number;
+  jobsFailed: number;
+  jobsRunning: number;
+  assetsMade: number;
+  generations: number;
+  researchDone: number;
+  recommendation: string;
+}
 
 export function MySystemView() {
   const [blueprint, setBlueprint] = useState<Bp | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [report, setReport] = useState<Report | null>(null);
+  const [briefing, setBriefing] = useState<Briefing | null>(null);
+  const [setup, setSetup] = useState<{ eligible: boolean; link: string | null; prompt: string } | null>(null);
+  const [busySetup, setBusySetup] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<"draft" | "approve" | null>(null);
 
   const load = useCallback(async () => {
     try {
       const res = await fetch("/api/blueprint");
-      const data = (await res.json().catch(() => ({}))) as { blueprint?: Bp | null; summary?: Summary };
+      const data = (await res.json().catch(() => ({}))) as {
+        blueprint?: Bp | null;
+        summary?: Summary;
+        report?: Report | null;
+        briefing?: Briefing;
+      };
       if (res.ok) {
         setBlueprint(data.blueprint ?? null);
         if (data.summary) setSummary(data.summary);
+        setReport(data.report ?? null);
+        if (data.briefing) setBriefing(data.briefing);
       }
     } catch {
       // leave the empty state; the buttons still work
@@ -66,6 +97,30 @@ export function MySystemView() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function craftSetup() {
+    setBusySetup(true);
+    try {
+      const res = await fetch("/api/blueprint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "setup" }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        eligible?: boolean;
+        link?: string | null;
+        prompt?: string;
+        error?: string;
+      };
+      if (!res.ok || !data.prompt) throw new Error(data.error ?? "Setup failed");
+      setSetup({ eligible: Boolean(data.eligible), link: data.link ?? null, prompt: data.prompt });
+      void load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Setup failed");
+    } finally {
+      setBusySetup(false);
+    }
+  }
 
   async function act(action: "draft" | "approve") {
     setBusy(action);
@@ -113,6 +168,49 @@ export function MySystemView() {
             publishes, sends, or spends still waits for your tap.
           </p>
         </div>
+      </div>
+
+      <div className="rounded-2xl border bg-card p-5 sm:p-6 space-y-3">
+        <p className="font-semibold">Day-1 setup — start with your own Muse</p>
+        <p className="text-sm text-muted-foreground">
+          Ralph crafts one master prompt from your blueprint. Paste it to your Muse (or any agent you
+          run) and it builds your complete agent management UI in your own stack, wires the workforce,
+          and has you operating from day 1. The bridge link rides inside the prompt.
+        </p>
+        {setup ? (
+          <div className="space-y-3">
+            {setup.link ? (
+              <p className="text-sm">
+                Your fresh connect link:{" "}
+                <span className="font-medium break-all">{setup.link}</span>
+                <span className="text-muted-foreground"> — it's inside the prompt too. Crafting a new one retires older unused links.</span>
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Connect links mint on Operator and Agency plans — the prompt includes the one step to
+                get yours. Everything else in it works today.
+              </p>
+            )}
+            <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-xl bg-muted p-4 text-xs leading-relaxed">{setup.prompt}</pre>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => {
+                  void navigator.clipboard.writeText(setup.prompt);
+                  toast.success("Setup prompt copied — paste it to your Muse.");
+                }}
+              >
+                Copy the prompt
+              </Button>
+              <Button variant="outline" onClick={() => void craftSetup()} disabled={busySetup}>
+                {busySetup ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Craft a fresh one
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Button onClick={() => void craftSetup()} disabled={busySetup}>
+            {busySetup ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />} Craft my Day-1 setup prompt
+          </Button>
+        )}
       </div>
 
       {!blueprint ? (
@@ -250,8 +348,63 @@ export function MySystemView() {
               )}
             </div>
           ) : null}
+
+          {report ? (
+            <div className="rounded-2xl border bg-card p-5 sm:p-6 space-y-3">
+              <p className="font-semibold">Launch report — {report.systemName}</p>
+              <div className="space-y-1.5">
+                {report.agents.map((a) => (
+                  <p key={a.name} className="text-sm text-muted-foreground">
+                    <span className="font-medium text-foreground">{a.name}</span> — {a.state}
+                  </p>
+                ))}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">Schedules:</span>{" "}
+                {report.schedules.map((s) => `${s.agent}: ${s.schedule}`).join(" · ")}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">Autonomy:</span> {report.autonomy}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">Costs:</span> {report.costs}
+              </p>
+              {report.outstanding.length ? (
+                <div className="space-y-1.5">
+                  <p className="text-sm font-semibold">Outstanding</p>
+                  {report.outstanding.map((o, i) => (
+                    <p key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                      <TriangleAlert className="h-4 w-4 mt-0.5 shrink-0 text-amber-500" /> {o}
+                    </p>
+                  ))}
+                </div>
+              ) : null}
+              <div className="space-y-1.5">
+                <p className="text-sm font-semibold">How you run it</p>
+                {report.howTo.map((h, i) => (
+                  <p key={i} className="text-sm text-muted-foreground">{h}</p>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
       )}
+
+      {briefing ? (
+        <div className="rounded-2xl border bg-card p-5 sm:p-6 space-y-3">
+          <p className="font-semibold">Manager briefing — last 24 hours</p>
+          <p className="text-sm text-muted-foreground">
+            {briefing.jobsDone} agent jobs done
+            {briefing.jobsFailed ? `, ${briefing.jobsFailed} failed` : ""}
+            {briefing.jobsRunning ? `, ${briefing.jobsRunning} running or queued` : ""} ·{" "}
+            {briefing.assetsMade} assets made · {briefing.generations} generations ·{" "}
+            {briefing.researchDone} research runs finished
+          </p>
+          <p className="text-sm">
+            <span className="font-medium">Ralph's recommendation:</span> {briefing.recommendation}
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }

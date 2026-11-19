@@ -390,8 +390,11 @@ export async function systemSummary(user: { id: string; plan: string; whopId: st
 
   const attention: string[] = [];
   if (!ctx.brandWebsite) attention.push("No website on file — add one in the start card so research (and your agents) have your real material.");
-  if (latestResearch && latestResearch.status !== "DONE" && latestResearch.status !== "COMPLETED") {
-    attention.push(`Your latest deep research is ${latestResearch.status.toLowerCase()} — agents draft better once it lands.`);
+  if (latestResearch && latestResearch.status === "running") {
+    attention.push("Your latest deep research is still running — agents draft better once it lands.");
+  }
+  if (latestResearch && latestResearch.status === "failed") {
+    attention.push("Your latest deep research failed — run it again from Brand Profiles so your agents have real material.");
   }
   const up = ctx.integrations.find((i) => i.key === "upload-post");
   if (up && !up.connected) attention.push("Upload-Post isn't connected — finished content has nowhere to go. Connect it in Account.");
