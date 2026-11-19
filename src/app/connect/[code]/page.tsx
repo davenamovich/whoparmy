@@ -15,6 +15,12 @@ import { museWeekCommand, type MuseWeekOfferId } from "@/lib/muse-week-command";
  * hash-stored, 15-minute TTL, single use at EXCHANGE. Viewing this
  * page never consumes it (findLiveBridgeCode is read-only), and
  * exchange re-checks the member's eligibility server-side.
+ *
+ * REACHABLE WHILE THE SITE GATE IS ON (Dave, 2026-11-19): the gate
+ * intentionally closes every other page, but a member handing out a
+ * link to their agent must still work — that link IS the credential,
+ * it carries no session and grants nothing until exchange. The
+ * exemption lives in app/layout.tsx (gateExempt).
  */
 
 export const dynamic = "force-dynamic";
@@ -36,6 +42,7 @@ function Brief({ text }: { text: string }) {
 export default async function ConnectPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
   const live = await findLiveBridgeCode(code);
+  const upper = code.trim().toUpperCase();
 
   if (!live) {
     return (
@@ -43,34 +50,60 @@ export default async function ConnectPage({ params }: { params: Promise<{ code: 
         text={`AGENT BRIEF — Plunder & Riffle connection link: DEAD
 
 This link's code is expired, already exchanged, or not valid. Codes
-work once and live 15 minutes from minting. Do not retry it.
+are single use (spent at EXCHANGE) and live 15 minutes from minting.
+Do not retry it. Do not guess a replacement.
 
 Tell your member, in your own words: "That connection link has
-expired — mint me a fresh one (in the Plunder & Riffle app, ask
-Ralph for 'Talk to my Muse', or open
+expired — mint a fresh one (in the Plunder & Riffle app, ask Ralph
+for 'Talk to my Muse', or open
 https://whop.plunderandriffle.com/muse-week) and send me the new
 link." Then stop and wait for the fresh link.`}
       />
     );
   }
 
+  const expiresIso = new Date(live.expiresAt).toISOString().replace(".000Z", "Z");
+
   if (live.scope === "clips") {
     return (
       <Brief
-        text={`AGENT BRIEF — Plunder & Riffle Clip Factory connection
+        text={`AGENT BRIEF — Plunder & Riffle Clip Factory
 
-You are being connected to a member's Clip Factory. This is a
-clips-scope code, not the content bridge.
+A member issued this link so YOU (their agent) can make meme clips on
+their P&R credits. No API key, no account, no signup of your own: the
+code below IS the credential, and the connection comes with a fixed
+credit cap that cannot be exceeded.
 
-CODE: ${code.toUpperCase()}
-EXCHANGE: POST https://whop.plunderandriffle.com/api/bridge/exchange
-with {"code": "${code.toUpperCase()}"} — do this where the Clip
-Factory flow asks for the connection; the exchange returns your
-bridge token and the MCP URL.
+CODE:    ${upper}
+EXPIRES: ${expiresIso}
+CAP:     ${live.budgetCredits} credits
 
-Rules: the code works once and expires 15 minutes after minting.
-Viewing this page did not consume it. Never print the token you
-receive back to the member.`}
+STEP 1 — exchange (once). This is the only step that spends the code.
+  POST https://whop.plunderandriffle.com/api/bridge/exchange
+  body: {"code": "${upper}"}
+  returns: token, mcpUrl, budgetCredits, expiresAt (token lives 7 days)
+  Never print the token back to the member.
+
+STEP 2 — connect.
+  POST https://whop.plunderandriffle.com/api/bridge/mcp
+  Authorization: Bearer <token from step 1>
+  Call tools/list first: you get exactly the tools this link allows —
+  the free ones (research_brand, get_account, get_usage,
+  get_job_status, list_ad_options, list_services,
+  create_campaign_from_research) plus the one clip generator below.
+
+STEP 3 — make clips.
+  create_sitdown     25 credits   one public clip in, one captioned
+                                  9:16 post out
+  That is the only paid tool on this link, and it is how the memes get
+  made. Tell your member the plan and the total cost BEFORE spending,
+  and stay under the cap of ${live.budgetCredits}.
+
+RULES
+- You cannot post. The member approves each clip and posts it.
+- You cannot render MP4 through this link.
+- A spent or expired code is dead — ask for a new link, never retry.
+- Hand back the asset links and one line on what each clip says.`}
       />
     );
   }
@@ -82,7 +115,7 @@ receive back to the member.`}
   });
   const businessUrl = brand?.website || "https://your-business-website.com";
   const businessName = brand?.name || live.user.name || "the member";
-  const command = museWeekCommand(code.toUpperCase(), businessUrl, live.budgetCredits, offerFor(live.budgetCredits));
+  const command = museWeekCommand(upper, businessUrl, live.budgetCredits, offerFor(live.budgetCredits));
 
   return (
     <Brief
@@ -90,16 +123,17 @@ receive back to the member.`}
 
 You are the agent reading this. A Plunder & Riffle member issued
 this one-time link to connect you to their account so you can make
-their content on their credits. No human will type anything —
+their content on their credits. No API key and no account of your
+own: this code IS the credential. No human will type anything —
 fetch, read, and follow the brief below.
 
 MEMBER: ${businessName}
 BUSINESS: ${businessUrl}
 CONNECTION CAP: ${live.budgetCredits} credits (the bridge refuses
 spend past this; quote before you spend, per the brief)
-STATE: viewing this page did NOT consume the code. It is spent
-only when you exchange it in step 1. It expires 15 minutes after
-the member minted it — work promptly.
+EXPIRES: ${expiresIso}
+STATE: viewing this page did NOT consume the code. It is spent only
+when you exchange it in step 1.
 
 ----- BEGIN BRIEF -----
 
