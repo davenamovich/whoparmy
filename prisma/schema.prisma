@@ -994,6 +994,15 @@ model PickaphoneSession {
   bankedTokens    Int                @default(0) // Vault Tokens banked from reveals; only ever grows
   pendingOffer    Int? // offer milestone index awaiting a decision
   offers          Json               @default("[]") // {milestone, gens, decision} records
+  streak          Int                @default(0) // current Call It read streak
+  bestStreak      Int                @default(0)
+  peeksBanked     Int                @default(0) // earned Peeks not yet spent (max 2)
+  peeksUsed       Json               @default("[]") // {slot, band} — bands revealed by spent Peeks
+  sweatArmed      Boolean            @default(false) // Host Sweat earned, applies to the next offer
+  calls           Json               @default("[]") // {slot, call, correct} — Call It results
+  readGuess       String? // Final Read lock: "HIGH" | "LOW" (final phone >= 100 VT?)
+  pendingOfferTokens Int?           // effective Vault Token value of the pending offer (Host Sweat applied at presentation)
+  pendingOfferSweat  Boolean        @default(false) // whether Host Sweat was applied to the pending offer
   finalTokens     Int?
   gensAwarded     Int                @default(0)
   claimNonce      String?            @unique // nonce of the minted W1 claim token (mint-once lock)
@@ -1009,7 +1018,7 @@ model PickaphoneSession {
 model PickaphoneEvent {
   id         String             @id @default(cuid())
   sessionId  String
-  type       String // game_start | phone_pick | reveal | offer_presented | offer_accepted | offer_declined | game_finish | claim_minted
+  type       String // game_start | phone_pick | reveal | call_it | peek_earned | peek_used | sweat_earned | sweat_applied | offer_presented | offer_accepted | offer_declined | final_read | game_finish | claim_minted
   payload    Json?
   createdAt  DateTime           @default(now())
   session    PickaphoneSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)

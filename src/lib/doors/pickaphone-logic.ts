@@ -94,6 +94,47 @@ export function tokensPerGen(): number {
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : 23;
 }
 
+export type PickaphoneBand = "LOW" | "HIGH";
+
+// Bands are the Call It skill unit; 9 of 12 phones are LOW, 3 are HIGH.
+export function bandForRarity(rarity: PickaphoneRarity): PickaphoneBand {
+  return rarity === "EPIC" || rarity === "LEGENDARY" ? "HIGH" : "LOW";
+}
+
+export function bandForTokens(tokens: number): PickaphoneBand {
+  return tokens >= 100 ? "HIGH" : "LOW";
+}
+
+export const isBand = (v: unknown): v is PickaphoneBand => v === "LOW" || v === "HIGH";
+
+export const BAND_COUNTS: Record<PickaphoneBand, number> = {
+  LOW: BOARD_COMPOSITION.COMMON + BOARD_COMPOSITION.RARE,
+  HIGH: BOARD_COMPOSITION.EPIC + BOARD_COMPOSITION.LEGENDARY,
+};
+
+// Host Sweat multiplies an offer's token value by 1.10 (at the default rate:
+// 2 gens 46 VT -> 51 VT, 5 gens 115 -> 127, 9 gens 207 -> 228).
+export const SWEAT_MULTIPLIER = 1.1;
+
+export function sweatTokensValue(gens: number): number {
+  return Math.round(gens * tokensPerGen() * SWEAT_MULTIPLIER);
+}
+
+// v2 offers carry an effective token value (sweat may have raised it), so
+// payout compares in tokens.
+export function payoutForOfferTokens(bankedTokens: number, offerTokensValue: number | null): number {
+  return offerTokensValue === null ? bankedTokens : Math.max(bankedTokens, offerTokensValue);
+}
+
+export const FINAL_READ_BONUS_TOKENS = 50;
+export const FINAL_READ_THRESHOLD_TOKENS = 100;
+
+// The Final Read asks whether the last phone holds EPIC-or-better (>= 100 VT);
+// a correct read adds FINAL_READ_BONUS_TOKENS to the payout, a wrong one costs nothing.
+export function scoreFinalRead(guess: PickaphoneBand, finalPhoneTokens: number): boolean {
+  return (guess === "HIGH") === (finalPhoneTokens >= FINAL_READ_THRESHOLD_TOKENS);
+}
+
 export const gensForTokens = (tokens: number): number => Math.max(0, Math.floor(tokens / tokensPerGen()));
 
 export function offerAt(revealsCompleted: number): { index: number; milestone: OfferMilestone } | null {

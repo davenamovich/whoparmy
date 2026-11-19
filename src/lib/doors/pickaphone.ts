@@ -5,14 +5,21 @@ import { db } from "@/lib/db";
 import { mintClaimToken } from "@/lib/claims";
 import {
   assetById,
+  bandForRarity,
+  BAND_COUNTS,
   drawBoard,
+  FINAL_READ_BONUS_TOKENS,
+  FINAL_READ_THRESHOLD_TOKENS,
   gensForTokens,
+  isBand,
   isSlot,
   OFFER_MILESTONES,
   offerAt,
-  payoutTokens,
+  payoutForOfferTokens,
   PICKAPHONE_PHONE_COUNT,
   RARITY_TOKENS,
+  scoreFinalRead,
+  sweatTokensValue,
   tokensPerGen,
 } from "./pickaphone-logic";
 
@@ -56,13 +63,37 @@ function boardReveal(assignment: string[]) {
   });
 }
 
+function skillSnapshot(session: { streak: number; bestStreak: number; peeksBanked: number; peeksUsed: unknown; sweatArmed: boolean; readGuess: string | null }) {
+  return {
+    streak: session.streak,
+    bestStreak: session.bestStreak,
+    peeksBanked: session.peeksBanked,
+    peeksUsed: (session.peeksUsed as { slot: number; band: string }[]) ?? [],
+    sweatArmed: session.sweatArmed,
+    readGuess: session.readGuess,
+  };
+}
+
+function finalReadFor(session: { readGuess: string | null; picks: unknown; assignment: unknown }) {
+  if (!isBand(session.readGuess)) return null;
+  const picks = session.picks as number[];
+  const assignment = session.assignment as string[];
+  const unopened = Array.from({ length: PICKAPHONE_PHONE_COUNT }, (_, slot) => slot).filter((slot) => !picks.includes(slot));
+  const finalSlot = unopened.length === 1 ? unopened[0] : picks.length === PICKAPHONE_PHONE_COUNT ? picks[picks.length - 1] : null;
+  if (finalSlot == null) return null;
+  const finalAsset = assetById(assignment[finalSlot]!) ?? fail("board_corrupt", 500);
+  const finalPhoneTokens = RARITY_TOKENS[finalAsset.rarity];
+  const correct = scoreFinalRead(session.readGuess, finalPhoneTokens);
+  return { guess: session.readGuess, correct, bonusTokens: correct ? FINAL_READ_BONUS_TOKENS : 0, finalPhoneTokens };
+}
+
 function finishPayload(session: {
   commitmentHash: string;
   assignment: unknown;
   finalTokens: number | null;
   gensAwarded: number;
   claimToken: string | null;
-}) {
+}, finalRead: ReturnType<typeof finalReadFor>) {
   const assignment = session.assignment as string[];
   return {
     state: "finished" as const,
@@ -74,6 +105,7 @@ function finishPayload(session: {
       : null,
     commitmentHash: session.commitmentHash,
     board: boardReveal(assignment),
+    finalRead,
   };
 }
 
@@ -98,12 +130,15 @@ export async function createPickaphoneSession() {
       perks: offer.perks,
       tokensValue: offer.gens * tokensPerGen(),
     })),
+    skill: { streak: 0, bestStreak: 0, peeksBanked: 0, peeksUsed: [], sweatArmed: false, readGuess: null },
+    bands: { lowCount: BAND_COUNTS.LOW, highCount: BAND_COUNTS.HIGH, lowMaxTokens: 25, highMinTokens: FINAL_READ_THRESHOLD_TOKENS },
   };
 }
 
-export async function pickPickaphonePhone(sessionId: unknown, slot: unknown) {
+export async function pickPickaphonePhone(sessionId: unknown, slot: unknown, call?: unknown) {
   if (typeof sessionId !== "string" || !sessionId) fail("invalid_pick");
   if (!isSlot(slot)) fail("invalid_pick");
+  if (call !== undefined && call !== null && !isBand(call)) fail("invalid_call");
   const session = await pickaphoneDb.pickaphoneSession.findUnique({ where: { id: sessionId } });
   if (!session) fail("session_not_found", 404);
   if (session.state === "finished") fail("game_finished");
@@ -118,12 +153,34 @@ export async function pickPickaphonePhone(sessionId: unknown, slot: unknown) {
   const tokens = RARITY_TOKENS[asset.rarity];
   const newPicks = [...picks, pickSlot];
   const newBanked = session.bankedTokens + tokens;
+  let streak = session.streak;
+  let bestStreak = session.bestStreak;
+  let peeksBanked = session.peeksBanked;
+  let sweatArmed = session.sweatArmed;
+  const calls = [...((session.calls as unknown[]) ?? [])];
+  let peekEarned = false;
+  let sweatEarned = false;
+  const callResult = isBand(call) ? (() => {
+    const correct = bandForRarity(asset.rarity) === call;
+    if (correct) {
+      streak += 1;
+      bestStreak = Math.max(bestStreak, streak);
+      if (streak === 2 && peeksBanked < 2) { peeksBanked += 1; peekEarned = true; }
+      if (streak === 3 && !sweatArmed) { sweatArmed = true; sweatEarned = true; }
+    } else streak = 0;
+    calls.push({ slot: pickSlot, call, correct });
+    return { call, correct, streak };
+  })() : null;
   const milestone = offerAt(newPicks.length);
   const nextState = milestone ? "offer" : "playing";
   const pendingOffer = nextState === "offer" && milestone ? milestone.index : null;
+  const baseTokensValue = milestone ? milestone.milestone.gens * tokensPerGen() : null;
+  let tokensValue = baseTokensValue;
+  let sweatApplied = false;
+  if (milestone && sweatArmed) { tokensValue = sweatTokensValue(milestone.milestone.gens); sweatApplied = true; sweatArmed = false; }
   const claim = await pickaphoneDb.pickaphoneSession.updateMany({
     where: { id: session.id, version: session.version },
-    data: { picks: newPicks, bankedTokens: newBanked, state: nextState, pendingOffer, version: { increment: 1 } },
+    data: { picks: newPicks, bankedTokens: newBanked, state: nextState, pendingOffer, calls, streak, bestStreak, peeksBanked, sweatArmed, pendingOfferTokens: nextState === "offer" ? tokensValue : null, pendingOfferSweat: nextState === "offer" ? sweatApplied : false, version: { increment: 1 } },
   });
   if (claim.count !== 1) fail("stale_state");
 
@@ -132,6 +189,10 @@ export async function pickPickaphonePhone(sessionId: unknown, slot: unknown) {
   if (milestone && nextState === "offer") {
     await logEvent(session.id, "offer_presented", { milestone: milestone.index, gens: milestone.milestone.gens });
   }
+  if (callResult) await logEvent(session.id, "call_it", { slot: pickSlot, call: callResult.call, correct: callResult.correct, streak: callResult.streak });
+  if (peekEarned) await logEvent(session.id, "peek_earned", { streak });
+  if (sweatEarned) await logEvent(session.id, "sweat_earned", { streak });
+  if (sweatApplied) await logEvent(session.id, "sweat_applied", { milestone: milestone!.index, gens: milestone!.milestone.gens, baseTokensValue, tokensValue });
   const revealPayload = {
     slot: pickSlot,
     asset: { id: asset.id, file: asset.file, type: asset.type, caption: asset.caption, category: asset.category },
@@ -141,14 +202,51 @@ export async function pickPickaphonePhone(sessionId: unknown, slot: unknown) {
     picksCount: newPicks.length,
     state: nextState,
     offer: milestone && nextState === "offer"
-      ? { index: milestone.index, afterReveals: milestone.milestone.afterReveals, gens: milestone.milestone.gens, perks: milestone.milestone.perks, tokensValue: milestone.milestone.gens * tokensPerGen() }
+      ? { index: milestone.index, afterReveals: milestone.milestone.afterReveals, gens: milestone.milestone.gens, perks: milestone.milestone.perks, tokensValue, baseTokensValue, sweatApplied }
       : null,
+    callResult,
+    skill: skillSnapshot({ streak, bestStreak, peeksBanked, peeksUsed: session.peeksUsed, sweatArmed, readGuess: session.readGuess }),
+    rewards: { peekEarned, sweatEarned },
     finished: null as ReturnType<typeof finishPayload> | null,
   };
   if (newPicks.length === PICKAPHONE_PHONE_COUNT) {
     return { ...revealPayload, finished: await finishPickaphoneSession(session.id, null) };
   }
   return revealPayload;
+}
+
+export async function peekPickaphonePhone(sessionId: unknown, slot: unknown) {
+  if (typeof sessionId !== "string" || !sessionId) fail("invalid_pick");
+  if (!isSlot(slot)) fail("invalid_pick");
+  const session = await pickaphoneDb.pickaphoneSession.findUnique({ where: { id: sessionId } });
+  if (!session) fail("session_not_found", 404);
+  if (session.state === "finished") fail("game_finished");
+  const peekSlot = slot as number;
+  const picks = (session.picks as number[]) ?? [];
+  if (picks.includes(peekSlot)) fail("already_picked");
+  const used = (session.peeksUsed as { slot: number; band: string }[]) ?? [];
+  if (used.some((peek) => peek.slot === peekSlot)) fail("already_peeked");
+  if (session.peeksBanked <= 0) fail("no_peeks");
+  const asset = assetById((session.assignment as string[])[peekSlot]!) ?? fail("board_corrupt", 500);
+  const band = bandForRarity(asset.rarity);
+  const nextUsed = [...used, { slot: peekSlot, band }];
+  const claim = await pickaphoneDb.pickaphoneSession.updateMany({ where: { id: session.id, version: session.version }, data: { peeksBanked: session.peeksBanked - 1, peeksUsed: nextUsed, version: { increment: 1 } } });
+  if (claim.count !== 1) fail("stale_state");
+  await logEvent(session.id, "peek_used", { slot: peekSlot, band });
+  return { slot: peekSlot, band, skill: skillSnapshot({ ...session, peeksBanked: session.peeksBanked - 1, peeksUsed: nextUsed }) };
+}
+
+export async function lockPickaphoneFinalRead(sessionId: unknown, guess: unknown) {
+  if (typeof sessionId !== "string" || !sessionId) fail("session_not_found", 404);
+  if (!isBand(guess)) fail("invalid_read");
+  const session = await pickaphoneDb.pickaphoneSession.findUnique({ where: { id: sessionId } });
+  if (!session) fail("session_not_found", 404);
+  if (session.state === "finished") fail("game_finished");
+  if (!(session.state === "offer" && session.pendingOffer === OFFER_MILESTONES.length - 1)) fail("no_final_read_now");
+  if (session.readGuess != null) fail("read_locked");
+  const claim = await pickaphoneDb.pickaphoneSession.updateMany({ where: { id: session.id, version: session.version, readGuess: null }, data: { readGuess: guess, version: { increment: 1 } } });
+  if (claim.count !== 1) fail("read_locked");
+  return { ok: true as const, readGuess: guess };
 }
 
 export async function decidePickaphoneOffer(sessionId: unknown, take: unknown) {
@@ -158,23 +256,26 @@ export async function decidePickaphoneOffer(sessionId: unknown, take: unknown) {
   if (session.state !== "offer" || session.pendingOffer === null) fail("no_offer_now");
   const milestone = OFFER_MILESTONES[session.pendingOffer];
   if (!milestone) fail("board_corrupt", 500);
-  const offers = [...((session.offers as unknown[]) ?? []), { milestone: session.pendingOffer, gens: milestone.gens, decision: take ? "take_it" : "keep_playing" }];
+  const effectiveTokensValue = session.pendingOfferTokens ?? milestone.gens * tokensPerGen();
+  const offers = [...((session.offers as unknown[]) ?? []), { milestone: session.pendingOffer, gens: milestone.gens, tokensValue: effectiveTokensValue, sweatApplied: session.pendingOfferSweat, decision: take ? "take_it" : "keep_playing" }];
   const claim = await pickaphoneDb.pickaphoneSession.updateMany({
     where: { id: session.id, version: session.version },
-    data: { offers, pendingOffer: null, state: "playing", version: { increment: 1 } },
+    data: { offers, pendingOffer: null, pendingOfferTokens: null, pendingOfferSweat: false, state: "playing", version: { increment: 1 } },
   });
   if (claim.count !== 1) fail("stale_state");
   await logEvent(session.id, take ? "offer_accepted" : "offer_declined", { milestone: session.pendingOffer, gens: milestone.gens });
-  if (take) return { decision: "take_it" as const, finished: await finishPickaphoneSession(session.id, milestone.gens) };
-  return { decision: "keep_playing" as const, state: "playing" as const, bankedTokens: session.bankedTokens, picksCount: (session.picks as number[]).length, finished: null };
+  if (take) return { decision: "take_it" as const, finished: await finishPickaphoneSession(session.id, effectiveTokensValue) };
+  return { decision: "keep_playing" as const, state: "playing" as const, bankedTokens: session.bankedTokens, picksCount: (session.picks as number[]).length, skill: skillSnapshot(session), finished: null };
 }
 
-export async function finishPickaphoneSession(sessionId: string, acceptedOfferGens: number | null) {
+export async function finishPickaphoneSession(sessionId: string, acceptedOfferTokens: number | null) {
   let session = await pickaphoneDb.pickaphoneSession.findUnique({ where: { id: sessionId } });
   if (!session) fail("session_not_found", 404);
-  if (session.state === "finished") return finishPayload(session);
+  if (session.state === "finished") return finishPayload(session, finalReadFor(session));
   if (session.state === "offer") fail("offer_pending");
-  const finalTokens = payoutTokens(session.bankedTokens, acceptedOfferGens);
+  const finalRead = finalReadFor(session);
+  const basePayout = payoutForOfferTokens(session.bankedTokens, acceptedOfferTokens);
+  const finalTokens = basePayout + (finalRead?.bonusTokens ?? 0);
   const gens = gensForTokens(finalTokens);
   let token: string | null = null;
   let nonce: string | null = null;
@@ -196,14 +297,15 @@ export async function finishPickaphoneSession(sessionId: string, acceptedOfferGe
   });
   if (result.count !== 1) {
     session = await pickaphoneDb.pickaphoneSession.findUnique({ where: { id: sessionId } });
-    if (session?.state === "finished") return finishPayload(session);
+    if (session?.state === "finished") return finishPayload(session, finalReadFor(session));
     fail("stale_state");
   }
   session = await pickaphoneDb.pickaphoneSession.findUnique({ where: { id: sessionId } });
   if (!session) fail("session_not_found", 404);
-  await logEvent(session.id, "game_finish", { finalTokens, gensAwarded: gens, acceptedOfferGens });
+  await logEvent(session.id, "game_finish", { finalTokens, gensAwarded: gens, acceptedOfferTokens });
+  if (finalRead) await logEvent(session.id, "final_read", finalRead);
   if (token) await logEvent(session.id, "claim_minted", { gens });
-  return finishPayload(session);
+  return finishPayload(session, finalRead);
 }
 
 export async function bankPickaphoneSession(sessionId: unknown) {

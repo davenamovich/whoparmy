@@ -59,6 +59,15 @@ const ADDITIVE_COLUMNS: Array<{ table: string; column: string; ddl: string }> = 
   { table: "DoorsSession", column: "version", ddl: 'ALTER TABLE "DoorsSession" ADD COLUMN "version" INTEGER NOT NULL DEFAULT 0' },
   { table: "ClipJob", column: "fundingLane", ddl: 'ALTER TABLE "ClipJob" ADD COLUMN "fundingLane" TEXT' },
   { table: "ClipJob", column: "grantId", ddl: 'ALTER TABLE "ClipJob" ADD COLUMN "grantId" TEXT' },
+  { table: "PickaphoneSession", column: "streak", ddl: 'ALTER TABLE "PickaphoneSession" ADD COLUMN "streak" INTEGER NOT NULL DEFAULT 0' },
+  { table: "PickaphoneSession", column: "bestStreak", ddl: 'ALTER TABLE "PickaphoneSession" ADD COLUMN "bestStreak" INTEGER NOT NULL DEFAULT 0' },
+  { table: "PickaphoneSession", column: "peeksBanked", ddl: 'ALTER TABLE "PickaphoneSession" ADD COLUMN "peeksBanked" INTEGER NOT NULL DEFAULT 0' },
+  { table: "PickaphoneSession", column: "peeksUsed", ddl: 'ALTER TABLE "PickaphoneSession" ADD COLUMN "peeksUsed" TEXT NOT NULL DEFAULT \'[]\'' },
+  { table: "PickaphoneSession", column: "sweatArmed", ddl: 'ALTER TABLE "PickaphoneSession" ADD COLUMN "sweatArmed" BOOLEAN NOT NULL DEFAULT false' },
+  { table: "PickaphoneSession", column: "calls", ddl: 'ALTER TABLE "PickaphoneSession" ADD COLUMN "calls" TEXT NOT NULL DEFAULT \'[]\'' },
+  { table: "PickaphoneSession", column: "readGuess", ddl: 'ALTER TABLE "PickaphoneSession" ADD COLUMN "readGuess" TEXT' },
+  { table: "PickaphoneSession", column: "pendingOfferTokens", ddl: 'ALTER TABLE "PickaphoneSession" ADD COLUMN "pendingOfferTokens" INTEGER' },
+  { table: "PickaphoneSession", column: "pendingOfferSweat", ddl: 'ALTER TABLE "PickaphoneSession" ADD COLUMN "pendingOfferSweat" BOOLEAN NOT NULL DEFAULT false' },
 ];
 for (const { table, column, ddl } of ADDITIVE_COLUMNS) {
   const cols = db.query(`PRAGMA table_info("${table}")`).all() as Array<{ name: string }>;
