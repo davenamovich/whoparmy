@@ -44,6 +44,10 @@ const PUBLIC_API_PREFIXES = [
   // (x-panel-key vs PANEL_RUNNER_KEY), checked inside the handler.
   // The member-facing /api/panel stays behind the session floor.
   "/api/panel/runner",
+  // The public game API carries its own credential (the server-held session
+  // id); picks are validated server-side and claim minting is server-only, so
+  // the auth floor must not block anonymous players (routes reject bad sessions themselves).
+  "/api/doors/pickaphone",
 ];
 
 // Same value as SESSION_COOKIE in lib/whop.ts — duplicated because

@@ -981,3 +981,39 @@ model TelegramPairCode {
 
   @@index([userId])
 }
+
+// ─── Pick a Phone (public game) ─────────────────────────────────────
+// Anonymous public game sessions keep their assignment server-only until
+// the game finishes; events provide the append-only audit trail.
+model PickaphoneSession {
+  id              String             @id @default(cuid())
+  assignment      Json // phone slot (0-11) -> library asset id; server-only until finished
+  commitmentHash  String
+  state           String             @default("playing") // playing | offer | finished
+  picks           Json               @default("[]") // slot indices in pick order
+  bankedTokens    Int                @default(0) // Vault Tokens banked from reveals; only ever grows
+  pendingOffer    Int? // offer milestone index awaiting a decision
+  offers          Json               @default("[]") // {milestone, gens, decision} records
+  finalTokens     Int?
+  gensAwarded     Int                @default(0)
+  claimNonce      String?            @unique // nonce of the minted W1 claim token (mint-once lock)
+  claimToken      String? // the minted token, returned to the player exactly at finish
+  version         Int                @default(0) // optimistic-concurrency claim, same pattern as DoorsSession
+  createdAt       DateTime           @default(now())
+  finishedAt      DateTime?
+  events          PickaphoneEvent[]
+
+  @@index([createdAt])
+}
+
+model PickaphoneEvent {
+  id         String             @id @default(cuid())
+  sessionId  String
+  type       String // game_start | phone_pick | reveal | offer_presented | offer_accepted | offer_declined | game_finish | claim_minted
+  payload    Json?
+  createdAt  DateTime           @default(now())
+  session    PickaphoneSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([type])
+}
