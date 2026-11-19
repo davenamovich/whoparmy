@@ -7,6 +7,9 @@ import { Flame, RefreshCcw, ExternalLink, Zap, Bot } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ReplyGuyButton } from "./reply-guy";
+
+const X_POST_RE = /^https:\/\/(x\.com|twitter\.com)\/[^/]+\/status\/\d+/;
 
 /**
  * TRENDING — the day's default topics.
@@ -76,8 +79,9 @@ export function TrendingView({ onCreateMemes }: { onCreateMemes: (brief: string)
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             What's moving today, a viral headline written for each — and one click loads any of them into
-            Create a Meme, ready to generate. Today's topics are set once for the day, so every refresh shows
-            the same wire. A fresh set lands tomorrow.
+            Create a Meme, ready to generate. On X posts, Reply Guy goes further: it reads the post, writes
+            your reply, makes the meme, and posts the reply in one click. Today's topics are set once for
+            the day, so every refresh shows the same wire. A fresh set lands tomorrow.
           </p>
         </div>
         <Button variant="outline" size="sm" className="ml-auto" disabled={refreshing} onClick={() => void load()}>
@@ -85,7 +89,12 @@ export function TrendingView({ onCreateMemes }: { onCreateMemes: (brief: string)
         </Button>
       </div>
       {updatedAt ? (
-        <p className="text-[11px] text-muted-foreground">Today's topics set {new Date(updatedAt).toLocaleTimeString()} · Sources: Google Trends + Google News · Headlines by the Scout tier</p>
+        <p className="text-[11px] text-muted-foreground">
+          Today's topics set {new Date(updatedAt).toLocaleTimeString()} ·{" "}
+          {topics?.some((t) => t.source.startsWith("X"))
+            ? "Sources: X posts, read and verified · Reply Guy rides them with a meme"
+            : "Sources: Google Trends + Google News · Headlines by the Scout tier"}
+        </p>
       ) : null}
 
       {error ? (
@@ -105,7 +114,7 @@ export function TrendingView({ onCreateMemes }: { onCreateMemes: (brief: string)
                 <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                   <span className="font-black text-foreground/60">#{i + 1}</span>
                   {t.traffic ? (
-                    <Badge className="bg-red-500/15 text-red-500 border-0 text-[10px]">{t.traffic} searches</Badge>
+                    <Badge className="bg-red-500/15 text-red-500 border-0 text-[10px]">{t.source.startsWith("X") ? t.traffic : `${t.traffic} searches`}</Badge>
                   ) : null}
                   <span>{t.source}</span>
                   {t.publishedAt ? <span>· {new Date(t.publishedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span> : null}
@@ -120,6 +129,7 @@ export function TrendingView({ onCreateMemes }: { onCreateMemes: (brief: string)
                   <Zap className="h-3.5 w-3.5 mr-1" />
                   Create memes from this headline
                 </Button>
+                {X_POST_RE.test(t.link) ? <ReplyGuyButton topic={t} /> : null}
               </CardContent>
             </Card>
           ))}

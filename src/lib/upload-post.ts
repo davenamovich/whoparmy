@@ -190,6 +190,10 @@ export interface UpPostInput {
   text: string;
   firstComment?: string;
   scheduledDate?: string;
+  /** X only: post as a reply to this tweet id (Upload-Post
+   *  reply_to_id — supported on upload, upload_photos, upload_text
+   *  per the provider docs). Powers the Reply Guy. */
+  replyToId?: string;
 }
 
 const MAX_MEDIA_BYTES = 200 * 1024 * 1024;
@@ -208,6 +212,7 @@ export async function upPost(apiKey: string, input: UpPostInput): Promise<unknow
     form.set("text", input.text);
     if (firstComment) form.set("first_comment", firstComment);
     if (input.scheduledDate) form.set("scheduled_date", input.scheduledDate);
+    if (input.replyToId) form.set("reply_to_id", input.replyToId);
     return upFetch(apiKey, "/upload_text", { method: "POST", body: form });
   }
 
@@ -229,6 +234,7 @@ export async function upPost(apiKey: string, input: UpPostInput): Promise<unknow
   form.set("title", input.text);
   if (firstComment) form.set("first_comment", firstComment);
   if (input.scheduledDate) form.set("scheduled_date", input.scheduledDate);
+  if (input.replyToId) form.set("reply_to_id", input.replyToId);
   if (input.kind === "video") {
     form.append("video", blob, filename);
     return upFetch(apiKey, "/upload", { method: "POST", body: form });
