@@ -43,6 +43,28 @@ export const VIDEO_FORMATS = [
 ] as const;
 export type VideoFormat = (typeof VIDEO_FORMATS)[number];
 
+/**
+ * AUDIO GATE (Dave, 2026-11-18): "Limit generation with audio to
+ * BYOK only — those cost more than a $0.01." Engine credits are
+ * flat, but a generated voice track carries a real per-call audio
+ * cost the house key absorbs. Formats that generate audio:
+ * BEFORE_PACK (the /before monologue is TTS-voiced — bot code:
+ * "TTS (auto-voiced)"), BEST_OF and FUNNEL (both sold in this app
+ * as "voiced" formats). These three never run on the house lane;
+ * the member makes them on their own key via the Muse connection
+ * (/muse-week), where demo packs already run on member credits.
+ * Sitdown previews, scroll, infomercial (rides an existing pack's
+ * audio, free) and follow-up generate no new audio and stay.
+ */
+export const AUDIO_FORMATS: readonly VideoFormat[] = ["BEFORE_PACK", "BEST_OF", "FUNNEL"];
+
+export function isAudioFormat(format: VideoFormat): boolean {
+  return (AUDIO_FORMATS as readonly string[]).includes(format);
+}
+
+export const BYOK_AUDIO_MESSAGE =
+  "This format generates a voice track, and audio costs more than the 1-credit house lane covers — so voiced formats are BYOK-only. Make it from your own Muse instead: open the Muse connection (/muse-week) and ask for it there; it runs on your own key and credits there.";
+
 export const VIDEO_FORMAT_LABELS: Record<VideoFormat, string> = {
   BEST_OF: "Best-of reel",
   RIDICULOUS: "Ridiculous — Joe reaction show",
@@ -252,6 +274,9 @@ async function runVideoJob(jobId: string): Promise<void> {
 
 /** Create a video job and kick its detached run. Returns the row instantly. */
 export async function startVideoJob(userId: string, format: VideoFormat, params: Record<string, unknown>) {
+  // The audio gate holds at the choke point — the member API, the
+  // agent runner, and any future caller all pass through here.
+  if (isAudioFormat(format)) throw new Error(BYOK_AUDIO_MESSAGE);
   const staleBefore = new Date(Date.now() - 12 * 60_000);
   await db.videoJob
     .updateMany({

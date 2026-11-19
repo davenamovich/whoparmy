@@ -42,11 +42,11 @@ interface SourceDTO {
 
 const FORMAT_INFO: Record<string, { hint: string; cost: string }> = {
   RIDICULOUS: { hint: "A ~30s Jobless Joe reaction episode roasting your topic.", cost: "1 credit" },
-  BEST_OF: { hint: "1–5 single meme pages or media links count down in one voiced reel.", cost: "1 credit" },
+  BEST_OF: { hint: "1–5 single meme pages or media links count down in one voiced reel.", cost: "BYOK only — voiced" },
   NEWS: { hint: "Joe News from live sources — desk or TV, 45–120s.", cost: "1 credit" },
   PRESENT: { hint: "A 16:9 Joe presentation on your topic.", cost: "1 credit" },
-  BEFORE_PACK: { hint: "Joe's welcome + five custom examples for one business.", cost: "1 credit" },
-  FUNNEL: { hint: "One offer link becomes voiced content whose CTA is that link.", cost: "2–3 credits" },
+  BEFORE_PACK: { hint: "Joe's voiced welcome + five custom examples for one business.", cost: "BYOK only — voiced" },
+  FUNNEL: { hint: "One offer link becomes voiced content whose CTA is that link.", cost: "BYOK only — voiced" },
   SCROLL: { hint: "A ~20s scroll video of a finished Before pack's examples.", cost: "Free preview" },
   INFOMERCIAL: { hint: "A ~30s retro infomercial of a finished Before pack's memes.", cost: "Free preview" },
   FOLLOWUP: { hint: "Another post rebuilt from a finished job's script — nothing new invented.", cost: "1 credit" },
@@ -54,6 +54,16 @@ const FORMAT_INFO: Record<string, { hint: string; cost: string }> = {
 
 const selectCls = "h-9 rounded-md border border-input bg-background px-2 text-sm";
 const labelCls = "text-xs font-medium text-muted-foreground";
+
+/** Voiced formats are BYOK-only (Dave, 2026-11-18) — mirrors
+ *  AUDIO_FORMATS in lib/video-jobs.ts, which enforces it server-side. */
+const AUDIO_UI_FORMATS = ["BEFORE_PACK", "BEST_OF", "FUNNEL"];
+
+interface BrandLite {
+  id: string;
+  name: string;
+  website: string | null;
+}
 
 export function VideoStudio() {
   const [format, setFormat] = useState("RIDICULOUS");
@@ -73,7 +83,28 @@ export function VideoStudio() {
   const [jobs, setJobs] = useState<VideoJobDTO[]>([]);
   const [sources, setSources] = useState<SourceDTO[]>([]);
   const [starting, setStarting] = useState(false);
+  const [brands, setBrands] = useState<BrandLite[]>([]);
+  const [brandId, setBrandId] = useState("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Brand profile over the studio (Dave, 2026-11-18): the member's
+  // saved brand drives the studio's business inputs instead of
+  // retyping them per format.
+  useEffect(() => {
+    void fetch("/api/brands")
+      .then((r) => r.json())
+      .then((d: { brands?: BrandLite[] }) => setBrands(d.brands ?? []))
+      .catch(() => undefined);
+  }, []);
+
+  function applyBrand(id: string) {
+    setBrandId(id);
+    const b = brands.find((x) => x.id === id);
+    if (!b) return;
+    setPackInput(b.website ?? b.name);
+    if (b.website) setOfferUrl(b.website);
+    toast.success(`Brand profile on: ${b.name} — the studio's business fields are filled from it.`);
+  }
 
   const load = useCallback(async () => {
     try {
@@ -181,6 +212,26 @@ export function VideoStudio() {
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
+        {brands.length > 0 ? (
+          <div className="flex flex-wrap items-end gap-3 rounded-xl border border-primary/25 bg-primary/5 px-3 py-2.5">
+            <div className="space-y-1">
+              <p className={labelCls}>Brand profile — drives this studio</p>
+              <select className={selectCls} value={brandId} onChange={(e) => applyBrand(e.target.value)}>
+                <option value="">Pick your brand profile…</option>
+                {brands.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="text-xs text-muted-foreground pb-2 max-w-md">
+              Picking your brand fills the business fields below (Before pack business, funnel offer
+              link) from the profile — no retyping.
+            </p>
+          </div>
+        ) : null}
+
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
             <p className={labelCls}>Format</p>
@@ -339,10 +390,24 @@ export function VideoStudio() {
           </div>
         ) : null}
 
-        <Button onClick={() => void start()} disabled={starting}>
-          {starting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
-          Start video job
-        </Button>
+        {AUDIO_UI_FORMATS.includes(format) ? (
+          <div className="rounded-xl border border-border bg-muted/50 px-4 py-3 space-y-2">
+            <p className="text-sm font-semibold">Voiced format — BYOK only</p>
+            <p className="text-sm text-muted-foreground">
+              This format generates a voice track, and audio costs more than the 1-credit house lane
+              covers — so voiced formats run on your own key. Your Muse can make it today: connect
+              once, then just ask it for a Before pack, a best-of reel or a funnel.
+            </p>
+            <Button asChild variant="outline" size="sm">
+              <a href="/muse-week">Open the Muse connection</a>
+            </Button>
+          </div>
+        ) : (
+          <Button onClick={() => void start()} disabled={starting}>
+            {starting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
+            Start video job
+          </Button>
+        )}
 
         {jobs.length > 0 ? (
           <div className="space-y-2 border-t border-border pt-3">

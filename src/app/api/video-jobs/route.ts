@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getWhopUser } from "@/lib/auth";
 import {
+  BYOK_AUDIO_MESSAGE,
+  isAudioFormat,
   startVideoJob,
   serializeVideoJob,
   VIDEO_FORMATS,
@@ -68,6 +70,12 @@ export async function POST(req: NextRequest) {
   const params = (body?.params ?? {}) as Record<string, unknown>;
   if (!format || !(VIDEO_FORMATS as readonly string[]).includes(format)) {
     return bad("Unknown video format.");
+  }
+  // Audio gate (Dave, 2026-11-18): voiced formats are BYOK-only —
+  // see lib/video-jobs.ts. 402 so the UI can present it as a
+  // lane choice, not a failure.
+  if (isAudioFormat(format)) {
+    return NextResponse.json({ error: BYOK_AUDIO_MESSAGE, byokOnly: true }, { status: 402 });
   }
 
   // Resolve contextual sources server-side: the client names one of
