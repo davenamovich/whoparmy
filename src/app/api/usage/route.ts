@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { getWhopConfig } from "@/lib/whop";
 import { getPlan } from "@/lib/plans";
 import type { UsageSummaryDTO } from "@/lib/types";
@@ -63,7 +63,7 @@ export async function GET(_req: NextRequest) {
     };
     return NextResponse.json(payload);
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to load usage" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to load usage" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }
 
@@ -100,6 +100,6 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ ok: true, plan: body.plan, planSource: "manual" });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to set plan" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to set plan" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }

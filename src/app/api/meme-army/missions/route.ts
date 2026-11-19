@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { serializeMission } from "@/lib/serialize";
 import { isSupportedLanguage } from "@/lib/languages";
 
@@ -30,7 +30,7 @@ export async function GET() {
     const missions = await db.mission.findMany({ where: { botId: bot.id }, orderBy: { createdAt: "desc" } });
     return NextResponse.json({ missions: missions.map(serializeMission) });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to load missions" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to load missions" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }
 
@@ -68,6 +68,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ mission: serializeMission(mission) });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to create mission" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to create mission" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import {
   BridgeError,
   MAX_BUDGET_CREDITS,
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Could not generate a bridge code" },
-      { status: 500 },
+      { status: err instanceof UnauthorizedError ? 401 : 500 },
     );
   }
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getWhopUser, getWhopUserWithMode } from "@/lib/auth";
+import { getWhopUser, getWhopUserWithMode, UnauthorizedError } from "@/lib/auth";
 import { canCreateArmyBot } from "@/lib/plans";
 import { serializeBot, serializeMission, serializeMember } from "@/lib/serialize";
 import { tgGetMe, tgDeleteWebhook } from "@/lib/telegram";
@@ -49,7 +49,7 @@ export async function GET() {
     };
     return NextResponse.json(response);
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to load Meme Army" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to load Meme Army" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }
 
@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ bot: serializeBot(updated) });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to update Meme Army" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to update Meme Army" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }
 

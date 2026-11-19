@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { getBridgeAccountView } from "@/lib/muse-bridge";
 
 export const runtime = "nodejs";
@@ -21,7 +21,7 @@ export async function GET() {
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Could not load your bridge account" },
-      { status: 500 },
+      { status: err instanceof UnauthorizedError ? 401 : 500 },
     );
   }
 }

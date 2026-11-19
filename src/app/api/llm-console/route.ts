@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getWhopUserWithMode } from "@/lib/auth";
+import { getWhopUserWithMode, UnauthorizedError } from "@/lib/auth";
 import { JOB_TIERS } from "@/lib/agents";
 import {
   fetchStarimgCatalog,
@@ -127,7 +127,7 @@ export async function GET() {
     if (err instanceof Error && err.message === "OPERATOR_ONLY") {
       return NextResponse.json({ error: "The LLM console is operator-only." }, { status: 403 });
     }
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to load LLM console" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to load LLM console" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }
 
@@ -158,7 +158,7 @@ export async function PATCH(req: NextRequest) {
     if (err instanceof Error && err.message === "OPERATOR_ONLY") {
       return NextResponse.json({ error: "The LLM console is operator-only." }, { status: 403 });
     }
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Policy update failed" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Policy update failed" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }
 
@@ -176,6 +176,6 @@ export async function POST(req: NextRequest) {
     if (err instanceof Error && err.message === "OPERATOR_ONLY") {
       return NextResponse.json({ error: "The LLM console is operator-only." }, { status: 403 });
     }
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Policy reset failed" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Policy reset failed" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }

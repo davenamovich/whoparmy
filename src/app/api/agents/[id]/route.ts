@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { isGrantExpired } from "@/lib/bot-grants";
 import { toolsFromJson, toolsToJson } from "@/lib/agent-architect-core";
 
@@ -57,6 +57,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const updated = await db.hiredAgent.update({ where: { id }, data: { status: body.status } });
     return NextResponse.json({ hire: updated });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Update failed" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Update failed" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }

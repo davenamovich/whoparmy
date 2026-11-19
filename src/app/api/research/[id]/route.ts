@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { getResearchJob } from "@/lib/research-jobs";
 
 export const runtime = "nodejs";
@@ -15,7 +15,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Could not read the research job." },
-      { status: 500 },
+      { status: err instanceof UnauthorizedError ? 401 : 500 },
     );
   }
 }

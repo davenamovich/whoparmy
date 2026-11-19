@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { getBridgeState, saveBridgeLinks } from "@/lib/bridge";
 
 /**
@@ -16,7 +16,7 @@ export async function GET() {
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Could not load your links" },
-      { status: 500 },
+      { status: err instanceof UnauthorizedError ? 401 : 500 },
     );
   }
 }
@@ -43,7 +43,7 @@ export async function PUT(req: NextRequest) {
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Could not save your links" },
-      { status: 500 },
+      { status: err instanceof UnauthorizedError ? 401 : 500 },
     );
   }
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { getWalletState } from "@/lib/agents";
 
 export const runtime = "nodejs";
@@ -17,7 +17,7 @@ export async function GET() {
     });
     return NextResponse.json({ listings, myUserId: user.id });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to load marketplace" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to load marketplace" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }
 
@@ -49,6 +49,6 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ listing }, { status: 201 });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Posting failed" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Posting failed" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }

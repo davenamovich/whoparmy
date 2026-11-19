@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { getGameState } from "@/lib/game";
 import { getEffectiveTiers } from "@/lib/llm-policy";
 
@@ -23,7 +23,7 @@ export async function GET() {
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load War Room" },
-      { status: 500 },
+      { status: err instanceof UnauthorizedError ? 401 : 500 },
     );
   }
 }

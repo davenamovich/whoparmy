@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { serializeCampaign } from "@/lib/serialize";
 
 export const runtime = "nodejs";
@@ -35,6 +35,6 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
 
     return NextResponse.json({ campaign: serializeCampaign(copy) });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to duplicate campaign" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to duplicate campaign" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { runGenerationJob, recordUsage } from "@/lib/pr-engine";
 import { FORMAT_MAP, isContentCategory } from "@/lib/formats";
 import { isSupportedLanguage, languageLabel } from "@/lib/languages";
@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to start generation." },
-      { status: 500 },
+      { status: err instanceof UnauthorizedError ? 401 : 500 },
     );
   }
 }

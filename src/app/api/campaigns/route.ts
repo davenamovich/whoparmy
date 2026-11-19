@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { serializeCampaign, campaignAssetCounts } from "@/lib/serialize";
 
 export const runtime = "nodejs";
@@ -21,6 +21,6 @@ export async function GET(req: NextRequest) {
     );
     return NextResponse.json({ campaigns: withCounts });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to load campaigns" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to load campaigns" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }

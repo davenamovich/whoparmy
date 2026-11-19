@@ -4,14 +4,45 @@ import { getSessionUserId } from "@/lib/session";
 import type { WhopUserInfo } from "@/lib/whop";
 
 /**
+ * Thrown when a request has no signed session and the anonymous operator
+ * fallback is not explicitly enabled. Route catches map it to 401 via
+ * statusForAuthError(); before 2026-11-18 the fallback resolved ANY
+ * anonymous request to the shared operator account (Codex whole-repo
+ * review, verified live) — that is the hole this closes.
+ */
+export class UnauthorizedError extends Error {
+  readonly status = 401;
+  constructor(message = "Sign in required") {
+    super(message);
+    this.name = "UnauthorizedError";
+  }
+}
+
+/** The anonymous operator fallback is a dev/sandbox convenience ONLY.
+ *  It is on solely when ALLOW_OPERATOR_FALLBACK=1 is set explicitly —
+ *  the same flag the LLM console guard already used. Production never
+ *  sets it, so a missing/invalid session is simply signed out. */
+export function operatorFallbackAllowed(): boolean {
+  return process.env.ALLOW_OPERATOR_FALLBACK === "1";
+}
+
+/** Map a caught error to an HTTP status: auth failures are 401, the
+ *  route's own default (usually 500) stands for everything else. */
+export function statusForAuthError(err: unknown, fallbackStatus = 500): number {
+  return err instanceof UnauthorizedError ? 401 : fallbackStatus;
+}
+
+/**
  * ─── Whop user anchor — the single authorization point of this app ───
  *
  * Resolution order:
  *   1. Signed session cookie (issued only by our own OAuth callback after
  *      a verified Whop token exchange — client-supplied IDs are never
  *      trusted for authorization).
- *   2. Fallback: the stable operator account so the full product remains
- *      exercisable in sandbox/dev mode before Whop credentials exist.
+ *   2. Fallback (dev/sandbox only, ALLOW_OPERATOR_FALLBACK=1): the stable
+ *      operator account so the full product remains exercisable before
+ *      Whop credentials exist. With the flag off — production — an
+ *      anonymous request throws UnauthorizedError instead.
  *
  * Every query in the app filters by the ID returned here, so tenant
  * isolation holds regardless of which branch resolved the user.
@@ -22,7 +53,8 @@ export async function getWhopUser(): Promise<User> {
     const user = await db.user.findUnique({ where: { id: sessionUserId } });
     if (user) return user;
   }
-  return getOperatorUser();
+  if (operatorFallbackAllowed()) return getOperatorUser();
+  throw new UnauthorizedError();
 }
 
 /** Same as getWhopUser, but reports which branch resolved the identity. */
@@ -45,7 +77,10 @@ export async function getWhopUserWithMode(): Promise<{ user: User; mode: "whop" 
     const user = await db.user.findUnique({ where: { id: sessionUserId } });
     if (user) return { user, mode: isDesignatedOperator(user) ? "operator" : "whop", viaFallback: false };
   }
-  return { user: await getOperatorUser(), mode: "operator", viaFallback: true };
+  if (operatorFallbackAllowed()) {
+    return { user: await getOperatorUser(), mode: "operator", viaFallback: true };
+  }
+  throw new UnauthorizedError();
 }
 
 /** Stable operator account (dev/sandbox mode before Whop credentials exist). */

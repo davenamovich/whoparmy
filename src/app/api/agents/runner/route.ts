@@ -1,5 +1,5 @@
 import { NextResponse, after } from "next/server";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { runQueuedJobsForUser } from "@/lib/agent-runner";
 
 export const runtime = "nodejs";
@@ -19,6 +19,6 @@ export async function POST() {
     });
     return NextResponse.json({ ok: true, note: "Runner started for your queued jobs — refresh the queue in a few seconds." });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Runner failed to start" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Runner failed to start" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }

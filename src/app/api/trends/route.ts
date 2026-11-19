@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { getTrending } from "@/lib/trends";
 import { isSupportedLanguage } from "@/lib/languages";
 
@@ -19,6 +19,6 @@ export async function GET(req: NextRequest) {
     const { topics, updatedAt } = await getTrending(lang);
     return NextResponse.json({ topics, updatedAt });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to load trending" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to load trending" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }

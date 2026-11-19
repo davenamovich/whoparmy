@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { serializeBrand } from "@/lib/serialize";
 
 export const runtime = "nodejs";
@@ -35,7 +35,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     });
     return NextResponse.json({ brand: serializeBrand(updated) });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to update brand" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to update brand" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }
 
@@ -50,6 +50,6 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
     await db.brandProfile.delete({ where: { id } });
     return NextResponse.json({ ok: true });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to delete brand" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to delete brand" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }

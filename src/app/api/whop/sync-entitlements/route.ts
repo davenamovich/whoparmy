@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getWhopUserWithMode } from "@/lib/auth";
+import { getWhopUserWithMode, UnauthorizedError } from "@/lib/auth";
 import { getWhopConfig, whopCheckAccess, whopListMemberships } from "@/lib/whop";
 import { getPlan } from "@/lib/plans";
 
@@ -125,7 +125,7 @@ export async function POST(_req: NextRequest) {
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Entitlement sync failed" },
-      { status: 500 },
+      { status: err instanceof UnauthorizedError ? 401 : 500 },
     );
   }
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getWhopUserWithMode } from "@/lib/auth";
+import { getWhopUserWithMode, UnauthorizedError } from "@/lib/auth";
 import { CLAIM_MAX_AMOUNT, claimSecret, mintClaimToken } from "@/lib/claims";
 
 export const runtime = "nodejs";
@@ -37,6 +37,6 @@ export async function POST(req: NextRequest) {
     const claimUrl = `${(process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://whop.plunderandriffle.com").replace(/\/$/, "")}/claim?code=${encodeURIComponent(token)}`;
     return NextResponse.json({ token, claimUrl, amount, source }, { status: 201 });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Mint failed" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Mint failed" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }

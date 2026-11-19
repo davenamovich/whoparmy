@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { regenerateAsset } from "@/lib/pr-engine";
 import { serializeAsset } from "@/lib/serialize";
 import { assertMonthlyAllowance } from "@/lib/usage-server";
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Regeneration failed — you were not charged." },
-      { status: 500 },
+      { status: err instanceof UnauthorizedError ? 401 : 500 },
     );
   }
 }
