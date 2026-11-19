@@ -20,7 +20,8 @@ import { NextRequest, NextResponse } from "next/server";
  * Public paths are the ones that carry their own credentials: OAuth
  * endpoints, signature-verified webhooks, the bridge's code/bearer
  * endpoints, the cron-secret clip worker, the pair-secret Telegram
- * verify, and read-only public status/teaser/redirect surfaces.
+ * verify, and read-only public status/teaser/redirect surfaces
+ * (including /api/showcase, the public live-generation feed proxy).
  */
 const PUBLIC_API_PREFIXES = [
   "/api/auth/",
@@ -33,6 +34,7 @@ const PUBLIC_API_PREFIXES = [
   "/api/clips/worker/",
   "/api/telegram/webhook/",
   "/api/telegram/pair/verify",
+  "/api/showcase",
 ];
 
 // Same value as SESSION_COOKIE in lib/whop.ts — duplicated because
