@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getWhopUser } from "@/lib/auth";
-import { getBlueprint, draftBlueprint, approveBlueprint, systemSummary } from "@/lib/blueprint";
+import { getBlueprint, draftBlueprint, approveBlueprint, systemSummary, systemContext } from "@/lib/blueprint";
 import { launchReport, dailyBriefing } from "@/lib/briefing";
 import { craftSetupPrompt } from "@/lib/setup-prompt";
+import { composeTeamPrompt, getTeamConfirmedAt, confirmTeamBoard, boardNameFor } from "@/lib/team-board";
 
 export const runtime = "nodejs";
 
@@ -16,13 +17,35 @@ export const runtime = "nodejs";
 export async function GET() {
   try {
     const user = await getWhopUser();
-    const [blueprint, summary, report, briefing] = await Promise.all([
+    const [blueprint, summary, report, briefing, teamConfirmedAt, ctx] = await Promise.all([
       getBlueprint(user.id),
       systemSummary(user),
       launchReport(user),
       dailyBriefing(user),
+      getTeamConfirmedAt(user.id),
+      systemContext(user),
     ]);
-    return NextResponse.json({ blueprint, summary, report, briefing });
+    // Your Team (Dave, 2026-11-19): the standalone board prompt is
+    // pure composition from the blueprint — no minting, safe on GET.
+    const team = {
+      confirmedAt: teamConfirmedAt,
+      roster: blueprint
+        ? blueprint.workforce.map((a) => ({
+            name: a.name,
+            role: a.role,
+            boardName: boardNameFor(a),
+            seated: a.seated !== false,
+          }))
+        : [],
+      prompt: blueprint
+        ? composeTeamPrompt({
+            business: ctx.brandName ?? "your business",
+            website: ctx.brandWebsite,
+            blueprint,
+          })
+        : null,
+    };
+    return NextResponse.json({ blueprint, summary, report, briefing, team });
   } catch (err) {
     if (err instanceof Error && err.name === "UnauthorizedError") {
       return NextResponse.json({ error: "Sign in required" }, { status: 401 });
@@ -40,6 +63,12 @@ export async function POST(req: NextRequest) {
       // bridge connect link; minting retires older unused codes, so
       // this only ever runs on the member's explicit tap.
       return NextResponse.json(await craftSetupPrompt(user));
+    }
+    if (body.action === "team-confirm") {
+      // The member's word that their own Muse stood their board
+      // up — Whoparmy cannot see their Vercel board, by design.
+      const confirmedAt = await confirmTeamBoard(user.id);
+      return NextResponse.json({ team: { confirmedAt } });
     }
     if (body.action === "draft") {
       const blueprint = await draftBlueprint(user);

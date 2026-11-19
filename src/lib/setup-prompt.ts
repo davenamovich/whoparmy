@@ -8,6 +8,7 @@ import {
   mintBridgeCode,
   BridgeError,
 } from "@/lib/muse-bridge";
+import { teamBoardSection } from "@/lib/team-board";
 
 /**
  * ─── DAY-1 SETUP PROMPT (Dave, 2026-11-19) ───────────────────────
@@ -118,6 +119,8 @@ export function composeSetupPrompt(args: {
     `4. A first proof: my free /before pack (quote it first; it is the free tier).`,
     `5. Connect my posting and ship ONE real post: if Upload-Post isn't connected, walk me through the one connection step in the app; then generate one piece, bring it to me, and post it only after my approve tap in the app. Day 1 ends with something live — not just built.`,
     `6. A launch report: what is running, what it does, what it costs, what it produced, what needs my attention.`,
+    ``,
+    teamBoardSection(bp, business),
     ``,
     `## Rules`,
     `- Never invent connections, results, numbers, or earnings. If something is not connected, say so and give me the one step.`,

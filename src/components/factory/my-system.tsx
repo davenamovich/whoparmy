@@ -77,6 +77,12 @@ export function MySystemView() {
     verdict?: { summary: string; lenses: { lens: string; findings: string }[]; fixes: string[] };
   } | null>(null);
   const [busyPanel, setBusyPanel] = useState(false);
+  const [team, setTeam] = useState<{
+    confirmedAt: string | null;
+    roster: { name: string; role: string; boardName: string; seated: boolean }[];
+    prompt: string | null;
+  } | null>(null);
+  const [busyTeam, setBusyTeam] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<"draft" | "approve" | null>(null);
 
@@ -94,12 +100,14 @@ export function MySystemView() {
         summary?: Summary;
         report?: Report | null;
         briefing?: Briefing;
+        team?: typeof team;
       };
       if (res.ok) {
         setBlueprint(data.blueprint ?? null);
         if (data.summary) setSummary(data.summary);
         setReport(data.report ?? null);
         if (data.briefing) setBriefing(data.briefing);
+        if (data.team) setTeam(data.team);
       }
     } catch {
       // leave the empty state; the buttons still work
@@ -148,6 +156,25 @@ export function MySystemView() {
       toast.error(e instanceof Error ? e.message : "Panel request failed");
     } finally {
       setBusyPanel(false);
+    }
+  }
+
+  async function confirmTeam() {
+    setBusyTeam(true);
+    try {
+      const res = await fetch("/api/blueprint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "team-confirm" }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { team?: { confirmedAt: string }; error?: string };
+      if (!res.ok || !data.team) throw new Error(data.error ?? "That didn't work");
+      setTeam((t) => (t ? { ...t, confirmedAt: data.team!.confirmedAt } : t));
+      toast.success("Marked — your team board is set up.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "That didn't work");
+    } finally {
+      setBusyTeam(false);
     }
   }
 
@@ -280,6 +307,67 @@ export function MySystemView() {
             {busyPanel ? <Loader2 className="h-4 w-4 animate-spin" /> : <Network className="h-4 w-4" />} Send to the expert panel
           </Button>
         )}
+      </div>
+
+      <div className="rounded-2xl border bg-card p-5 sm:p-6 space-y-3">
+        <p className="font-semibold">Your Team — your crew, on your own board</p>
+        <p className="text-sm text-muted-foreground">
+          Your agents coordinate on a Vercel Board that belongs to you — your account, your sign-in,
+          your data. During the Day-1 setup your Muse stands it up: you as the member, your Muse as
+          coordinator, and each agent below working under its own board name, claiming tasks from the
+          week's real work. The full Day-1 prompt includes the board setup automatically; the button
+          below copies just that part on its own.
+        </p>
+        {team?.roster.length ? (
+          <div className="space-y-1.5">
+            {team.roster.map((a) => (
+              <p key={a.boardName} className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                <Bot className="h-4 w-4 text-primary" />
+                <span className="font-medium text-foreground">{a.name}</span>
+                <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold">--as {a.boardName}</span>
+                {a.seated ? (
+                  <span className="rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 text-[11px] font-semibold">On your floor</span>
+                ) : (
+                  <span className="rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 px-2 py-0.5 text-[11px] font-semibold">Queued — gets its name when seated</span>
+                )}
+              </p>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Draft your blueprint first — your team is your workforce, under board names.</p>
+        )}
+        {team?.confirmedAt ? (
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">Board status: set up</span> — you confirmed it on{" "}
+            {new Date(team.confirmedAt).toLocaleDateString()}. Whoparmy can't see your Vercel board, so
+            this status is your word — by design.
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">Board status: in your Day-1 prompt</span> — not
+            confirmed yet. Once your Muse has stood the board up, mark it here.
+          </p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            disabled={!team?.prompt}
+            onClick={() => {
+              if (!team?.prompt) return;
+              void navigator.clipboard.writeText(team.prompt).then(
+                () => toast.success("Team setup prompt copied — paste it to your Muse."),
+                () => toast.error("Copy failed — try again."),
+              );
+            }}
+          >
+            Copy team setup prompt
+          </Button>
+          {!team?.confirmedAt ? (
+            <Button variant="outline" onClick={() => void confirmTeam()} disabled={busyTeam || !team?.roster.length}>
+              {busyTeam ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} My board is set up
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {!blueprint ? (
