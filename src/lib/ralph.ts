@@ -259,16 +259,18 @@ export async function ralphAction(userId: string, locale: string, actionId: Ralp
         });
         const businessUrl = brand?.website || "https://your-business-website.com";
         const command = museWeekCommand(minted.code, businessUrl, minted.budgetCredits, "week");
+        const link = `https://whop.plunderandriffle.com/connect/${minted.code}`;
         return {
           text:
-            `Minted just now — your code is inside the command, expires in 15 minutes, and works once. Copy the whole block into your Muse:\n\n${command}\n\n` +
-            `That's The Week (${minted.budgetCredits} credits, quoted to you before anything spends). Want The Taste or Week + Opener instead? The /muse-week page has all three — a fresh code there retires this one.`,
+            `Here's your agent link — minted just now, good for 15 minutes, works once:\n\n${link}\n\n` +
+            `Give it to Muse or any AI agent you use. The page hands the agent your connection and your business; it researches you free, quotes you the options (a Taste, a Week), and spends nothing without your "go". This connection is capped at ${minted.budgetCredits} credits, and publishing stays off — posting is your in-app tap.\n\n` +
+            `Prefer to paste? Same thing as a command:\n\n${command}`,
           actions: ["my_plan", "make_content"],
         };
       } catch (err) {
         if (err instanceof BridgeError && err.code === "NOT_ELIGIBLE") {
           return {
-            text: "That one's not on your plan yet. The Muse bridge is a special offer for Operator and Agency members: one command, and your own Muse makes your week on your own credits. Upgrade in Whop and I'll mint your command on the spot.",
+            text: "That one's not on your plan yet. The Muse bridge is a special offer for Operator and Agency members: one link, and your own Muse makes your content on your own credits. Upgrade in Whop and I'll mint your link on the spot.",
             actions: ["my_plan", "make_content"],
           };
         }

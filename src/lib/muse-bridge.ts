@@ -448,6 +448,23 @@ export async function exchangeBridgeCode(rawCode: string): Promise<{ token: stri
   return { token, expiresAt, budgetCredits: row.budgetCredits, userId: row.userId, scope };
 }
 
+/**
+ * Look up a live (unused, unexpired) bridge code WITHOUT consuming
+ * it — the /connect/[code] agent-link page renders from this.
+ * Viewing never burns the code; only exchangeBridgeCode claims it,
+ * and exchange re-checks eligibility per scope. Returns null for
+ * unknown, used, or expired codes alike (no oracle about which).
+ */
+export async function findLiveBridgeCode(
+  rawCode: string,
+): Promise<{ budgetCredits: number; scope: BridgeScope; user: User } | null> {
+  const code = (rawCode ?? "").trim().toUpperCase();
+  if (!code) return null;
+  const row = await db.bridgeCode.findUnique({ where: { codeHash: sha256(code) }, include: { user: true } });
+  if (!row || row.usedAt || row.expiresAt.getTime() <= Date.now()) return null;
+  return { budgetCredits: row.budgetCredits, scope: normalizeScope(row.scope), user: row.user };
+}
+
 export interface BridgeSession {
   tokenId: string;
   user: User;

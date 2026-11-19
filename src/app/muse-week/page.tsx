@@ -265,6 +265,16 @@ export default function MuseWeekPage() {
             </>
           ) : (
             <>
+              <div className="rounded-md border border-primary/30 bg-primary/5 p-4 space-y-1.5">
+                <p className="text-sm font-bold">Easiest: give any agent this link</p>
+                <p className="text-sm break-all font-medium text-primary">
+                  https://whop.plunderandriffle.com/connect/{code}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Muse or any AI agent opens it and gets the command below — no copy-paste, no login.
+                  Works once, expires in 15 minutes. Or paste the command yourself:
+                </p>
+              </div>
               <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-4 text-xs leading-relaxed">
                 {museWeekCommand(code, businessUrl, budget, offerId)}
               </pre>
@@ -284,8 +294,8 @@ export default function MuseWeekPage() {
               </div>
               <p className="text-muted-foreground">
                 The code inside expires in 15 minutes and works once. The token it issues lasts 7 days — one pairing,
-                one run. Your Muse will quote {selectedOffer.name} first (list price {budget} credits) and wait for
-                your &ldquo;go&rdquo; before spending anything.
+                one run. Your agent researches first (free), quotes the exact cost, and waits for your
+                &ldquo;go&rdquo; before spending anything.
               </p>
             </>
           )}

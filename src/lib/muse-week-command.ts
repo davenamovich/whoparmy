@@ -40,11 +40,11 @@ ${intro}
 6. When the week is delivered or my token expires, stop. Next week I'll get a fresh code from whop.plunderandriffle.com/muse-week.`;
   }
 
-  return `Make my week of content
+  return `Connect to my Plunder & Riffle account and make my content
 
 ${intro}
-3. Quote me the week before you spend anything: 7 day-packs (create_demo_pack — 5 memes, an iMessage, a Top 10 and a slideshow per day), one for each day, each on a different angle from the research: Day 1 my offer · Day 2 my customer's pain · Day 3 proof · Day 4 one product · Day 5 me vs. the alternative · Day 6 questions customers ask · Day 7 best-of + call to action. The week is approved for up to ${budget} credits. Tell me the exact credit cost and my remaining balance (get_account through the bridge), and wait for my "go". No go, no spend.
-4. On my "go", make all 7 packs through the bridge MCP, polling get_job_status until each is done. A failed piece refunds — if a whole pack fails, tell me and retry it once.
-5. Deliver my week as a calendar: for each day, the pack's share-page link and what's in it. End with the receipt: credits spent, credits remaining. Do not publish anything and do not render MP4s — I'll approve the pieces I want first.
-6. When the week is delivered or my token expires, stop. Next week I'll get a fresh code from whop.plunderandriffle.com/muse-week.`;
+3. Quote me my options before you spend anything — the exact credit cost and my remaining balance (get_account through the bridge) for each: The Taste — 1 day-pack (create_demo_pack: 5 memes, an iMessage, a Top 10 and a slideshow) on my main offer, about 115 credits. The Week — 7 day-packs, one per day, each on a different angle from the research: Day 1 my offer · Day 2 my customer's pain · Day 3 proof · Day 4 one product · Day 5 me vs. the alternative · Day 6 questions customers ask · Day 7 best-of + call to action, about ${budget} credits. This connection is capped at ${budget} credits. Wait for my pick and my "go". No go, no spend.
+4. On my "go", make what I picked through the bridge MCP, polling get_job_status until it's done. A failed piece refunds — if a whole pack fails, tell me and retry it once.
+5. Deliver each pack's share-page link and what's in it — a week as a calendar, day by day. End with the receipt: credits spent, credits remaining. Do not publish anything and do not render MP4s — I'll approve the pieces I want first.
+6. When the work is delivered or my token expires, stop. Next time I'll get a fresh code from whop.plunderandriffle.com/muse-week.`;
 }
