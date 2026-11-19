@@ -698,7 +698,7 @@ CREATE TABLE "AppSetting" (
 
 
 -- CreateTable
-CREATE TABLE IF NOT EXISTS "TelegramPairCode" (
+CREATE TABLE "TelegramPairCode" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "userId" TEXT NOT NULL,
     "codeHash" TEXT NOT NULL,
@@ -709,7 +709,7 @@ CREATE TABLE IF NOT EXISTS "TelegramPairCode" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX IF NOT EXISTS "TelegramPairCode_codeHash_key" ON "TelegramPairCode"("codeHash");
+CREATE UNIQUE INDEX "TelegramPairCode_codeHash_key" ON "TelegramPairCode"("codeHash");
 
 -- CreateIndex
-CREATE INDEX IF NOT EXISTS "TelegramPairCode_userId_idx" ON "TelegramPairCode"("userId");
+CREATE INDEX "TelegramPairCode_userId_idx" ON "TelegramPairCode"("userId");

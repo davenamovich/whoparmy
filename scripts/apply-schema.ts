@@ -21,7 +21,16 @@ const sql = readFileSync(new URL("../prisma/schema.sql", import.meta.url), "utf8
   .replace(/CREATE INDEX /g, "CREATE INDEX IF NOT EXISTS ");
 
 const db = new Database(path, { create: true });
-db.exec(sql);
+// Never let one bad statement in schema.sql kill the whole boot
+// step: the additive columns below are the part existing databases
+// actually depend on. (2026-11-18: a baked-in IF NOT EXISTS in the
+// TelegramPairCode block double-transformed into a syntax error and
+// silently stopped every additive column after it.)
+try {
+  db.exec(sql);
+} catch (err) {
+  console.error("[boot] schema.sql exec hit an error — continuing to additive columns:", err);
+}
 
 // Additive columns for tables that already exist (schema.sql only
 // creates missing tables). Keep this list in step with schema.prisma:
