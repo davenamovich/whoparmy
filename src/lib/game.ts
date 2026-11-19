@@ -166,7 +166,7 @@ export async function getGameState(userId: string, planKey: string) {
     { key: "jobs-10", title: "Production Line", description: "Your bots finish 10 jobs.", rewardXp: 0, progress: Math.min(jobsDone, 10), target: 10, done: jobsDone >= 10 },
     { key: "first-recruit", title: "First Recruit", description: "A new member joins with your referral link.", rewardXp: XP_VALUES.REFERRAL_JOINED, progress: Math.min(recruits, 1), target: 1, done: recruits >= 1 },
     { key: "recruits-3", title: "Squad Builder", description: "3 members join with your referral link.", rewardXp: XP_VALUES.REFERRAL_JOINED, progress: Math.min(recruits, 3), target: 3, done: recruits >= 3 },
-    { key: "first-conversion", title: "First Commission", description: "A recruit rents their first bot — you earn 30% of their plan.", rewardXp: XP_VALUES.REFERRAL_CONVERTED, progress: Math.min(conversions, 1), target: 1, done: conversions >= 1 },
+    { key: "first-conversion", title: "First Commission", description: "A recruit sets up their first agent — you earn 30% of their plan.", rewardXp: XP_VALUES.REFERRAL_CONVERTED, progress: Math.min(conversions, 1), target: 1, done: conversions >= 1 },
     { key: "three-tier-trial", title: "Three-Tier Trial", description: "Run one brief on Scout, Balanced and Flagship, pick the winner, mint it in P&R.", rewardXp: 150, progress: 0, target: 1, done: false, locked: "Arrives with the Bridge (Bifrost) — Phase 2" },
   ];
 

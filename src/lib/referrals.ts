@@ -9,7 +9,7 @@ import { LINK_SAVE_FREE_GENS } from "@/lib/bridge";
  *
  * Dave's program (2026-11-17): a member who brings in another member
  * earns 30% of that recruit's plan price when the recruit converts
- * (rents their first bot) — once the referrer is commission-unlocked
+ * (sets up their first agent) — once the referrer is commission-unlocked
  * (see COMMISSION_UNLOCK_CONVERSIONS; qualifying conversions before
  * the unlock earn no commission, never a held one). Free generations
  * pay on a separate trigger: when a recruit saves their bridge links
