@@ -306,9 +306,13 @@ export default function Home() {
               </button>
               {/* Jump chips (Dave, 2026-11-18: "where is reply guy" —
                   the Create room stacks everything, so the doors get
-                  named shortcuts at the top). */}
-              <div className="flex flex-wrap gap-2 -mb-6">
+                  named shortcuts at the top). The row is a plain block
+                  in the space-y flow: an earlier -mb-6 pulled the
+                  Brand Profiles section up over the chips (Dave:
+                  "fix the overlap"), so no negative margins here. */}
+              <div className="flex flex-wrap gap-2">
                 {[
+                  { id: "create-brands", label: "Brand Profiles" },
                   { id: "create-trending", label: "🔥 Trending — Reply Guy lives here" },
                   { id: "create-meme-studio", label: "Meme Studio" },
                   { id: "create-video-studio", label: "Video Studio" },
@@ -324,7 +328,9 @@ export default function Home() {
               </div>
               {/* Nav diet phase 1: Brands lives here now — pick or
                   research a brand, then the wizard below runs with it. */}
-              <BrandsView onUseInCampaign={startWizardWithBrand} />
+              <div id="create-brands" className="scroll-mt-24">
+                <BrandsView onUseInCampaign={startWizardWithBrand} />
+              </div>
               <CreateWizard onCompleted={onWizardCompleted} initialProfile={brandPrefill} initialProfileName={brandPrefillName} />
               {/* Trending lives here too — its one action loads the
                   meme studio directly below it. */}
