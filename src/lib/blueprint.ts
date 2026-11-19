@@ -39,6 +39,13 @@ export interface BlueprintAgent {
   /** custom-template only: validated Factory tool ids. */
   tools?: string[];
   instructions?: string;
+  /**
+   * Panel fix 2 (2026-11-19): seat reconciliation. True when the
+   * member's plan seats this agent (or it's already hired); false
+   * means it queues for a seat. Undefined on pre-fix blueprints —
+   * treat as seated.
+   */
+  seated?: boolean;
 }
 
 export interface BlueprintIntegration {
@@ -56,6 +63,10 @@ export interface Blueprint {
   workflows: { name: string; flow: string }[];
   integrations: BlueprintIntegration[];
   budget: string;
+  /** Panel fix 4: the pinned weekly content spec (targets + credit estimates). */
+  contentSpec?: string[];
+  /** Panel fix 5: the brand voice every agent works in. */
+  voiceSpec?: string;
   autonomy: "copilot";
   createdAt: string;
   updatedAt: string;
@@ -163,32 +174,103 @@ export async function systemContext(user: { id: string; plan: string; whopId: st
 const CATALOG_KEYS = new Set(AGENT_CATALOG.map((t) => t.key));
 const TOOL_IDS = new Set(FACTORY_TOOLS.map((t) => t.id));
 
+/**
+ * Panel fix 4 (2026-11-19): a pinned weekly content spec — exact
+ * pieces per cycle with credit estimates against the real caps, so
+ * "a week of content" is a spec, not a hope. Targets, never
+ * charges: every run is still quoted before it spends.
+ */
+export function weeklyContentSpec(planKey: string): string[] {
+  const plan = getPlan(planKey);
+  const perWeek = Math.max(1, Math.round(plan.monthlyItems / 4));
+  return [
+    "5 memes (~5 engine credits on your key)",
+    "3 social posts (~3 credits)",
+    "1 trending-angle pack (~15 credits)",
+    "1 lead-research pass (research time — no engine credits)",
+    `≈23 engine credits a week, inside your ~${perWeek} plan generations a week and the 805-credit bridge cap. These are planning targets — every run is quoted exactly before it spends.`,
+  ];
+}
+
+/** Panel fix 5: the brand voice, from research when it names one. */
+export function voiceSpecFrom(ctx: SystemContext): string {
+  if (ctx.researchSnippet) {
+    try {
+      const parsed = JSON.parse(ctx.researchSnippet) as Record<string, unknown>;
+      for (const k of ["voice", "tone", "brandVoice"]) {
+        const v = parsed[k];
+        if (typeof v === "string" && v.trim()) return v.trim().slice(0, 300);
+      }
+    } catch {
+      /* research is free text — fall through to the default */
+    }
+  }
+  const where = ctx.brandWebsite ?? "your website";
+  return `Mirror the voice on ${where}: pull three real phrases from your own pages and reuse that register — plain, direct, in your customers' words. No hype words, no corporate polish.`;
+}
+
+/**
+ * Panel fix 2: reconcile the workforce with the plan's seats
+ * BEFORE anything is promised — in blueprint order, already-hired
+ * agents keep their seat; the rest fill the remaining seats; the
+ * overflow is honestly flagged seated:false (queued for a seat).
+ */
+export async function withSeats(user: { id: string; plan: string }, bp: Blueprint): Promise<Blueprint> {
+  const plan = getPlan(user.plan);
+  const existing = await db.hiredAgent.findMany({
+    where: { userId: user.id },
+    select: { templateKey: true, source: true },
+  });
+  const hiredKeys = new Set(existing.map((h) => h.templateKey));
+  let rented = existing.filter((h) => h.source === "RENTAL").length;
+  const workforce = bp.workforce.map((a) => {
+    if (hiredKeys.has(a.templateKey)) return { ...a, seated: true };
+    if (rented < plan.botSeats) {
+      rented += 1;
+      return { ...a, seated: true };
+    }
+    return { ...a, seated: false };
+  });
+  return { ...bp, workforce };
+}
+
 function fallbackBlueprint(ctx: SystemContext): Blueprint {
   const biz = ctx.brandName ?? "your business";
   const plan = getPlan(ctx.planKey);
   const now = new Date().toISOString();
   return {
     status: "draft",
-    objective: `Keep ${biz} in front of its customers every day — fresh content, watched competitors, and leads researched — without the owner doing the marketing by hand.`,
+    // Panel fix 1: the objective names the bookable outcome —
+    // content is the means, never the objective.
+    objective: `Turn ${biz}'s presence into booked work: a weekly rhythm of content that ends in inquiries and bookings, competitors watched and leads researched — without the owner doing the marketing by hand.`,
     opportunities: [
-      { title: "Daily content from your own material", why: "Your site and research already hold the stories; a content crew turns them into posts and memes on a rhythm." },
+      { title: "Content that ends in a booking", why: "Every week of posts points at one bookable outcome — an inquiry, an estimate request, a call — so the owner can see what the marketing produced." },
       { title: "Competitor + trend watching", why: "Riding what is already working in your niche beats inventing angles from zero." },
       { title: "A free /before pack as the front door", why: "The Assessor turns your research into a spoken pitch + memes a prospect can say yes to." },
     ],
+    // Priority order (panel fixes 1+5): angles → making → leads →
+    // production support → QA → the bridge offer. withSeats()
+    // seats them in this order, so the floor is the promise.
     workforce: [
       { templateKey: "scout", name: "Trend Scout", role: "Watches trends and drafts angles for your niche, every day.", mission: `Find the day's rideable angles for ${biz} and queue the strongest.`, schedule: "Daily", approval: "Drafts only — you approve anything that ships", metric: "Angles queued per week" },
       { templateKey: "meme-smith", name: "Meme Smith", role: "Turns briefs into meme packs and captions on order.", mission: `Turn approved angles into meme packs in ${biz}'s voice.`, schedule: "On demand", approval: "Every pack waits for your approve tap", metric: "Packs delivered per week" },
+      { templateKey: "lead-researcher", name: "Lead Researcher", role: "Finds and qualifies businesses that fit your offer.", mission: `Build ${biz} a weekly list of qualified prospects the content and the /before pack can be aimed at.`, schedule: "Weekly", approval: "Research only — outreach always waits for your approval", metric: "Qualified leads found per week" },
       { templateKey: "content-creator", name: "Content Creator", role: "Builds content packs from your briefs.", mission: `Build the weekly content rhythm for ${biz} from the scout's angles.`, schedule: "Weekly", approval: "Drafts only — you approve anything that ships", metric: "Pieces ready per week" },
+      { templateKey: "qa-editor", name: "QA Editor", role: "Checks every piece against your brand before it reaches you.", mission: `Check voice, claims, and links on everything the crew drafts, so what reaches you is already clean.`, schedule: "On demand", approval: "Flags problems — never ships or rewrites silently", metric: "Pieces passed per week" },
       ...(ctx.brandWebsite
         ? [{ templateKey: "assessor", name: "The Assessor", role: "Bridge agent: your /before pack + assessment offer, on your credits.", mission: `Keep ${biz}'s free /before pack current as the front-door offer.`, schedule: "On demand", approval: "Runs through your Muse on your credits, quote first", metric: "Packs generated" } satisfies BlueprintAgent]
         : []),
     ],
     workflows: [
-      { name: "Morning angles", flow: "Trend Scout drafts angles → you skim → Meme Smith builds the pack → your approve tap posts it." },
-      { name: "Weekly rhythm", flow: "Content Creator assembles the week from approved angles; everything waits for your approval before it goes out." },
+      { name: "Morning angles", flow: "Trend Scout drafts angles → you skim → Meme Smith builds the pack → QA Editor checks it → your approve tap posts it." },
+      { name: "Weekly rhythm", flow: "Content Creator assembles the week from approved angles; the Lead Researcher refreshes the prospect list it aims at; everything waits for your approval before it goes out." },
     ],
     integrations: ctx.integrations,
-    budget: `${plan.name} plan (${plan.price}) covers ${plan.botSeats} bot seat${plan.botSeats === 1 ? "" : "s"} and ${plan.monthlyItems} generations a month. Your own P&R key (BYOK) runs at 1 credit ($0.01) per engine call beyond that. No other running costs are switched on.`,
+    // Panel (Risk): never guarantee "no other costs" — the member's
+    // own agent runs on their own accounts, outside P&R credits.
+    budget: `${plan.name} plan (${plan.price}) covers ${plan.botSeats} bot seat${plan.botSeats === 1 ? "" : "s"} and ${plan.monthlyItems} generations a month. Your own P&R key (BYOK) runs at 1 credit ($0.01) per engine call beyond that. Those are the only P&R-side costs switched on — your own Muse or Agent37 usage runs on your own accounts, outside P&R credits.`,
+    contentSpec: weeklyContentSpec(ctx.planKey),
+    voiceSpec: voiceSpecFrom(ctx),
     autonomy: "copilot",
     createdAt: now,
     updatedAt: now,
@@ -203,7 +285,7 @@ export async function draftBlueprint(user: { id: string; plan: string; whopId: s
   const ctx = await systemContext(user);
   const fallback = fallbackBlueprint(ctx);
   const cfg = starimgConfig();
-  if (!cfg) return persist(user.id, fallback);
+  if (!cfg) return persist(user.id, await withSeats(user, fallback));
   try {
     const ladder = await getLadder("mid");
     const catalog = AGENT_CATALOG.map((t) => `${t.key} — ${t.name}: ${t.role}`).join("\n");
@@ -217,7 +299,7 @@ export async function draftBlueprint(user: { id: string; plan: string; whopId: s
           {
             role: "system",
             content:
-              "You are Muse, the P&R onboarding architect. You design a small AI workforce for a small-business owner from a FIXED catalog — never invent agents, tools, integrations, prices, or results. Plain language, no jargon, no earnings promises. Approval rules must keep a human approving anything that publishes, sends, or spends. " +
+              "You are Muse, the P&R onboarding architect. You design a small AI workforce for a small-business owner from a FIXED catalog — never invent agents, tools, integrations, prices, or results. Plain language, no jargon, no earnings promises. Approval rules must keep a human approving anything that publishes, sends, or spends. The OBJECTIVE must name the member's bookable outcome (bookings, estimate requests, calls, sales) — content is the means, never the objective. Order the workforce: angle-finding first, content-making second, lead/outcome work third, then production support and QA — the first agents are the floor the member's plan seats, so order is a promise. Metrics measure outcomes (leads, inquiries, bookings) for roles that touch them; output counts only for pure production roles. Include a QA/editor step when the catalog offers one. " +
               `Reply with ONLY JSON: {"objective":"...","opportunities":[{"title":"...","why":"..."}],"workforce":[{"templateKey":"<catalog key>","name":"...","mission":"...","schedule":"Daily|Weekly|On demand","approval":"...","metric":"..."}],"workflows":[{"name":"...","flow":"..."}]} — exactly 3 opportunities, 3–5 workforce agents, 2–3 workflows. For a "custom" agent also include "tools":[<tool ids>] and "instructions":"...".`,
           },
           {
@@ -226,18 +308,18 @@ export async function draftBlueprint(user: { id: string; plan: string; whopId: s
               `Business: ${ctx.brandName ?? "(unknown)"} ${ctx.brandWebsite ? `(${ctx.brandWebsite})` : ""}\n` +
               `What they promote: ${ctx.promoting ?? "(unknown)"}\n` +
               `Research on file: ${ctx.researchSnippet ?? "(none yet)"}\n` +
-              `Plan: ${ctx.planKey}\n\nAgent catalog (templateKey — name: role):\n${catalog}\n\nCustom-agent tools:\n${tools}\n\nDesign the system.`,
+              `Plan: ${ctx.planKey} (${getPlan(ctx.planKey).botSeats} bot seats — the first ${getPlan(ctx.planKey).botSeats} workforce agents are the seated floor)\n\nAgent catalog (templateKey — name: role):\n${catalog}\n\nCustom-agent tools:\n${tools}\n\nDesign the system.`,
           },
         ],
       }),
       signal: AbortSignal.timeout(90_000),
     });
-    if (!res.ok) return persist(user.id, fallback);
+    if (!res.ok) return persist(user.id, await withSeats(user, fallback));
     const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
     const text = data.choices?.[0]?.message?.content ?? "";
     const start = text.indexOf("{");
     const end = text.lastIndexOf("}");
-    if (start < 0 || end <= start) return persist(user.id, fallback);
+    if (start < 0 || end <= start) return persist(user.id, await withSeats(user, fallback));
     const p = JSON.parse(text.slice(start, end + 1)) as Record<string, unknown>;
 
     const opportunities = (Array.isArray(p.opportunities) ? p.opportunities : [])
@@ -283,10 +365,10 @@ export async function draftBlueprint(user: { id: string; plan: string; whopId: s
       .slice(0, 3);
 
     if (!clampStr(p.objective, 500) || opportunities.length < 2 || workforce.length < 3) {
-      return persist(user.id, fallback);
+      return persist(user.id, await withSeats(user, fallback));
     }
     const now = new Date().toISOString();
-    return persist(user.id, {
+    return persist(user.id, await withSeats(user, {
       ...fallback,
       objective: clampStr(p.objective, 500),
       opportunities,
@@ -294,9 +376,9 @@ export async function draftBlueprint(user: { id: string; plan: string; whopId: s
       workflows: workflows.length ? workflows : fallback.workflows,
       createdAt: now,
       updatedAt: now,
-    });
+    }));
   } catch {
-    return persist(user.id, fallback);
+    return persist(user.id, await withSeats(user, fallback));
   }
 }
 
@@ -354,6 +436,11 @@ export async function approveBlueprint(user: { id: string; plan: string; whopId:
     ...bp,
     status: "approved",
     hireResults: results,
+    // Seat truth after hiring: hired/existing = seated.
+    workforce: bp.workforce.map((a) => ({
+      ...a,
+      seated: results[a.templateKey] === "hired" || results[a.templateKey] === "existing",
+    })),
     integrations: (await systemContext(user)).integrations,
     updatedAt: new Date().toISOString(),
   };

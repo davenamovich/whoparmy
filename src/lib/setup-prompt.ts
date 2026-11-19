@@ -45,15 +45,28 @@ export function composeSetupPrompt(args: {
     ? `Open this link and follow its brief to connect to my P&R account:\n${link}\nThe link exchanges for a 7-day connection on my own credits, capped at the budget it states. It is CONTENT-ONLY: it generates content; it never publishes, posts, sends, or spends beyond quoted content credits.`
     : `I don't have a live connect link in this prompt. First, tell me the one step to get it: in the Plunder & Riffle app (whop.plunderandriffle.com), Account → "Talk to my Muse" mints my link (Operator and Agency plans). Once I paste it, follow its brief to connect. The connection is 7 days, on my own credits, content-only.`;
 
-  const workforce = bp.workforce
-    .map(
-      (a) =>
-        `- ${a.name} (${a.role})\n  Mission: ${a.mission}\n  Schedule: ${a.schedule}\n  Approval rule: ${a.approval}\n  Success metric: ${a.metric}`,
-    )
-    .join("\n");
+  const agentLine = (a: Blueprint["workforce"][number]) =>
+    `- ${a.name} (${a.role})\n  Mission: ${a.mission}\n  Schedule: ${a.schedule}\n  Approval rule: ${a.approval}\n  Success metric: ${a.metric}`;
+  // Panel fix 2: the prompt promises only the seated floor; the
+  // rest is honestly queued, never silently staffed.
+  const floor = bp.workforce.filter((a) => a.seated !== false);
+  const queued = bp.workforce.filter((a) => a.seated === false);
+  const workforce =
+    `Your floor — these agents are covered by my plan's seats:\n${floor.map(agentLine).join("\n")}` +
+    (queued.length
+      ? `\n\nQueued for a seat — do NOT staff these until I upgrade or free a seat:\n${queued.map(agentLine).join("\n")}`
+      : "");
   const workflows = bp.workflows.map((w) => `- ${w.name}: ${w.flow}`).join("\n");
   const integrations = bp.integrations
-    .map((g) => `- ${g.label}: ${g.connected ? "connected" : "NOT connected"} — ${g.note}`)
+    .map((g) => {
+      // Coherence (panel, Funnel lens): when this prompt carries a
+      // live link, the bridge line must say so — the stored
+      // snapshot predates the mint.
+      if (link && g.key === "bridge") {
+        return `- ${g.label}: connected — this prompt carries my live connect link (section 1; 7 days, content-only).`;
+      }
+      return `- ${g.label}: ${g.connected ? "connected" : "NOT connected"} — ${g.note}`;
+    })
     .join("\n");
 
   return [
@@ -68,16 +81,24 @@ export function composeSetupPrompt(args: {
     `## 2. My business`,
     `Business: ${business}${website ? `\nWebsite: ${website}` : ""}`,
     `System objective: ${bp.objective}`,
+    `Brand voice: ${bp.voiceSpec ?? "Mirror the voice on my website — my own phrases, my register, no hype."}`,
     `Top opportunities: ${bp.opportunities.map((o) => `${o.title} — ${o.why}`).join(" · ")}`,
     `First, research my website and any public presence, then confirm what you learned in ONE short plain-language summary before building. If something here is wrong, fix your understanding from the research, not from my corrections.`,
     ``,
     `## 3. The system to build (my approved blueprint)`,
-    `Workforce:`,
+    `Workforce — every agent works in the brand voice above; the QA step checks against it:`,
     workforce,
     ``,
     `Workflows:`,
     workflows,
     ``,
+    ...(bp.contentSpec?.length
+      ? [
+          `Weekly content spec — the pinned targets for the rhythm (quoted exactly before anything generates):`,
+          ...bp.contentSpec.map((l) => `- ${l}`),
+          ``,
+        ]
+      : []),
     `Integrations (wire what you can; flag the rest with the ONE step I need to take):`,
     integrations,
     ``,
@@ -95,7 +116,8 @@ export function composeSetupPrompt(args: {
     `2. The management UI built, and tell me how I open it.`,
     `3. The workforce created or configured per section 3 — or a precise list of what only I can do, and why.`,
     `4. A first proof: my free /before pack (quote it first; it is the free tier).`,
-    `5. A launch report: what is running, what it does, what it costs, what it produced, what needs my attention.`,
+    `5. Connect my posting and ship ONE real post: if Upload-Post isn't connected, walk me through the one connection step in the app; then generate one piece, bring it to me, and post it only after my approve tap in the app. Day 1 ends with something live — not just built.`,
+    `6. A launch report: what is running, what it does, what it costs, what it produced, what needs my attention.`,
     ``,
     `## Rules`,
     `- Never invent connections, results, numbers, or earnings. If something is not connected, say so and give me the one step.`,

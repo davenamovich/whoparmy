@@ -23,6 +23,7 @@ interface BpAgent {
   schedule: string;
   approval: string;
   metric: string;
+  seated?: boolean;
 }
 interface Bp {
   status: "draft" | "approved";
@@ -32,6 +33,8 @@ interface Bp {
   workflows: { name: string; flow: string }[];
   integrations: { key: string; label: string; connected: boolean; note: string }[];
   budget: string;
+  contentSpec?: string[];
+  voiceSpec?: string;
   hireResults?: Record<string, string>;
 }
 interface Summary {
@@ -331,6 +334,10 @@ export function MySystemView() {
                       <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold">Already on your floor</span>
                     ) : blueprint.hireResults?.[a.templateKey] === "needs-seat" ? (
                       <span className="rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 px-2 py-0.5 text-[11px] font-semibold">Needs a bot seat — upgrade to hire</span>
+                    ) : a.seated === false ? (
+                      <span className="rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 px-2 py-0.5 text-[11px] font-semibold">Queued — needs a bot seat</span>
+                    ) : a.seated === true ? (
+                      <span className="rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 text-[11px] font-semibold">Seat covered by your plan</span>
                     ) : null}
                   </p>
                   <p className="text-sm text-muted-foreground">{a.mission}</p>
@@ -365,6 +372,21 @@ export function MySystemView() {
                 </p>
               ))}
             </div>
+
+            {blueprint.contentSpec?.length ? (
+              <div className="space-y-1.5">
+                <p className="text-sm font-semibold">Weekly content spec</p>
+                {blueprint.contentSpec.map((l, i) => (
+                  <p key={i} className="text-sm text-muted-foreground">• {l}</p>
+                ))}
+              </div>
+            ) : null}
+
+            {blueprint.voiceSpec ? (
+              <p className="text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">Brand voice:</span> {blueprint.voiceSpec}
+              </p>
+            ) : null}
 
             <p className="text-sm text-muted-foreground">
               <span className="font-medium text-foreground">Budget:</span> {blueprint.budget}
