@@ -68,7 +68,7 @@ export function composeSetupPrompt(args: {
     `## 2. My business`,
     `Business: ${business}${website ? `\nWebsite: ${website}` : ""}`,
     `System objective: ${bp.objective}`,
-    `Top opportunities: ${bp.opportunities.join(" · ")}`,
+    `Top opportunities: ${bp.opportunities.map((o) => `${o.title} — ${o.why}`).join(" · ")}`,
     `First, research my website and any public presence, then confirm what you learned in ONE short plain-language summary before building. If something here is wrong, fix your understanding from the research, not from my corrections.`,
     ``,
     `## 3. The system to build (my approved blueprint)`,
