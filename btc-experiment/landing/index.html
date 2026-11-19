@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The BTC Experiment</title>
+<meta name="description" content="Bitcoin was made for agents. Get a free Muse agent through Whop Army, give it a job, and let it work.">
+<style>
+  :root{
+    --bg:#070706;--bg2:#100c08;--orange:#f7931a;--orange-bright:#ffb84d;--orange-soft:rgba(247,147,26,.14);
+    --text:#f7f2e9;--muted:#b4aa9b;--card:#171717;--card2:#24211d;--line:#4a3a27;--metal:#9b9b96;--radius:22px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{color-scheme:dark;background:var(--bg);overflow-x:hidden}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;background:
+    radial-gradient(680px 360px at 50% -5%,rgba(247,147,26,.22),transparent 67%),
+    radial-gradient(760px 330px at 50% 52%,rgba(247,147,26,.08),transparent 70%),
+    linear-gradient(180deg,var(--bg2),var(--bg) 55%,#0b0907);color:var(--text);min-height:100vh;line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  body:before{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 38%,rgba(0,0,0,.68) 100%);z-index:-1}
+  a{color:inherit}:focus-visible{outline:3px solid var(--orange-bright);outline-offset:4px;border-radius:6px}
+  .topbar{max-width:1080px;margin:0 auto;padding:18px 20px 0;display:flex;justify-content:flex-end;position:relative;z-index:2}
+  .lang-toggle{display:inline-flex;border:1px solid #66563e;border-radius:999px;overflow:hidden;background:linear-gradient(180deg,#2a251d,#11100e);box-shadow:inset 0 1px rgba(255,255,255,.18),0 5px 18px #0008}
+  .lang-toggle button{appearance:none;border:0;background:transparent;color:#b9ae9e;cursor:pointer;font:inherit;font-size:.82rem;font-weight:800;padding:9px 14px;letter-spacing:.04em;min-height:44px}
+  .lang-toggle button[aria-pressed="true"]{background:linear-gradient(180deg,#ffd18a,var(--orange) 45%,#b95608);color:#1a0d02;box-shadow:inset 0 1px #fff8,inset 0 -3px #7d3504}
+  header.hero{max-width:900px;margin:0 auto;padding:38px 20px 4px;text-align:center}
+  h1{font-size:clamp(2.15rem,7.8vw,4.9rem);line-height:.98;letter-spacing:.055em;font-weight:950;text-transform:uppercase;color:#d8d7d2;text-shadow:0 1px #fff8,0 3px 0 #696964,0 5px 0 #252525,0 9px 22px #000,0 0 26px rgba(247,147,26,.48)}
+  h1 .btc{color:#f1eee6;background:linear-gradient(180deg,#fff9e8 0%,#c6c3ba 38%,#64645f 52%,#f4eee2 65%,#73736e 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 12px rgba(247,147,26,.75))}
+  .sub{margin:18px auto 0;max-width:650px;color:#c0b6a7;font-size:clamp(1rem,2.4vw,1.16rem);text-shadow:0 2px 8px #000}
+  .phone-wrap{position:relative;display:flex;flex-direction:column;align-items:center;padding:56px 16px 24px;isolation:isolate}
+  .phone-wrap:before{content:"";position:absolute;z-index:-1;top:20px;left:50%;width:min(680px,120vw);height:700px;transform:translateX(-50%);background:radial-gradient(ellipse at 50% 24%,rgba(255,188,84,.28) 0,rgba(247,147,26,.12) 22%,transparent 66%);filter:blur(3px);pointer-events:none}
+  .phone-wrap:after{content:"";position:absolute;z-index:-1;bottom:35px;left:50%;width:min(540px,92vw);height:86px;transform:translateX(-50%);background:radial-gradient(ellipse,rgba(247,147,26,.34),transparent 68%);filter:blur(13px);pointer-events:none}
+  .phone{position:relative;width:min(360px,88vw);aspect-ratio:360/724;border-radius:56px;padding:13px;background:
+    linear-gradient(115deg,#f0eee8 0%,#737574 5%,#282b2c 13%,#090a0a 36%,#454746 53%,#111212 71%,#b5b5b0 94%,#343535 100%);
+    box-shadow:0 48px 70px rgba(0,0,0,.88),0 22px 34px rgba(247,147,26,.15),0 0 0 2px #dedbd1,0 0 0 5px #111,inset 0 1px 2px #fff9,inset 0 -3px 5px #000;transform:perspective(1000px) rotateX(1deg)}
+  .phone:before{content:"";position:absolute;inset:5px;border-radius:51px;border:1px solid rgba(255,255,255,.22);pointer-events:none}
+  .phone:after{content:"";position:absolute;left:12%;right:12%;bottom:-28px;height:35px;border-radius:50%;background:radial-gradient(ellipse,rgba(247,147,26,.4),transparent 70%);filter:blur(9px);pointer-events:none}
+  .phone:before,.phone:after{ }
+  .phone::marker{display:none}
+  .phone .screen:after{content:"";position:absolute;inset:0;z-index:6;pointer-events:none;background:linear-gradient(122deg,rgba(255,255,255,.16),transparent 18%,transparent 66%,rgba(255,255,255,.05) 82%,transparent 100%);mix-blend-mode:screen}
+  .phone > .screen{position:relative;width:100%;height:100%;border-radius:44px;overflow:hidden;background:linear-gradient(180deg,#12100d,#080909);box-shadow:inset 0 0 0 1px rgba(255,255,255,.2),inset 0 0 34px rgba(0,0,0,.8)}
+  .phone > .screen:before{content:"";position:absolute;inset:0;z-index:5;pointer-events:none;border-radius:44px;box-shadow:inset 10px 0 18px -18px #fff8,inset -10px 0 18px -18px #fff6}
+  .phone:has(.screen)::before{content:"";position:absolute;left:-4px;top:156px;width:4px;height:104px;border-radius:4px;background:linear-gradient(90deg,#555856,#111);box-shadow:0 -62px 0 -0.5px #81827e,0 0 0 1px #111}
+  .phone:has(.screen)::after{content:"";position:absolute;right:-4px;top:192px;width:4px;height:150px;border-radius:4px;background:linear-gradient(90deg,#111,#9b9c97);box-shadow:0 0 0 1px #111}
+  .island{position:absolute;top:11px;left:50%;transform:translateX(-50%);z-index:7;width:104px;height:27px;border-radius:999px;background:#000;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12),inset -14px 0 8px -8px rgba(150,170,190,.35)}
+  .statusbar{padding:14px 24px 4px;display:flex;justify-content:space-between;align-items:center;font-size:.72rem;color:#ded8cd;font-weight:700;position:relative;z-index:2}.statusbar .dots{letter-spacing:.18em;color:var(--orange);font-size:.6rem}
+  .scenes{position:relative;flex:1;margin:8px 14px 10px}.scene{position:absolute;inset:0;display:flex;flex-direction:column;gap:10px;opacity:0;transform:translateY(8px) scale(.995);pointer-events:none;transition:opacity .6s ease,transform .6s ease}.scene.active{opacity:1;transform:none;pointer-events:auto}
+  .scene-label{align-self:flex-start;font-size:.66rem;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:var(--orange-bright);background:linear-gradient(180deg,#3d2711,#1c130a);border:1px solid #b26a20;padding:6px 10px;border-radius:7px;box-shadow:inset 0 1px #fff3,0 3px 8px #0008}
+  .mock-card{background:linear-gradient(145deg,#282726,#121313);border:1px solid #575553;border-radius:12px;padding:13px 14px;box-shadow:inset 0 1px #fff2,inset 0 -3px 6px #0008,0 5px 12px #0006}.mock-card h3{font-size:.92rem;line-height:1.3;color:#f4eee4}.mock-card p{font-size:.78rem;color:#bcb4a7;line-height:1.45}.searchbar{display:flex;align-items:center;gap:8px;background:linear-gradient(180deg,#252525,#111212);border:1px solid #555;border-radius:9px;padding:10px 13px;font-size:.8rem;color:#bdb5a9;box-shadow:inset 0 1px #fff2}.searchbar .mag{color:var(--orange);font-weight:900}.row{display:flex;gap:10px}.row .mock-card{flex:1}.tag{display:inline-block;font-size:.64rem;font-weight:800;color:#1a0e02;background:linear-gradient(180deg,#ffd18a,var(--orange));border-radius:4px;padding:2px 7px;margin-bottom:6px;box-shadow:inset 0 1px #fff8}.tag.ghost{background:transparent;color:var(--orange-bright);border:1px solid #bd6a16;box-shadow:none}.meme-visual{height:168px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 38%,rgba(247,147,26,.55),rgba(247,147,26,.08) 62%),linear-gradient(160deg,#31200d,#101010);border:1px solid #b26a20;font-size:5.2rem;color:var(--orange);font-weight:900;text-shadow:0 3px 0 #723507,0 6px 28px rgba(247,147,26,.65);box-shadow:inset 0 1px #fff2,0 5px 14px #0008}.meme-caption{font-size:.95rem;font-weight:800;text-align:center;line-height:1.35}.composer{min-height:118px}.composer .cursor{display:inline-block;width:8px;height:15px;background:var(--orange);vertical-align:-2px;animation:blink 1.1s steps(1) infinite}@keyframes blink{50%{opacity:0}}.chips{display:flex;flex-wrap:wrap;gap:7px}.chip{font-size:.68rem;border:1px solid #57504a;border-radius:6px;padding:5px 10px;color:#ddd4c6;background:linear-gradient(180deg,#2b2a28,#171817);box-shadow:inset 0 1px #fff2}ul.checks{list-style:none;display:flex;flex-direction:column;gap:9px}ul.checks li{display:flex;gap:10px;align-items:flex-start;font-size:.84rem;background:linear-gradient(145deg,#292a29,#151616);border:1px solid #555;border-radius:9px;padding:11px 12px;box-shadow:inset 0 1px #fff2,0 4px 10px #0007}ul.checks .box{flex:none;width:20px;height:20px;border-radius:4px;border:1.5px solid var(--orange);display:flex;align-items:center;justify-content:center;color:var(--orange);font-size:.72rem;font-weight:900;margin-top:1px}ul.checks li.done .box{background:linear-gradient(180deg,#ffd18a,var(--orange));color:#171006}ul.checks li small{display:block;color:#aaa196;font-size:.72rem}.report-big{font-size:1.02rem;font-weight:800;line-height:1.5}.report-big .dash{color:var(--orange)}.bar{height:8px;border-radius:99px;background:#302d29;overflow:hidden}.bar i{display:block;height:100%;width:38%;background:linear-gradient(90deg,#a94c05,var(--orange-bright));border-radius:99px}.scene-dots{display:flex;gap:9px;justify-content:center;padding:2px 0 14px}.scene-dots button{width:9px;height:9px;border-radius:99px;border:1px solid #706050;background:#342d25;cursor:pointer;padding:0;transition:all .3s;min-width:9px;min-height:9px}.scene-dots button[aria-current="true"]{background:var(--orange);border-color:#ffd18a;width:25px;box-shadow:0 0 12px #f7931a99}
+  .sim-chip{margin-top:22px;font-size:.66rem;font-weight:900;letter-spacing:.22em;color:var(--orange-bright);border:1px solid #a8611e;background:linear-gradient(180deg,#36200f,#1a1008);padding:7px 14px;border-radius:6px;text-transform:uppercase;box-shadow:inset 0 1px #fff2,0 4px 12px #0008}
+  .steps{max-width:980px;margin:38px auto 0;padding:0 20px}.steps ol{list-style:none;display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.steps li{position:relative;background:linear-gradient(145deg,#242321,#101111);border:1px solid #51483e;border-radius:12px;padding:22px;box-shadow:inset 0 1px #fff2,inset 0 -4px 8px #0008,0 13px 28px #0008}.steps li:before{content:"";position:absolute;inset:5px;border:1px solid rgba(247,147,26,.16);border-radius:8px;pointer-events:none}.steps .num{font-size:1.5rem;font-weight:950;color:var(--orange-bright);line-height:1;text-shadow:0 2px 0 #5e2805}.steps h2{font-size:.98rem;letter-spacing:.06em;margin:10px 0 7px;text-transform:uppercase}.steps p{color:#c0b6a7;font-size:.9rem}.cta-block{text-align:center;padding:46px 20px 12px}.cta{display:inline-block;position:relative;overflow:hidden;background:linear-gradient(180deg,#ffd18a 0%,var(--orange) 42%,#b95608 100%);border:1px solid #ffcf83;color:#1b0d02;text-decoration:none;font-weight:950;letter-spacing:.07em;font-size:clamp(.95rem,2.6vw,1.08rem);padding:18px 34px;border-radius:10px;min-height:56px;box-shadow:inset 0 1px #fff9,inset 0 -5px #843601,0 10px 0 #4d2206,0 17px 30px rgba(247,147,26,.28);text-shadow:0 1px #fff5}.cta:before{content:"";position:absolute;inset:2px 8%;height:35%;border-radius:50%;background:rgba(255,255,255,.24);filter:blur(5px);pointer-events:none}.cta:hover{background:linear-gradient(180deg,#ffe0a8 0%,#ffac3d 42%,#c7630b 100%)}.cta:active{transform:translateY(4px);box-shadow:inset 0 3px 7px #0007,0 6px 0 #4d2206,0 10px 18px rgba(247,147,26,.2)}.cta-sub{margin-top:20px;color:#a9a093;font-size:.92rem}footer{max-width:720px;margin:0 auto;padding:30px 20px 42px;text-align:center}footer p{font-size:.72rem;color:#70685c;line-height:1.6}
+  @media(max-width:720px){.steps ol{grid-template-columns:1fr}.steps li{padding:20px}header.hero{padding-top:26px}.phone-wrap{padding-top:42px}}
+  @media(max-width:390px){.topbar{padding-left:12px;padding-right:12px}.phone{width:min(350px,88vw);border-radius:49px;padding:11px}.phone > .screen{border-radius:39px}.phone > .screen:before,.phone .screen:after{border-radius:39px}.scenes{margin-left:11px;margin-right:11px}.mock-card{padding:11px 12px}.row{gap:7px}.row .mock-card{min-width:0}.cta{width:100%;padding-left:18px;padding-right:18px}}
+  @media(prefers-reduced-motion:reduce){.scene{transition:none}.composer .cursor{animation:none}.cta,.phone{transform:none}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="lang-toggle" role="group" aria-label="Language / 言語">
+    <button type="button" id="btn-en" aria-pressed="true">EN</button>
+    <button type="button" id="btn-ja" aria-pressed="false">日本語</button>
+  </div>
+</div>
+
+<header class="hero">
+  <h1><span class="btc">Bitcoin</span> was made for agents.</h1>
+  <p class="sub">What happens when you give an AI agent a job, a distribution network, and access to Bitcoin? We&rsquo;re running the experiment.</p>
+</header>
+
+<main>
+  <section class="phone-wrap" aria-label="Agent demonstration inside a phone">
+    <div class="phone" role="img" aria-label="A smartphone showing an AI agent researching, creating a meme, preparing a webinar post, distributing an offer, and reporting results. This is a simulation.">
+      <div class="screen">
+        <div class="island" aria-hidden="true"></div>
+        <div class="statusbar" aria-hidden="true"><span>9:41</span><span class="dots">&#9679;&#9679;&#9679;</span></div>
+
+        <div class="scenes" id="scenes">
+
+          <!-- Scene 1: Researching -->
+          <article class="scene active" aria-label="Scene 1">
+            <span class="scene-label" data-en="Agent researching" data-ja="エージェントが調査中">Agent researching</span>
+            <div class="searchbar"><span class="mag" aria-hidden="true">&#8981;</span><span data-en="DH Media — tools for a small business" data-ja="DH Media — 小規模ビジネス向けツール">DH Media — tools for a small business</span></div>
+            <div class="mock-card">
+              <span class="tag" data-en="Found" data-ja="見つけました">Found</span>
+              <h3 data-en="Social Planner" data-ja="ソーシャルプランナー">Social Planner</h3>
+              <p data-en="Plan and schedule social posts in one place." data-ja="SNS投稿をひとつの場所で計画・予約できます。">Plan and schedule social posts in one place.</p>
+            </div>
+            <div class="row">
+              <div class="mock-card">
+                <h3 data-en="Website Builder" data-ja="ウェブサイトビルダー">Website Builder</h3>
+                <p data-en="Pages and funnels." data-ja="ページとファネル。">Pages and funnels.</p>
+              </div>
+              <div class="mock-card">
+                <h3 data-en="Booking" data-ja="予約カレンダー">Booking</h3>
+                <p data-en="Calendars that fill themselves." data-ja="自動で埋まるカレンダー。">Calendars that fill themselves.</p>
+              </div>
+            </div>
+            <div class="mock-card">
+              <p data-en="Next: who needs this, and where do they hang out?" data-ja="次に：誰に必要で、どこに集まっているか？">Next: who needs this, and where do they hang out?</p>
+            </div>
+          </article>
+
+          <!-- Scene 2: Meme -->
+          <article class="scene" aria-label="Scene 2">
+            <span class="scene-label" data-en="Agent creating a meme" data-ja="エージェントがミームを作成中">Agent creating a meme</span>
+            <div class="meme-visual" aria-hidden="true">&#8383;</div>
+            <p class="meme-caption" data-en="&ldquo;My agent posted while I slept.&rdquo;" data-ja="「寝ている間に、エージェントが投稿してくれた。」">&ldquo;My agent posted while I slept.&rdquo;</p>
+            <div class="chips">
+              <span class="chip" data-en="Made with the Meme Engine" data-ja="ミームエンジンで作成">Made with the Meme Engine</span>
+              <span class="chip" data-en="Ready to review" data-ja="確認待ち">Ready to review</span>
+            </div>
+          </article>
+
+          <!-- Scene 3: Webinar post -->
+          <article class="scene" aria-label="Scene 3">
+            <span class="scene-label" data-en="Agent preparing a webinar post" data-ja="エージェントがウェビナー投稿を準備中">Agent preparing a webinar post</span>
+            <div class="mock-card composer">
+              <span class="tag ghost" data-en="Draft post" data-ja="投稿の下書き">Draft post</span>
+              <p style="color:var(--text);font-size:.88rem"><span data-en="Live this week: watch an agent get a real job — research, content, and distribution, start to finish." data-ja="今週ライブ：エージェントが本当の仕事をする様子をご覧ください — 調査、コンテンツ、配信まで、最初から最後まで。">Live this week: watch an agent get a real job — research, content, and distribution, start to finish.</span> <span class="cursor" aria-hidden="true"></span></p>
+            </div>
+            <div class="chips">
+              <span class="chip" data-en="Webinar invite" data-ja="ウェビナー招待">Webinar invite</span>
+              <span class="chip" data-en="Your link attached" data-ja="あなたのリンクを添付">Your link attached</span>
+              <span class="chip" data-en="Waiting for your OK" data-ja="あなたの承認待ち">Waiting for your OK</span>
+            </div>
+            <div class="mock-card">
+              <p data-en="Nothing posts until you approve it." data-ja="承認するまで、何も投稿されません。">Nothing posts until you approve it.</p>
+            </div>
+          </article>
+
+          <!-- Scene 4: Distributing -->
+          <article class="scene" aria-label="Scene 4">
+            <span class="scene-label" data-en="Agent distributing" data-ja="エージェントが配信中">Agent distributing</span>
+            <ul class="checks">
+              <li class="done"><span class="box" aria-hidden="true">&#10003;</span><span><span data-en="Meme approved" data-ja="ミーム承認済み">Meme approved</span><small data-en="By you, in Whop Army" data-ja="Whop Armyであなたが承認">By you, in Whop Army</small></span></li>
+              <li class="done"><span class="box" aria-hidden="true">&#10003;</span><span><span data-en="Webinar post scheduled" data-ja="ウェビナー投稿を予約済み">Webinar post scheduled</span><small data-en="Upload-Post" data-ja="Upload-Post">Upload-Post</small></span></li>
+              <li><span class="box" aria-hidden="true"></span><span><span data-en="Referral link live" data-ja="紹介リンクを公開">Referral link live</span><small data-en="Attribution preserved" data-ja="アトリビューションを保持">Attribution preserved</small></span></li>
+              <li><span class="box" aria-hidden="true"></span><span><span data-en="Rotator placement" data-ja="ローテーター掲載">Rotator placement</span><small data-en="Shared traffic pool" data-ja="共有トラフィックプール">Shared traffic pool</small></span></li>
+            </ul>
+          </article>
+
+          <!-- Scene 5: Reporting -->
+          <article class="scene" aria-label="Scene 5">
+            <span class="scene-label" data-en="Agent reporting" data-ja="エージェントがレポート中">Agent reporting</span>
+            <div class="mock-card">
+              <span class="tag ghost" data-en="Daily report" data-ja="デイリーレポート">Daily report</span>
+              <p class="report-big"><span data-en="Referrals:" data-ja="紹介：">Referrals:</span> <span class="dash">—</span><br>
+              <span data-en="Commissions: reported from the program dashboard" data-ja="コミッション：プログラムのダッシュボードから報告">Commissions: reported from the program dashboard</span></p>
+            </div>
+            <div class="mock-card">
+              <p data-en="Work done today" data-ja="今日の作業" style="margin-bottom:8px">Work done today</p>
+              <div class="bar" aria-hidden="true"><i></i></div>
+              <p data-en="Research · 1 meme · 1 post · distribution queued" data-ja="調査 ・ ミーム1件 ・ 投稿1件 ・ 配信キュー済み" style="margin-top:8px">Research · 1 meme · 1 post · distribution queued</p>
+            </div>
+            <div class="mock-card">
+              <p data-en="No earnings are promised. The agent reports what the program reports — nothing more." data-ja="収益は約束されません。エージェントはプログラムの報告をそのまま伝えます — それ以上でも以下でもありません。">No earnings are promised. The agent reports what the program reports — nothing more.</p>
+            </div>
+          </article>
+
+        </div>
+
+        <div class="scene-dots" role="tablist" aria-label="Demonstration scenes"></div>
+      </div>
+    </div>
+    <span class="sim-chip" data-en="Simulation" data-ja="シミュレーション">Simulation</span>
+  </section>
+
+  <section class="steps" aria-label="Three steps">
+    <ol>
+      <li>
+        <span class="num" aria-hidden="true">1</span>
+        <h2 data-en="Get your agent" data-ja="エージェントを手に入れる">Get your agent</h2>
+        <p data-en="Your customized Muse agent, configured through Whop Army." data-ja="Whop Armyを通じて設定された、あなた専用のClaudeエージェント。">Your customized Muse agent, configured through Whop Army.</p>
+      </li>
+      <li>
+        <span class="num" aria-hidden="true">2</span>
+        <h2 data-en="Give it a job" data-ja="仕事を与える">Give it a job</h2>
+        <p data-en="Connect the Bitcoin affiliate opportunity and your promotional tools." data-ja="ビットコインのアフィリエイト機会とプロモーションツールを接続します。">Connect the Bitcoin affiliate opportunity and your promotional tools.</p>
+      </li>
+      <li>
+        <span class="num" aria-hidden="true">3</span>
+        <h2 data-en="Let it work" data-ja="働かせる">Let it work</h2>
+        <p data-en="Your agent researches, creates, distributes, and tracks results." data-ja="エージェントが調査し、作成し、配信し、結果を追跡します。">Your agent researches, creates, distributes, and tracks results.</p>
+      </li>
+    </ol>
+  </section>
+
+  <section class="cta-block">
+    <a class="cta" id="cta" href="watch.html">START THE BTC EXPERIMENT</a>
+    <p class="cta-sub">No coding. No expensive AI subscription. Just copy, paste, and let Muse get to work.</p>
+  </section>
+</main>
+
+<footer>
+  <p>An experiment, not a promise. No earnings are guaranteed. DH Media terms apply at dh.media. Commissions, if any, are paid by the affiliate program, not by Whop Army.</p>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  /* --- CTA: preserve an incoming ?ref= --- */
+  try{
+    var ref = new URLSearchParams(window.location.search).get("ref");
+    if(ref){
+      document.getElementById("cta").href =
+        "watch.html?ref=" + encodeURIComponent(ref);
+    }
+  }catch(e){}
+
+  /* --- Scene rotation (~4s, crossfade) --- */
+  var scenes = Array.prototype.slice.call(document.querySelectorAll(".scene"));
+  var dotsWrap = document.querySelector(".scene-dots");
+  var current = 0, timer = null;
+  var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var dots = scenes.map(function(_, i){
+    var b = document.createElement("button");
+    b.type = "button";
+    b.setAttribute("role","tab");
+    b.setAttribute("aria-label","Scene " + (i+1));
+    b.setAttribute("aria-current", i===0 ? "true" : "false");
+    b.addEventListener("click", function(){ show(i); restart(); });
+    dotsWrap.appendChild(b);
+    return b;
+  });
+
+  function show(i){
+    scenes[current].classList.remove("active");
+    dots[current].setAttribute("aria-current","false");
+    current = i;
+    scenes[current].classList.add("active");
+    dots[current].setAttribute("aria-current","true");
+  }
+  function next(){ show((current+1) % scenes.length); }
+  function restart(){
+    if(reduced) return;
+    if(timer) clearInterval(timer);
+    timer = setInterval(next, 4000);
+  }
+  restart();
+  document.addEventListener("visibilitychange", function(){
+    if(document.hidden){ if(timer) clearInterval(timer); }
+    else { restart(); }
+  });
+
+  /* --- EN / 日本語 toggle: phone scenes + step labels only --- */
+  var translatable = Array.prototype.slice.call(document.querySelectorAll("[data-en]"));
+  var btnEn = document.getElementById("btn-en");
+  var btnJa = document.getElementById("btn-ja");
+
+  function setLang(lang){
+    translatable.forEach(function(el){
+      var val = el.getAttribute("data-" + lang);
+      if(val !== null) el.textContent = val;
+    });
+    btnEn.setAttribute("aria-pressed", lang==="en" ? "true" : "false");
+    btnJa.setAttribute("aria-pressed", lang==="ja" ? "true" : "false");
+  }
+  btnEn.addEventListener("click", function(){ setLang("en"); });
+  btnJa.addEventListener("click", function(){ setLang("ja"); });
+})();
+</script>
+</body>
+</html>
