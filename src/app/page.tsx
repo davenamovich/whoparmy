@@ -14,11 +14,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import type { ProfileDTO } from "@/lib/types";
-import { CreateWizard, type WizardResult } from "@/components/factory/create-wizard";
 import { ResultsWorkspace } from "@/components/factory/results-workspace";
-import { MemeStudio } from "@/components/factory/meme-studio";
-import { VideoStudio } from "@/components/factory/video-studio";
 import { MemeArmy } from "@/components/factory/meme-army";
 import { WarRoom } from "@/components/factory/war-room";
 import { AgentsView } from "@/components/factory/agents";
@@ -52,9 +48,15 @@ type View =
 type NavKey = "create" | "ralph" | "campaigns" | "library" | "army" | "agents" | "system" | "account" | "admin";
 
 // Consolidated menu (Dave, 2026-11-17): fewer doors, same rooms.
-// Meme Studio folded into Create; the War Room folded into Meme
-// Army. The "studio" / "warroom" view keys no longer exist — the
-// components render inside their parent views below.
+// The War Room folded into Meme Army. The "warroom" view key no
+// longer exists — the component renders inside its parent view.
+//
+// Agent-creation reframe (Dave, 2026-11-19): the manual tools are
+// GONE — no Meme Studio, no Video Studio, no campaign wizard. The
+// member's agents create; the Create room holds the agent-led
+// start, Brand Profiles (agents work from them) and Trending
+// (headlines hand off to the member's Meme Smith as jobs). The
+// Telegram bot offer (Meme Army) stays.
 //
 // Nav diet, phase 1 (Dave, 2026-11-18, UI audit): Brands, Trending
 // and Publishing lose their doors too — Brands and Trending are
@@ -83,9 +85,6 @@ const MOBILE_NAV: View[] = ["create", "campaigns", "army", "agents", "account"];
 export default function Home() {
   const [view, setView] = useState<View>("create");
   const [resultsCampaignId, setResultsCampaignId] = useState<string | null>(null);
-  const [brandPrefill, setBrandPrefill] = useState<ProfileDTO | null>(null);
-  const [brandPrefillName, setBrandPrefillName] = useState<string | null>(null);
-  const [memePrefill, setMemePrefill] = useState<{ topic: string; nonce: number } | null>(null);
   // Front-door quiz (Dave, 2026-11-18): shown until the member's
   // answers (or a skip) are on file — see lib/quiz.ts.
   const [quizNeeded, setQuizNeeded] = useState(false);
@@ -172,38 +171,11 @@ export default function Home() {
     setView("results");
   }
 
-  function startWizardWithBrand(profile: ProfileDTO, name: string) {
-    setBrandPrefill(profile);
-    setBrandPrefillName(name);
-    setView("create");
-  }
-
-  // Trending → Create a Meme (Dave, 2026-11-17): the trend's brief
-  // lands in the Meme Studio topic field, ready to generate — the
-  // button never routes a member to a bot they can't use.
-  function startMemesFromTrend(topic: string) {
-    setMemePrefill({ topic, nonce: Date.now() });
-    setView("create");
-  }
-
-  function clearBrandPrefill() {
-    setBrandPrefill(null);
-    setBrandPrefillName(null);
-  }
-
   // Ralph chat navigation intents: Ralph routes, the page moves.
-  // A meme topic rides the same prefill the Trending view uses.
+  // (Topic taps no longer navigate — Ralph hands them to the
+  // member's Meme Smith directly, see ralph-chat.tsx.)
   function onRalphNavigate(intent: RalphNavIntent) {
-    if (intent.memeTopic) {
-      startMemesFromTrend(intent.memeTopic);
-      return;
-    }
     setView(intent.view);
-  }
-
-  function onWizardCompleted(result: WizardResult) {
-    openResults(result.campaignId);
-    clearBrandPrefill();
   }
 
   const activeLabel =
@@ -263,7 +235,6 @@ export default function Home() {
             <button
               key={item.key}
               onClick={() => {
-                if (item.key === "create") clearBrandPrefill();
                 setView(item.key);
               }}
               className={cn(
@@ -314,7 +285,8 @@ export default function Home() {
             <div className="space-y-12">
               {/* The agent-led start (Dave, 2026-11-18): one input —
                   website or CTA — then research + the agent handoff.
-                  Everything below this card is the manual stack. */}
+                  Everything in this room feeds the member's agents;
+                  there are no manual creation tools (Dave, 2026-11-19). */}
               <AgentStart />
               {/* The teardown card (Dave, 2026-11-19): a working
                   competitor ad/post in, angles + one agent command
@@ -335,14 +307,14 @@ export default function Home() {
                   <span className="block text-xs text-muted-foreground truncate">Free content · free AI audit · he remembers your business</span>
                 </span>
               </button>
-              {/* The manual stack, demoted (Dave, 2026-11-18):
-                  generation belongs in the member's agent; these
-                  stay for anyone who wants to make something by
-                  hand. */}
+              {/* Agent fuel (Dave, 2026-11-19): the manual studios
+                  and the campaign wizard are removed — what remains
+                  in this room is what the member's agents work from:
+                  their brand profiles and today's trends. */}
               <div className="flex items-center gap-3 pt-2" aria-hidden>
                 <span className="h-px flex-1 bg-border" />
                 <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Manual tools — most members hand this to their agent
+                  What your agents work from
                 </span>
                 <span className="h-px flex-1 bg-border" />
               </div>
@@ -356,8 +328,6 @@ export default function Home() {
                 {[
                   { id: "create-brands", label: "Brand Profiles" },
                   { id: "create-trending", label: "🔥 Trending — Reply Guy lives here" },
-                  { id: "create-meme-studio", label: "Meme Studio" },
-                  { id: "create-video-studio", label: "Video Studio" },
                 ].map((chip) => (
                   <button
                     key={chip.id}
@@ -368,22 +338,16 @@ export default function Home() {
                   </button>
                 ))}
               </div>
-              {/* Nav diet phase 1: Brands lives here now — pick or
-                  research a brand, then the wizard below runs with it. */}
+              {/* Brands lives here — the profiles the member's
+                  agents work from. Its button jumps to the Agents
+                  floor to brief them. */}
               <div id="create-brands" className="scroll-mt-24">
-                <BrandsView onUseInCampaign={startWizardWithBrand} />
+                <BrandsView onBriefAgents={() => setView("agents")} />
               </div>
-              <CreateWizard onCompleted={onWizardCompleted} initialProfile={brandPrefill} initialProfileName={brandPrefillName} />
-              {/* Trending lives here too — its one action loads the
-                  meme studio directly below it. */}
+              {/* Trending lives here too — its one action hands the
+                  headline to the member's Meme Smith as a job. */}
               <div id="create-trending" className="scroll-mt-24">
-                <TrendingView onCreateMemes={startMemesFromTrend} />
-              </div>
-              <div id="create-meme-studio" className="scroll-mt-24">
-                <MemeStudio prefill={memePrefill} />
-              </div>
-              <div id="create-video-studio" className="scroll-mt-24">
-                <VideoStudio />
+                <TrendingView onGoToAgents={() => setView("agents")} />
               </div>
             </div>
           ) : null}
@@ -393,7 +357,7 @@ export default function Home() {
           ) : null}
           {view === "campaigns" ? (
             <div className="space-y-12">
-              <CampaignsView onOpen={openResults} onNewCampaign={() => { clearBrandPrefill(); setView("create"); }} />
+              <CampaignsView onOpen={openResults} onNewCampaign={() => setView("create")} />
               {/* Publishing folded in (nav diet phase 1): posting
                   state is a property of the campaigns above. */}
               <PublishingView />
@@ -435,7 +399,6 @@ export default function Home() {
             <button
               key={item.key}
               onClick={() => {
-                if (item.key === "create") clearBrandPrefill();
                 setView(item.key);
               }}
               className={cn(

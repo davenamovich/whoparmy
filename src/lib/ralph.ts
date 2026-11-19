@@ -47,7 +47,7 @@ export interface RalphReply {
   text: string;
   actions: RalphActionId[];
   nav?: { view: "create" | "agents" | "campaigns" | "account" | "system"; memeTopic?: string };
-  /** Trending picks: tapping one loads the Meme Studio with the topic. */
+  /** Trending picks: tapping one hands the topic to the member's Meme Smith as a job. */
   topics?: string[];
 }
 
@@ -219,7 +219,7 @@ export async function ralphAction(userId: string, locale: string, actionId: Ralp
       }
       const list = top.map((t, i) => `${i + 1}. ${t.title}`).join("\n");
       return {
-        text: `Today's board:\n\n${list}\n\nTap a topic below and it lands in the Meme Studio, ready to generate.`,
+        text: `Today's board:\n\n${list}\n\nTap a topic below and I'll hand it straight to your Meme Smith as a job.`,
         actions: ["make_content", "free_audit", "memory"],
         topics: top.map((t) => t.title),
       };
@@ -231,7 +231,7 @@ export async function ralphAction(userId: string, locale: string, actionId: Ralp
       ]);
       if (hires.length === 0) {
         return {
-          text: "No bots on your floor yet. Your plan includes bot seats — rent one and it starts working your content, research, or audits. Taking you to the catalog.",
+          text: "No agents on your floor yet — agents are free on every plan, no seats, no rentals. Set one up and it starts working your content, research, or audits. Taking you to the catalog.",
           actions: ["free_audit", "make_content"],
           nav: { view: "agents" },
         };

@@ -24,7 +24,7 @@ import {
 const CONTINUE_LINES: Record<PromotingId, string> = {
   business: "Continue to Create — drop your website there and your free Before pack starts from it.",
   affiliate: "Continue to Create — your links and brands live there, and every piece you make carries them.",
-  creator: "Continue to Create — trending topics and the meme studio live there.",
+  creator: "Continue to Create — trending topics and your brand profiles live there, and your agents build from both.",
   clients: "Continue to Agents — your bots, jobs and client brands live there.",
   idea: "Continue to Ralph — talk the idea out and he'll research it with you.",
 };

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocale } from "next-intl";
 import { Bot, SendHorizonal, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { handBriefToMemeSmith } from "./agent-handoff";
 
 /**
  * ─── RALPH CHAT (Dave, 2026-11-18) ──────────────────────────────────
@@ -122,8 +123,17 @@ export function RalphChat({ onNavigate }: { onNavigate: (intent: RalphNavIntent)
     void send({ actionId: a.id }, a.label);
   }
 
+  // Dave, 2026-11-19: no manual studio to land in — a topic tap
+  // hands the trend straight to the member's Meme Smith as a job.
+  // No Meme Smith yet → the Agents floor, where they set one up.
   function tapTopic(topic: string) {
-    onNavigate({ view: "create", memeTopic: topic });
+    void (async () => {
+      const result = await handBriefToMemeSmith(
+        `TRENDING NOW: "${topic}". Ride this trend for my business — timely, native, shareable.`,
+      );
+      setMessages((m) => [...m, { role: "ralph", text: result.message, actions: [] }]);
+      if (result.noAgent) onNavigate({ view: "agents" });
+    })();
   }
 
   function submitDraft() {

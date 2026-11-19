@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ReplyGuyButton } from "./reply-guy";
+import { handBriefToMemeSmith } from "./agent-handoff";
 
 const X_POST_RE = /^https:\/\/(x\.com|twitter\.com)\/[^/]+\/status\/\d+/;
 
@@ -17,11 +18,10 @@ const X_POST_RE = /^https:\/\/(x\.com|twitter\.com)\/[^/]+\/status\/\d+/;
  * Topics (Google Trends + Google News) with a viral headline written
  * for each, settled once per day server-side: the first read of the
  * day builds the set and every refresh serves that same snapshot,
- * so the wire never reloads under a member. One click creates: the
- * headline becomes a meme job on the member's first active bot.
- * No bot yet → the click routes to the Army to rent one. The viral3
- * Scout's weekly deep-scan batches (Video Studio) stay the curated
- * layer; this is the daily wire.
+ * so the wire never reloads under a member. One click hands off:
+ * the headline becomes a meme job for the member's own Meme Smith
+ * (Dave, 2026-11-19 — no manual studios; agents create). No Meme
+ * Smith yet → the click routes to the Agents floor to set one up.
  */
 
 interface TrendTopic {
@@ -34,7 +34,7 @@ interface TrendTopic {
   hook: string;
 }
 
-export function TrendingView({ onCreateMemes }: { onCreateMemes: (brief: string) => void }) {
+export function TrendingView({ onGoToAgents }: { onGoToAgents: () => void }) {
   const locale = useLocale();
   const [topics, setTopics] = useState<TrendTopic[] | null>(null);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
@@ -60,13 +60,23 @@ export function TrendingView({ onCreateMemes }: { onCreateMemes: (brief: string)
     void load();
   }, [load]);
 
-  // Dave, 2026-11-17: Create Memes populates Create a Meme — the
-  // trend's brief lands in the Meme Studio topic field, ready to
-  // generate. It never routes a member to a bot they can't use.
-  function createFromTrend(topic: TrendTopic) {
+  // Dave, 2026-11-19: the manual studios are gone — a headline
+  // becomes a job handed to the member's own Meme Smith, never a
+  // form the member fills in. No Meme Smith yet → the Agents floor.
+  const [handingOff, setHandingOff] = useState<string | null>(null);
+  async function createFromTrend(topic: TrendTopic) {
     const brief = `TRENDING NOW: "${topic.title}"${topic.traffic ? ` (${topic.traffic} searches today)` : ""}. Headline angle: ${topic.headline}${topic.hook ? `. Hook: ${topic.hook}` : ""}. Ride this trend for my business — timely, native, shareable.`;
-    onCreateMemes(brief);
-    toast.success("Loaded in Create a Meme — Meme Studio is filled in for this headline. Hit Generate when you're ready.");
+    setHandingOff(topic.title);
+    const result = await handBriefToMemeSmith(brief);
+    setHandingOff(null);
+    if (result.ok) {
+      toast.success(result.message);
+    } else if (result.noAgent) {
+      toast.error(result.message);
+      onGoToAgents();
+    } else {
+      toast.error(result.message);
+    }
   }
 
   return (
@@ -125,9 +135,9 @@ export function TrendingView({ onCreateMemes }: { onCreateMemes: (brief: string)
                 <p className="text-[13px] text-muted-foreground">{t.title}</p>
                 <p className="text-base font-black leading-snug">{t.headline}</p>
                 {t.hook ? <p className="text-xs text-muted-foreground">{t.hook}</p> : null}
-                <Button size="sm" className="w-full" onClick={() => createFromTrend(t)}>
+                <Button size="sm" className="w-full" disabled={handingOff === t.title} onClick={() => void createFromTrend(t)}>
                   <Zap className="h-3.5 w-3.5 mr-1" />
-                  Create memes from this headline
+                  {handingOff === t.title ? "Handing to your Meme Smith…" : "Hand to my Meme Smith"}
                 </Button>
                 {X_POST_RE.test(t.link) ? <ReplyGuyButton topic={t} /> : null}
               </CardContent>
@@ -138,7 +148,7 @@ export function TrendingView({ onCreateMemes }: { onCreateMemes: (brief: string)
 
       <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
         <Bot className="h-3.5 w-3.5" />
-        Deeper cuts: the viral3 Scout's weekly trend batches feed the Video Studio — this wire is the daily layer on top.
+        Deeper cuts: the viral3 Scout's weekly trend batches feed your agents' research — this wire is the daily layer on top.
       </p>
     </div>
   );

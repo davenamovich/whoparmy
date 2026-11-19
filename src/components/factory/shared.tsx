@@ -144,7 +144,7 @@ export function CopyButton({ text, size = "sm" }: { text: string; size?: "sm" | 
   );
 }
 
-// ─── Asset card (results workspace, library, meme studio) ───────────
+// ─── Asset card (results workspace, library) ───────────
 
 const VARIATIONS = [
   { key: "funnier", label: "Make it funnier" },

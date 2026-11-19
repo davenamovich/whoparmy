@@ -24,7 +24,8 @@ import { narrativePromptBlock } from "@/lib/narrative-hooks";
  * blanks and the snapshot retries on the next refresh.
  *
  * This complements the viral3 Scout's weekly curated trend batches
- * (Video Studio): that is the deep scan; this is the daily wire.
+ * (the agents' research layer): that is the deep scan; this is the
+ * daily wire.
  *
  * X LANE (Dave, 2026-11-18): the day's topics can also be seeded
  * from real X posts — Muse's daily job finds what's moving on X

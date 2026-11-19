@@ -18,7 +18,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { LANGUAGES } from "@/lib/languages";
-import type { AnalyzeResponse, BrandDTO, ProfileDTO, ResearchJobDTO, ResearchSummary } from "@/lib/types";
+import type { AnalyzeResponse, BrandDTO, ResearchJobDTO, ResearchSummary } from "@/lib/types";
 import { EmptyState, LangChip, SectionHeader } from "./shared";
 import { WaitExplainer, RESEARCH_WAIT_SLIDES } from "./wait-explainer";
 
@@ -63,29 +63,10 @@ function formFromBrand(b: BrandDTO): BrandForm {
   };
 }
 
-function brandToProfile(b: BrandDTO): ProfileDTO {
-  return {
-    name: b.name,
-    industry: b.industry ?? undefined,
-    description: b.description ?? "",
-    products: (b.products ?? "")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean),
-    audience: b.audience ?? undefined,
-    sellingPoints: [],
-    differentiators: [],
-    website: b.website ?? undefined,
-    primaryLanguage: b.languages[0] ?? "en",
-    suggestedLanguages: b.languages,
-    suggestedTones: [],
-  };
-}
-
 export function BrandsView({
-  onUseInCampaign,
+  onBriefAgents,
 }: {
-  onUseInCampaign: (profile: ProfileDTO, brandName: string) => void;
+  onBriefAgents: () => void;
 }) {
   const { toast } = useToast();
   const [brands, setBrands] = useState<BrandDTO[] | null>(null);
@@ -411,9 +392,9 @@ export function BrandsView({
               <div className="flex flex-col gap-2 mt-auto pt-2">
                 <Button
                   className="w-full font-semibold"
-                  onClick={() => onUseInCampaign(brandToProfile(b), b.name)}
+                  onClick={() => onBriefAgents()}
                 >
-                  Use in campaign
+                  Brief my agents
                 </Button>
                 <div className="flex items-center gap-2">
                   <Button variant="outline" className="flex-1" onClick={() => openEdit(b)}>
@@ -664,7 +645,7 @@ export function BrandsView({
           <Badge variant="outline" className="mr-2 bg-secondary/60">
             Tip
           </Badge>
-          &quot;Use in campaign&quot; pre-fills the campaign brief with this profile&apos;s details.
+          Your agents already work from your saved brand profiles — &quot;Brief my agents&quot; takes you to the floor to hand them the job.
         </p>
       ) : null}
     </div>
