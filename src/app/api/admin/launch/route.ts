@@ -3,6 +3,7 @@ import { getSessionOperator } from "@/lib/site-gate";
 import { stackById } from "@/lib/stacks";
 import { BRIDGE_PARTNERS } from "@/lib/bridge";
 import { getSavedDhMediaLink } from "@/lib/btc-addresses";
+import { ensureBarryAgent } from "@/lib/barry-agent";
 import {
   BridgeError,
   MAX_BUDGET_CREDITS,
@@ -71,6 +72,21 @@ export async function POST(req: NextRequest) {
       await getMemberEngineKey(operator);
       const offer = bridgeOffer("week");
       minted = await mintBridgeCode(operator.id, offer.budgetCredits, "week");
+    }
+    // BTC Barry's agent record (Dave, 2026-11-19): a successful
+    // launch is what puts Barry on the member's roster — one
+    // HiredAgent row per member, so he holds a Traffic Pool v1
+    // allotment like every other agent and shows on their agents
+    // view. Only AFTER the gate above passed and the code minted;
+    // no other stack creates a record here. Best-effort by design:
+    // the record is roster/pool bookkeeping, and a failure must
+    // never eat a launch that already minted its bridge code.
+    if (stack.id === "btc-experiment") {
+      try {
+        await ensureBarryAgent(operator.id, operator.plan);
+      } catch (err) {
+        console.error("[launch] ensureBarryAgent failed:", err);
+      }
     }
     let prompt = stack.promptTemplate.replaceAll("{BRIDGE_CODE}", minted.code);
     if (prompt.includes("{MEMBER_NAME}")) {
