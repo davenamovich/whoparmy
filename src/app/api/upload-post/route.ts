@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getWhopUser } from "@/lib/auth";
 import {
+  HOUSE_ACCOUNT_EMAIL,
   UpError,
   clearUpConnection,
   getUpConnection,
@@ -23,6 +24,7 @@ export const runtime = "nodejs";
 
 interface StateBody {
   connected: boolean;
+  house?: boolean;
   email?: string | null;
   plan?: string | null;
   keyHint?: string;
@@ -33,7 +35,13 @@ interface StateBody {
 async function stateFor(userId: string): Promise<StateBody> {
   const conn = await getUpConnection(userId);
   if (!conn) return { connected: false };
-  const base: StateBody = { connected: true, email: conn.email, plan: conn.plan, keyHint: maskKey(conn.apiKey) };
+  const base: StateBody = {
+    connected: true,
+    house: conn.email === HOUSE_ACCOUNT_EMAIL,
+    email: conn.email,
+    plan: conn.plan,
+    keyHint: maskKey(conn.apiKey),
+  };
   try {
     base.profiles = await upFetchProfiles(conn.apiKey);
   } catch (err) {

@@ -68,6 +68,12 @@ export interface UpConnection {
  *  yet — Dave's saved hub offer (upload-post.com/?ref=VESSEL). */
 export const UPLOAD_POST_SIGNUP_URL = "https://upload-post.com/?ref=VESSEL";
 
+/** The house Upload-Post account (the operator's own, used by the
+ *  P&R Page circuit). If a key resolving to this account gets
+ *  connected in the member lane, the card says so plainly — its
+ *  profiles are the house's, not a member's (Dave, 2026-11-18). */
+export const HOUSE_ACCOUNT_EMAIL = "convertpods1@gmail.com";
+
 const keyFor = (userId: string) => `${KEY_PREFIX}${userId}`;
 
 export async function getUpConnection(userId: string): Promise<UpConnection | null> {

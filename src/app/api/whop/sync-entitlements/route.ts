@@ -96,6 +96,19 @@ export async function POST(_req: NextRequest) {
       }
     }
 
+    // A sync where EVERY check errored proves nothing about the
+    // member's access — never let it reset a paying member to FREE.
+    // Fail loudly with the first real error instead (Dave hit a
+    // silent/erroring sync 2026-11-18).
+    const anyCheckSucceeded = checks.some((c) => c.access_level !== "error");
+    if (!resolvedTier && !anyCheckSucceeded) {
+      const firstError = checks.find((c) => c.error)?.error ?? "Whop returned no usable access checks";
+      return NextResponse.json(
+        { error: `Entitlement sync couldn't verify your access: ${firstError}. Your current plan was left unchanged.`, checks },
+        { status: 502 },
+      );
+    }
+
     const plan = resolvedTier ?? "FREE";
     await db.user.update({
       where: { id: user.id },

@@ -30,6 +30,7 @@ interface Profile {
 }
 interface State {
   connected: boolean;
+  house?: boolean;
   email?: string | null;
   plan?: string | null;
   keyHint?: string;
@@ -168,6 +169,18 @@ export function UploadPostCard() {
                 <Unlink className="h-3.5 w-3.5 mr-1" /> Disconnect
               </Button>
             </div>
+
+            {state.house ? (
+              <p className="flex items-start gap-2 text-sm rounded-lg border border-border bg-muted/50 px-3 py-2">
+                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>
+                  This key belongs to the <b>house Upload-Post account</b> — the profiles below are the
+                  house's (Plunderandriffle, Jobless Joe…), not a member's. That's expected when the
+                  operator tests with the house key; a member connecting their own key sees only their
+                  own profiles and socials.
+                </span>
+              </p>
+            ) : null}
 
             {state.profilesError ? (
               <p className="flex items-center gap-2 text-sm text-destructive">

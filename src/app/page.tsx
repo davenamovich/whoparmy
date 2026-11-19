@@ -304,15 +304,39 @@ export default function Home() {
                   <span className="block text-xs text-muted-foreground truncate">Free content · free AI audit · he remembers your business</span>
                 </span>
               </button>
+              {/* Jump chips (Dave, 2026-11-18: "where is reply guy" —
+                  the Create room stacks everything, so the doors get
+                  named shortcuts at the top). */}
+              <div className="flex flex-wrap gap-2 -mb-6">
+                {[
+                  { id: "create-trending", label: "🔥 Trending — Reply Guy lives here" },
+                  { id: "create-meme-studio", label: "Meme Studio" },
+                  { id: "create-video-studio", label: "Video Studio" },
+                ].map((chip) => (
+                  <button
+                    key={chip.id}
+                    onClick={() => document.getElementById(chip.id)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                    className="rounded-full border border-border bg-card px-3.5 py-1.5 text-xs font-semibold hover:border-primary/50 transition-colors"
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
               {/* Nav diet phase 1: Brands lives here now — pick or
                   research a brand, then the wizard below runs with it. */}
               <BrandsView onUseInCampaign={startWizardWithBrand} />
               <CreateWizard onCompleted={onWizardCompleted} initialProfile={brandPrefill} initialProfileName={brandPrefillName} />
               {/* Trending lives here too — its one action loads the
                   meme studio directly below it. */}
-              <TrendingView onCreateMemes={startMemesFromTrend} />
-              <MemeStudio prefill={memePrefill} />
-              <VideoStudio />
+              <div id="create-trending" className="scroll-mt-24">
+                <TrendingView onCreateMemes={startMemesFromTrend} />
+              </div>
+              <div id="create-meme-studio" className="scroll-mt-24">
+                <MemeStudio prefill={memePrefill} />
+              </div>
+              <div id="create-video-studio" className="scroll-mt-24">
+                <VideoStudio />
+              </div>
             </div>
           ) : null}
           {view === "ralph" ? <RalphChat onNavigate={onRalphNavigate} /> : null}
