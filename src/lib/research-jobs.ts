@@ -35,6 +35,7 @@ type JobRow = {
   resultJson: string | null;
   error: string | null;
   createdAt: Date;
+  updatedAt: Date;
 };
 
 function toView(job: JobRow): ResearchJobView {
@@ -60,11 +61,18 @@ function toView(job: JobRow): ResearchJobView {
 
 async function sweepStale(job: JobRow): Promise<JobRow> {
   if (job.status === "running" && Date.now() - job.createdAt.getTime() > STALE_MS) {
-    const updated = await db.researchJob.update({
-      where: { id: job.id },
+    // Conditional: only sweep the exact row state we read — a worker
+    // finishing in the meantime must not be overwritten as failed.
+    const claimed = await db.researchJob.updateMany({
+      where: { id: job.id, status: "running", updatedAt: job.updatedAt },
       data: { status: "failed", error: "Research timed out before it could finish. Please run it again." },
     });
-    return updated as JobRow;
+    if (claimed.count !== 1) {
+      const fresh = await db.researchJob.findUnique({ where: { id: job.id } });
+      return (fresh ?? job) as JobRow;
+    }
+    const updated = await db.researchJob.findUnique({ where: { id: job.id } });
+    return (updated ?? job) as JobRow;
   }
   return job;
 }
@@ -92,8 +100,10 @@ export async function startResearchJob(params: {
   void (async () => {
     try {
       const result = await runBrandAnalysis(params.brandName, params.website);
-      await db.researchJob.update({
-        where: { id: job.id },
+      // Fenced terminal write: a stale sweep may have already closed
+      // this job — a late worker must not resurrect it as done.
+      await db.researchJob.updateMany({
+        where: { id: job.id, status: "running", updatedAt: job.updatedAt },
         data: { status: "done", resultJson: JSON.stringify(result) },
       });
       // Learn from the deep dive (Dave, 2026-11-18): the distilled
@@ -120,8 +130,8 @@ export async function startResearchJob(params: {
       }
     } catch (err) {
       await db.researchJob
-        .update({
-          where: { id: job.id },
+        .updateMany({
+          where: { id: job.id, status: "running", updatedAt: job.updatedAt },
           data: {
             status: "failed",
             error: err instanceof Error ? err.message : "Research failed. Please try again.",

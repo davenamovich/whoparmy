@@ -26,18 +26,18 @@ jobs:
         run: bun run lint || true
 
       - name: Run TypeScript check
-        run: npx tsc --noEmit 2>&1 | head -50 || true
+        run: npx tsc --noEmit
 
       - name: Run Next.js build
-        run: bun run build || true
+        run: bun run build
 
       - name: Prisma generate
         if: always()
-        run: bun run db:generate 2>&1 || true
+        run: bun run db:generate
 
       - name: Prisma push
         if: always()
-        run: bun run db:push 2>&1 || true
+        run: bun run db:push
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4

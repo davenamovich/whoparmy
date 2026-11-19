@@ -446,8 +446,62 @@ export async function runAgentJob(jobId: string): Promise<void> {
   }
 }
 
+/**
+ * Recover stranded jobs: a job left RUNNING for over 20 minutes
+ * belongs to a worker that died mid-flight (deploy, crash). Fail it
+ * and refund its fuel exactly once — the refund rides the same
+ * conditional RUNNING → FAILED transition as a normal failure, so a
+ * worker that turns out to be merely slow cannot double-settle.
+ */
+export async function recoverStrandedJobs(userId: string): Promise<number> {
+  const cutoff = new Date(Date.now() - 20 * 60_000);
+  const stranded = await db.agentJob.findMany({
+    where: { userId, status: "RUNNING", updatedAt: { lt: cutoff } },
+    select: { id: true, hireId: true, tokenCost: true, kind: true },
+    take: 10,
+  });
+  let recovered = 0;
+  for (const job of stranded) {
+    const settled = await db.$transaction(async (tx) => {
+      const claimed = await tx.agentJob.updateMany({
+        where: { id: job.id, status: "RUNNING" },
+        data: {
+          status: "FAILED",
+          result: JSON.stringify({ error: "The run stalled and was recovered — its fuel was refunded.", provider: "runner-recovery" }),
+        },
+      });
+      if (claimed.count !== 1) return false;
+      const fresh = await tx.hiredAgent.findUnique({
+        where: { id: job.hireId },
+        select: { tokensUsed: true, tokenBudget: true, status: true },
+      });
+      if (fresh && job.tokenCost > 0) {
+        const refundedUsed = Math.max(0, fresh.tokensUsed - job.tokenCost);
+        await tx.hiredAgent.update({
+          where: { id: job.hireId },
+          data: {
+            tokensUsed: refundedUsed,
+            status: fresh.status === "PAUSED" ? "PAUSED" : refundedUsed >= fresh.tokenBudget ? "DEPLETED" : "ACTIVE",
+          },
+        });
+      }
+      return true;
+    }).catch(() => false);
+    if (settled) {
+      recovered += 1;
+      if (job.kind === "CAMPAIGN") {
+        await settleMarketListingForJob(job.id, "FAILED").catch((err) =>
+          console.error("[market] listing settle (recovery) failed", job.id, err),
+        );
+      }
+    }
+  }
+  return recovered;
+}
+
 /** Drain up to `limit` of one user's queued jobs (runner endpoint). */
 export async function runQueuedJobsForUser(userId: string, limit = 5): Promise<number> {
+  await recoverStrandedJobs(userId).catch(() => {});
   const queued = await db.agentJob.findMany({
     where: { userId, status: "QUEUED" },
     orderBy: { createdAt: "asc" },

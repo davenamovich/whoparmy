@@ -142,9 +142,16 @@ export async function redeemClaim(userId: string, token: string): Promise<Redeem
       return user.freeGenBalance;
     });
     return { ok: true, amount: payload.amt, source: payload.src, newBalance };
-  } catch {
-    // Unique nonce violation (or a concurrent double-claim): the win
-    // has already been paid — to someone, exactly once, by design.
-    return { ok: false, error: "This win has already been claimed." };
+  } catch (err) {
+    // ONLY a unique-nonce conflict means "already claimed". The old
+    // catch-all told a member whose redemption failed on a transient
+    // database error that their win was gone — it was not.
+    const code = (err as { code?: unknown })?.code;
+    const message = err instanceof Error ? err.message : "";
+    if (code === "P2002" || /unique constraint/i.test(message)) {
+      return { ok: false, error: "This win has already been claimed." };
+    }
+    console.error("[claims] redemption failed", err instanceof Error ? err.message : err);
+    throw new Error("The claim could not be completed — please try again.");
   }
 }

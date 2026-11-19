@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { runGenerationJob, recordUsage } from "@/lib/pr-engine";
+import { memeBackend } from "@/lib/engine";
 import { FORMAT_MAP, isContentCategory } from "@/lib/formats";
 import { isSupportedLanguage, languageLabel } from "@/lib/languages";
 import { getPlan } from "@/lib/plans";
@@ -52,6 +53,18 @@ export async function POST(req: NextRequest) {
     const formats = (body.formats ?? []).filter((f) => FORMAT_MAP[f.format] && isContentCategory(f.category));
     if (formats.length === 0) {
       return NextResponse.json({ error: "Select at least one content format." }, { status: 400 });
+    }
+
+    // Fail fast on the dead image lane: when the meme backend
+    // resolves to "legacy", the image generator behind it is not
+    // wired and throws unconditionally — after concept spend. A
+    // campaign asking for memes is refused here, before anything is
+    // created, queued or charged.
+    if (formats.some((f) => FORMAT_MAP[f.format]?.category === "MEMES") && memeBackend() === "legacy") {
+      return NextResponse.json(
+        { error: "Image provider not configured on this deployment — meme formats are unavailable right now. Text formats still work." },
+        { status: 503 },
+      );
     }
 
     const pieces = Math.min(Math.max(body.piecesPerFormat ?? 2, 1), MAX_PIECES);

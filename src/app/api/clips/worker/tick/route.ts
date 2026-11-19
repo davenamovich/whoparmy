@@ -38,8 +38,14 @@ const POLL_KIND = "sitdown";
 
 /** The engine answers tools/call as MCP content; be tolerant about the shape. */
 function readToolJson(reply: unknown): Record<string, unknown> {
-  const r = reply as { result?: { content?: Array<{ text?: string }> } } | undefined;
+  const r = reply as { result?: { isError?: boolean; content?: Array<{ text?: string }> } } | undefined;
   const text = r?.result?.content?.[0]?.text;
+  // An MCP isError result is an ERROR, never an empty success: the
+  // old parser JSON-parsed (or swallowed) the error text and the
+  // caller read it as a job with no status and no id.
+  if (r?.result?.isError) {
+    throw new Error(typeof text === "string" && text.trim() ? text.slice(0, 300) : "The engine reported an error.");
+  }
   if (typeof text === "string") {
     try {
       return JSON.parse(text) as Record<string, unknown>;
@@ -73,7 +79,7 @@ export async function POST(req: NextRequest) {
         const member = await getMemberEngineKey(clip.user);
         const reply = await mcpCall(member.key, "tools/call", {
           name: "get_job_status",
-          arguments: { kind: POLL_KIND, job_id: clip.engineJobId },
+          arguments: { kind: POLL_KIND, jobId: clip.engineJobId },
         });
         const engine = readToolJson(reply) as {
           status?: string;
@@ -213,6 +219,9 @@ export async function POST(req: NextRequest) {
 
         if (out.error) throw new Error(out.error);
         const engineJobId = out.jobId ?? out.job_id ?? out.id ?? null;
+        // A null engine id strands the row (rendering forever, never
+        // pollable): fail it through the normal retry path instead.
+        if (!engineJobId) throw new Error("The engine accepted the sit-down but returned no job id.");
 
         await db.clipJob.update({
           where: { id: clip.id },
@@ -237,7 +246,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ ok: true, ...summary });
+    // Honest ok: any failed row (or per-row error) makes the tick
+    // NOT ok, so the cron surfaces it instead of exiting 0 quietly.
+    const ok = summary.failed === 0 && summary.errors.length === 0;
+    return NextResponse.json({ ok, ...summary });
   } catch (err) {
     return NextResponse.json(
       { ok: false, error: err instanceof Error ? err.message : "Tick failed.", ...summary },

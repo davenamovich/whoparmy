@@ -17,8 +17,10 @@ export const maxDuration = 60;
  * - The bot token never leaves the server.
  */
 
-// per-instance de-duplication + rate limiting
-const seenUpdates = new Set<number>();
+// Per-instance rate limiting. (Update de-duplication is durable —
+// the TelegramUpdate table below — not an in-process set: a restart
+// used to forget every seen update, and a second instance never
+// shared the set at all.)
 const chatHits = new Map<string, number[]>();
 const RATE_LIMIT = 20; // messages per minute per chat
 
@@ -48,12 +50,14 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
   const update = (await req.json().catch(() => null)) as TgUpdate | null;
   if (!update) return NextResponse.json({ ok: true });
 
-  if (seenUpdates.has(update.update_id)) return NextResponse.json({ ok: true });
-  seenUpdates.add(update.update_id);
-  if (seenUpdates.size > 10000) {
-    const it = seenUpdates.values().next();
-    if (it.value !== undefined) seenUpdates.delete(it.value);
-  }
+  // Durable dedupe: an update row exists only for updates that were
+  // handled SUCCESSFULLY. A redelivery of a handled update drops
+  // here; a redelivery of a failed one runs again.
+  const seen = await db.telegramUpdate.findUnique({
+    where: { botSlug_updateId: { botSlug: slug, updateId: update.update_id } },
+    select: { id: true },
+  });
+  if (seen) return NextResponse.json({ ok: true });
 
   try {
     if (update.message?.text) {
@@ -62,8 +66,15 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
       await handleCallback(bot, update);
     }
   } catch (err) {
+    // No dedupe row is written, and the 500 invites Telegram's
+    // retry — the retry can succeed once the fault clears.
     console.error("[meme-army webhook]", err instanceof Error ? err.message : err);
+    return NextResponse.json({ ok: false }, { status: 500 });
   }
+
+  await db.telegramUpdate
+    .create({ data: { botSlug: slug, updateId: update.update_id } })
+    .catch(() => undefined); // a racing duplicate already recorded it
 
   return NextResponse.json({ ok: true });
 }
@@ -95,6 +106,20 @@ async function upsertMember(botId: string, telegramId: string, username?: string
   }
 
   return { member, isNew: true };
+}
+
+/** Canonical form for submission dedupe: case, trailing slash and
+ *  fragment differences do not make a new post. */
+function normalizeLink(raw: string): string {
+  const trimmed = raw.trim();
+  try {
+    const u = new URL(trimmed);
+    u.hash = "";
+    const path = u.pathname.replace(/\/+$/, "") || "/";
+    return `${u.protocol}//${u.host.toLowerCase()}${path}${u.search}`;
+  } catch {
+    return trimmed.toLowerCase().replace(/\/+$/, "");
+  }
 }
 
 function parseCommand(text: string): { cmd: string; args: string } {
@@ -316,8 +341,26 @@ async function handleMessage(
         break;
       }
       const live = await db.mission.findFirst({ where: { botId: bot.id, status: "LIVE" }, orderBy: { createdAt: "desc" } });
+      // One award per link per mission: the same link resubmitted
+      // (or the same update redelivered past dedupe) must not mint
+      // points twice. Links are stored normalized so variants of
+      // the same post compare equal.
+      const normalized = normalizeLink(link);
+      const prior = await db.submission.findMany({
+        where: { botId: bot.id, memberId: member.id, missionId: live?.id ?? null },
+        select: { payload: true },
+        take: 200,
+      });
+      if (prior.some((s) => normalizeLink(s.payload) === normalized)) {
+        await tgSendMessage(
+          bot.botToken,
+          chatId,
+          "That link is already in for this mission — one credit per post. Share a different one to earn more.",
+        );
+        break;
+      }
       await db.submission.create({
-        data: { botId: bot.id, missionId: live?.id ?? null, memberId: member.id, kind: "LINK", payload: link.slice(0, 500) },
+        data: { botId: bot.id, missionId: live?.id ?? null, memberId: member.id, kind: "LINK", payload: normalized.slice(0, 500) },
       });
       await db.armyMember.update({ where: { id: member.id }, data: { shares: { increment: 1 }, points: { increment: 5 } } });
       await tgSendMessage(

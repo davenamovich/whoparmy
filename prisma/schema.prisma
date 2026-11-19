@@ -953,6 +953,22 @@ model AppSetting {
 // as BridgeCode: only the SHA-256 hash is stored; the code is shown
 // once. The bot consumes it server-to-server via
 // POST /api/telegram/pair/verify behind TELEGRAM_PAIR_SECRET.
+/**
+ * Durable Telegram webhook dedupe: one row per (bot slug, update id)
+ * that was SUCCESSFULLY handled. Replaces the in-process Set, which
+ * forgot everything on restart and never deduped across instances.
+ * A failed handler writes no row, so Telegram's retry can succeed.
+ */
+model TelegramUpdate {
+  id        String   @id @default(cuid())
+  botSlug   String
+  updateId  Int
+  createdAt DateTime @default(now())
+
+  @@unique([botSlug, updateId])
+  @@index([botSlug])
+}
+
 model TelegramPairCode {
   id        String    @id @default(cuid())
   userId    String

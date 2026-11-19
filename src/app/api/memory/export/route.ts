@@ -24,11 +24,28 @@ export async function GET() {
   // house memory). Real sessions only — the anonymous operator
   // fallback does not pass getSessionOperator.
   const operator = await getSessionOperator().catch(() => null);
-  const [facts, brands, houseFactsRaw] = await Promise.all([
-    mnemosExport(person).catch(() => [] as string[]),
-    db.brandProfile.findMany({ where: { userId: user.id }, orderBy: { createdAt: "asc" } }).catch(() => []),
-    operator ? mnemosExport(HOUSE_PERSON).catch(() => [] as string[]) : Promise.resolve([] as string[]),
+  // A failed section read must not look like an empty memory: each
+  // section reports its own failure and the export carries a visible
+  // placeholder, so the member never trusts a partial file as whole.
+  const attempt = async <T,>(p: Promise<T>, fallback: T): Promise<{ ok: boolean; value: T }> => {
+    try {
+      return { ok: true, value: await p };
+    } catch (err) {
+      console.error("[memory export] section failed", err instanceof Error ? err.message : err);
+      return { ok: false, value: fallback };
+    }
+  };
+  const [factsR, brandsR, houseR] = await Promise.all([
+    attempt(mnemosExport(person), [] as string[]),
+    attempt(db.brandProfile.findMany({ where: { userId: user.id }, orderBy: { createdAt: "asc" } }), []),
+    operator
+      ? attempt(mnemosExport(HOUSE_PERSON), [] as string[])
+      : Promise.resolve({ ok: true, value: [] as string[] }),
   ]);
+  const facts = factsR.value;
+  const brands = brandsR.value;
+  const houseFactsRaw = houseR.value;
+  const UNAVAILABLE = "⚠ This section was unavailable during export — it is NOT empty; export again in a few minutes.";
   const memberKeys = new Set(facts.map((f) => f.toLowerCase().replace(/\s+/g, " ").slice(0, 140)));
   const houseFacts = houseFactsRaw.filter((f) => !memberKeys.has(f.toLowerCase().replace(/\s+/g, " ").slice(0, 140)));
 
@@ -49,7 +66,9 @@ export async function GET() {
     `## What your agents remember (${facts.length})`,
     "",
   ];
-  if (facts.length === 0) {
+  if (!factsR.ok) {
+    lines.push(`_${UNAVAILABLE}_`, "");
+  } else if (facts.length === 0) {
     lines.push("_Nothing yet — tell Ralph about your business and it lands here._", "");
   } else {
     for (const f of facts) lines.push(`- ${f}`);
@@ -58,7 +77,9 @@ export async function GET() {
 
   if (operator) {
     lines.push(`## House memory — operator scope (${houseFacts.length})`, "");
-    if (houseFacts.length === 0) {
+    if (!houseR.ok) {
+      lines.push(`_${UNAVAILABLE}_`, "");
+    } else if (houseFacts.length === 0) {
       lines.push("_Nothing recalled from the house scope._", "");
     } else {
       for (const f of houseFacts) lines.push(`- ${f}`);
@@ -66,7 +87,9 @@ export async function GET() {
     }
   }
 
-  if (brands.length > 0) {
+  if (!brandsR.ok) {
+    lines.push("## Your brands and research", "", `_${UNAVAILABLE}_`, "");
+  } else if (brands.length > 0) {
     lines.push("## Your brands and research", "");
     for (const b of brands) {
       lines.push(`### ${b.name}${b.website ? ` — ${b.website}` : ""}`, "");

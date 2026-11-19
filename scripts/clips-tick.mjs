@@ -47,6 +47,19 @@ try {
     process.exit(1);
   }
 
+  // The app reports per-row failures with ok:false in an otherwise
+  // successful response — that is a failed tick for cron purposes.
+  let reportedOk = true;
+  try {
+    reportedOk = JSON.parse(body)?.ok !== false;
+  } catch {
+    reportedOk = true;
+  }
+  if (!reportedOk) {
+    console.error(`[clips-tick] tick reported failures in ${Date.now() - started}ms: ${body.slice(0, 500)}`);
+    process.exit(1);
+  }
+
   console.log(`[clips-tick] ok in ${Date.now() - started}ms: ${body.slice(0, 500)}`);
   process.exit(0);
 } catch (err) {
