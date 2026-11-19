@@ -457,12 +457,17 @@ export async function exchangeBridgeCode(rawCode: string): Promise<{ token: stri
  */
 export async function findLiveBridgeCode(
   rawCode: string,
-): Promise<{ budgetCredits: number; scope: BridgeScope; user: User } | null> {
+): Promise<{ budgetCredits: number; scope: BridgeScope; expiresAt: Date; user: User } | null> {
   const code = (rawCode ?? "").trim().toUpperCase();
   if (!code) return null;
   const row = await db.bridgeCode.findUnique({ where: { codeHash: sha256(code) }, include: { user: true } });
   if (!row || row.usedAt || row.expiresAt.getTime() <= Date.now()) return null;
-  return { budgetCredits: row.budgetCredits, scope: normalizeScope(row.scope), user: row.user };
+  return {
+    budgetCredits: row.budgetCredits,
+    scope: normalizeScope(row.scope),
+    expiresAt: row.expiresAt,
+    user: row.user,
+  };
 }
 
 export interface BridgeSession {

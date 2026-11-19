@@ -53,7 +53,13 @@ export default async function RootLayout({
   // keep working; static assets bypass it too. The pathname arrives
   // via the x-pathname header stamped in middleware.ts.
   const pathname = (await headers()).get("x-pathname") ?? "/";
-  if (pathname !== "/gate") {
+  // The agent link (/connect/<code>) stays reachable while the gate is ON.
+  // The code inside the URL IS the credential: viewing never consumes it
+  // (findLiveBridgeCode is read-only) and /api/bridge/exchange re-checks
+  // eligibility server-side, so this page must not need an operator session.
+  const gateExempt =
+    pathname === "/gate" || pathname === "/connect" || pathname.startsWith("/connect/");
+  if (!gateExempt) {
     const gate = await getGateState();
     if (gate.on && !(await getSessionOperator())) {
       redirect("/gate");
