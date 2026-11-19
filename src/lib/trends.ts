@@ -274,7 +274,17 @@ export async function ingestXTopics(topics: TrendTopic[]): Promise<void> {
     ON CONFLICT("date", "lang") DO UPDATE SET "topicsJson" = EXCLUDED."topicsJson"
   `;
   await db.$executeRaw`DELETE FROM "TrendDay" WHERE "date" = ${date} AND "lang" <> 'x'`;
+  // The payload's headlines are written in English by the ingest
+  // job — store them as the day's en snapshot too, so English
+  // readers get the crafted headlines instead of regenerated ones.
+  // Other languages still rebuild (localized) from the x topics.
+  await db.$executeRaw`
+    INSERT INTO "TrendDay" ("id", "date", "lang", "topicsJson")
+    VALUES (${randomUUID()}, ${date}, 'en', ${JSON.stringify(snapshot)})
+    ON CONFLICT("date", "lang") DO UPDATE SET "topicsJson" = EXCLUDED."topicsJson"
+  `;
   dayCache.set(`${date}:x`, snapshot);
+  dayCache.set(`${date}:en`, snapshot);
 }
 
 async function storeSnapshot(date: string, lang: string, snapshot: DaySnapshot): Promise<void> {
