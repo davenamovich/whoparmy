@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getWhopUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { mnemosExport, mnemosPersonFor } from "@/lib/mnemos-bridge";
+import { HOUSE_PERSON, mnemosExport, mnemosPersonFor } from "@/lib/mnemos-bridge";
+import { getSessionOperator } from "@/lib/site-gate";
 import type { ResearchSummary } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -18,10 +19,18 @@ export const runtime = "nodejs";
 export async function GET() {
   const user = await getWhopUser();
   const person = mnemosPersonFor(user.id);
-  const [facts, brands] = await Promise.all([
+  // Designated-operator sessions also export the house scope, as its
+  // own labeled section (Dave's order, 2026-11-18: operators see
+  // house memory). Real sessions only — the anonymous operator
+  // fallback does not pass getSessionOperator.
+  const operator = await getSessionOperator().catch(() => null);
+  const [facts, brands, houseFactsRaw] = await Promise.all([
     mnemosExport(person).catch(() => [] as string[]),
     db.brandProfile.findMany({ where: { userId: user.id }, orderBy: { createdAt: "asc" } }).catch(() => []),
+    operator ? mnemosExport(HOUSE_PERSON).catch(() => [] as string[]) : Promise.resolve([] as string[]),
   ]);
+  const memberKeys = new Set(facts.map((f) => f.toLowerCase().replace(/\s+/g, " ").slice(0, 140)));
+  const houseFacts = houseFactsRaw.filter((f) => !memberKeys.has(f.toLowerCase().replace(/\s+/g, " ").slice(0, 140)));
 
   const today = new Date().toISOString().slice(0, 10);
   const lines: string[] = [
@@ -45,6 +54,16 @@ export async function GET() {
   } else {
     for (const f of facts) lines.push(`- ${f}`);
     lines.push("");
+  }
+
+  if (operator) {
+    lines.push(`## House memory — operator scope (${houseFacts.length})`, "");
+    if (houseFacts.length === 0) {
+      lines.push("_Nothing recalled from the house scope._", "");
+    } else {
+      for (const f of houseFacts) lines.push(`- ${f}`);
+      lines.push("");
+    }
   }
 
   if (brands.length > 0) {

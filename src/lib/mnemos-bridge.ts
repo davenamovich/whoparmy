@@ -20,6 +20,15 @@ export function mnemosPersonFor(userId: string): string {
   return `member-${userId}`;
 }
 
+/**
+ * Dave's house scope on the bridge — where Muse's captures for Dave
+ * live. Member surfaces read it ONLY for designated-operator sessions
+ * (Dave's order, 2026-11-18: operators see house memory, so Dave's
+ * own memories show up in his Whoparmy view). Member captures never
+ * write to it; it is a read-merge only.
+ */
+export const HOUSE_PERSON = "user";
+
 function bridgeConfig(): { url: string; token: string } | null {
   const token = process.env.MNEMOS_BRIDGE_TOKEN?.trim();
   if (!token) return null;
@@ -127,12 +136,34 @@ export function parseRecallFacts(raw: string): string[] {
     .filter((line) => line.length > 3);
 }
 
-export async function mnemosSnapshot(person: string): Promise<string | null> {
-  const raw = await callTool(person, "mnemos_recall", {
-    query: "business offer customers brand sell service product shop owner audience",
-  });
-  if (!raw) return null;
-  const facts = parseRecallFacts(raw);
+/**
+ * Recall is keyword-only (no stemming: "services" does not match a
+ * fact that says "service"), so a single narrow query silently
+ * misses real facts — proven live 2026-11-18, when the old export
+ * battery missed a plainly-worded fact 8 times out of 8. The
+ * snapshot therefore runs a small battery of wide, stem-doubled
+ * queries and merges, the same shape as the export below.
+ */
+const SNAPSHOT_QUERIES = [
+  "business offer customers clients brand sell selling service services product products shop store owner",
+  "website site online audience niche market local bookings appointments contact",
+  "goals plans prices pricing team location hours lessons results revenue",
+];
+
+export async function mnemosSnapshot(person: string, extraPersons: string[] = []): Promise<string | null> {
+  const persons = [person, ...extraPersons.filter((p) => p !== person)];
+  const raws = await Promise.all(persons.flatMap((p) => SNAPSHOT_QUERIES.map((q) => mnemosRecall(p, q))));
+  const seen = new Set<string>();
+  const facts: string[] = [];
+  for (const raw of raws) {
+    if (!raw) continue;
+    for (const fact of parseRecallFacts(raw)) {
+      const key = fact.toLowerCase().replace(/\s+/g, " ").slice(0, 140);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      facts.push(fact);
+    }
+  }
   if (facts.length === 0) return null;
   return facts.map((f) => `- ${f}`).join("\n").slice(0, 1800);
 }
@@ -146,14 +177,16 @@ export async function mnemosSnapshot(person: string): Promise<string | null> {
  * missed; the export file says so honestly.
  */
 const EXPORT_QUERIES = [
-  "business offer customers",
-  "brand website links social",
-  "content memes campaigns posts",
-  "audience niche market competitors",
-  "prices plans products services",
-  "goals decisions plans preferences",
-  "team staff location hours contact",
-  "lessons results performance reviews",
+  "business offer customers clients sell selling",
+  "service services product products plans prices pricing",
+  "brand website site links social online",
+  "content memes campaigns posts videos",
+  "audience niche market competitors local",
+  "bookings appointments calls phone email contact",
+  "goals decisions plans preferences strategy",
+  "team staff location hours address",
+  "lessons results performance reviews revenue money",
+  "remember notes history background story",
 ];
 
 export async function mnemosExport(person: string): Promise<string[]> {

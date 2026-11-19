@@ -4,7 +4,7 @@ import { getPlan } from "@/lib/plans";
 import { countMonthlyUsage } from "@/lib/usage-server";
 import { getTrending } from "@/lib/trends";
 import { getLadder, starimgConfig } from "@/lib/llm-policy";
-import { mnemosCapture, mnemosPersonFor, mnemosRecall, mnemosSnapshot } from "@/lib/mnemos-bridge";
+import { HOUSE_PERSON, mnemosCapture, mnemosPersonFor, mnemosRecall, mnemosSnapshot } from "@/lib/mnemos-bridge";
 import { BridgeError, assertBridgeEligible, bridgeOffer, getMemberEngineKey, mintBridgeCode } from "@/lib/muse-bridge";
 import { museWeekCommand } from "@/lib/muse-week-command";
 
@@ -141,10 +141,10 @@ async function brandLine(userId: string): Promise<string | null> {
   return bits.join(" — ").slice(0, 240);
 }
 
-export async function ralphGreeting(userId: string, locale: string): Promise<RalphReply> {
+export async function ralphGreeting(userId: string, locale: string, house = false): Promise<RalphReply> {
   const [brand, snapshot] = await Promise.all([
     brandLine(userId),
-    mnemosSnapshot(mnemosPersonFor(userId)),
+    mnemosSnapshot(mnemosPersonFor(userId), house ? [HOUSE_PERSON] : []),
   ]);
   const base = brand ? pick(L.greetingBrand, locale)(brand) : pick(L.greetingPlain, locale)();
   const memoryNote =
@@ -160,7 +160,7 @@ export async function ralphGreeting(userId: string, locale: string): Promise<Ral
   return { text: base + memoryNote, actions: RALPH_MENU };
 }
 
-export async function ralphAction(userId: string, locale: string, actionId: RalphActionId): Promise<RalphReply> {
+export async function ralphAction(userId: string, locale: string, actionId: RalphActionId, house = false): Promise<RalphReply> {
   const person = mnemosPersonFor(userId);
   switch (actionId) {
     case "make_content":
@@ -183,7 +183,7 @@ export async function ralphAction(userId: string, locale: string, actionId: Ralp
       };
     }
     case "memory": {
-      const snapshot = await mnemosSnapshot(person);
+      const snapshot = await mnemosSnapshot(person, house ? [HOUSE_PERSON] : []);
       if (snapshot && snapshot.length > 20) {
         return { text: pick(L.remembered, locale)(snapshot.slice(0, 1800)), actions: ["make_content", "free_audit", "trending"] };
       }
@@ -299,9 +299,14 @@ Answer using the member's brand facts and remembered facts below when relevant, 
 
 Return STRICT JSON only: {"reply": "...", "actions": ["id", ...up to 3], "remember": "one durable business fact the member just told you, or null"}. No markdown fences. If the member states a durable fact about their business (what they sell, where, who buys, their offer), you MUST put it in "remember" — telling them you'll remember it without setting the field is a lie, and Ralph doesn't lie.`;
 
-export async function ralphFreeText(userId: string, locale: string, text: string, history: { role: string; text: string }[]): Promise<RalphReply> {
+export async function ralphFreeText(userId: string, locale: string, text: string, history: { role: string; text: string }[], house = false): Promise<RalphReply> {
   const person = mnemosPersonFor(userId);
-  const [brand, recalled] = await Promise.all([brandLine(userId), mnemosRecall(person, text)]);
+  const [brand, recalledMember, recalledHouse] = await Promise.all([
+    brandLine(userId),
+    mnemosRecall(person, text),
+    house ? mnemosRecall(HOUSE_PERSON, text) : Promise.resolve(null),
+  ]);
+  const recalled = [recalledMember, recalledHouse].filter(Boolean).join("\n") || null;
   const cfg = starimgConfig();
   if (!cfg) {
     return { text: "My language brain isn't wired on this deployment yet — but the buttons all work. Tap one and I'll route it.", actions: RALPH_MENU.slice(0, 3) };
