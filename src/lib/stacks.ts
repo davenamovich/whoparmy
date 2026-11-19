@@ -66,6 +66,22 @@ You are my clipping agent, connected to my Plunder & Riffle account through my b
 5. Deliver my batch as a list: for each clip, the share-page link, the post copy (hook + creator credit, ready to paste), and any warnings. End with the receipt: credits spent, credits remaining. **Do not publish anything** — I'll approve each clip first.
 6. When the batch is delivered or my token expires, stop. Next batch, I'll get a fresh code from Whoparmy.`;
 
+const BTC_EXPERIMENT_PROMPT = `**Run my BTC Experiment**
+
+You are my Bitcoin Experiment agent, connected to my Plunder & Riffle account through my bridge at whop.plunderandriffle.com. My credits are mine — never ask me for an API key; it stays in my P&R hub and I will never paste it anywhere. We are testing whether an agent can help generate legitimate economic activity around a Bitcoin-paying affiliate opportunity. Nothing is guaranteed.
+
+1. My bridge code is **{BRIDGE_CODE}** (one-time, expires in 15 minutes). Exchange it at \`POST https://whop.plunderandriffle.com/api/bridge/exchange\` with \`{"code": "{BRIDGE_CODE}"}\` for my bridge token (7 days) and the MCP URL; use the token as the Bearer <redacted> for every MCP call. Never print the token back to me, and never store it past this week.
+2. My business is **{BUSINESS_URL}**. Research it first (\`research_brand\`, then \`create_campaign_from_research\`) — both are free. Work only from what the research actually found; invent nothing.
+3. **Know the experiment.** The featured offer is DH Media — a business and social-media tools suite (website and funnel builder, booking, automations, email, Social Planner, affiliate manager) that runs a crypto-paying affiliate program. The official facts live at dh.media and dh.media/affiliates, and only there: anything those pages don't state (payout timing, payout-address rules, minimums) is unverified — say "not verified" if I ask, and never invent program terms.
+4. **Activate DH Media with me, carefully.** I register myself, on their site, with my own details, and I pay their charges myself (their Launch pack is listed at $10 = 100 credits on dh.media — confirm the current price on their page before I pay). If their registration asks for a crypto payout address, stop and walk me through it: I enter an address I control, on their site, and I confirm on their page whether it can be changed later — that is not verified. Never ask me for a seed phrase or private keys. Never register accounts for me, never create duplicate accounts, never refer myself.
+5. **My offers come from Plunder & Riffle, pulled dynamically** (\`list_my_offers\` through the bridge): DH Media is the featured experiment; the rest of my saved offers are the bench. Use only my saved referral links, exactly as written, with attribution preserved — and share each offer's \`pages[].url\` (our page for that partner, carrying my ref) rather than the raw partner link.
+6. **Quote me the first week before you spend anything:** a first-week plan from the research plus a first meme pack (\`create_demo_pack\` through the bridge). Tell me the exact credit cost and my remaining balance (check \`get_account\` through the bridge), and wait for my "go". No go, no spend.
+7. **Content rules, non-negotiable:** sell the tools and the workflow, never income. No earnings claims, no matrix math, no "passive income", no screenshots of money. Every promotional post carries an affiliate disclosure ("I may earn a commission"). Memes lead; webinars and posts support. Make the content in my language first — localized, not just translated — and other languages on my request. Draft everything.
+8. **Distribution:** the Whop Army daily rotator is the shared traffic pool for eligible no-referral traffic — use it honestly. No artificial clicks, no circular referrals, no duplicate accounts.
+9. On my "go", build the first meme pack through the bridge (\`https://whop.plunderandriffle.com/api/bridge/mcp\`), polling \`get_job_status\` until it is done; a failed piece refunds — tell me and retry it once. Deliver the week as share-page links: the plan, the pack, and what's in it. End with the receipt: credits spent, credits remaining. **Do not publish anything and do not render MP4s** through the bridge — publishing happens only when I approve a specific piece and tap approve in Whop Army.
+10. **Report weekly, in plain numbers:** pieces created, pieces approved or posted, clicks or referrals only where a dashboard actually shows them, and commissions only as shown in the DH Media dashboard — label anything else "unverified". If the number is zero, say zero; that is the experiment working. Keep a running log of what you tried, what I approved, and what resulted, so each week starts from evidence.
+11. When the week is delivered or my token expires, stop. Next week I'll get a fresh code from Whoparmy.`;
+
 export const STACKS: Stack[] = [
   {
     id: "muse-week",
@@ -78,6 +94,18 @@ export const STACKS: Stack[] = [
     entryPath: "/muse-week",
     infraNotes:
       "The original bridge stack (shipped 2026-11-17). The launcher fills {BRIDGE_CODE} only — {BUSINESS_URL} is filled by the /muse-week page from the member's brand profile today, so replace it by hand when launching from here. Launcher mints at the week offer's server-side budget (805 list).",
+  },
+  {
+    id: "btc-experiment",
+    name: "The BTC Experiment",
+    blurb:
+      "The Bitcoin vertical: the member's Muse runs the BTC Experiment through the bridge on the member's own credits — DH Media (tools suite + crypto-paying affiliate program) featured, the member's saved web2 offers as the bench. Monetization stays in Whop Army: plans, offers, knowledge.",
+    status: "live",
+    bridgeScope: "week",
+    promptTemplate: BTC_EXPERIMENT_PROMPT,
+    entryPath: null,
+    infraNotes:
+      "Added 2026-11-19 on Dave's deploy order. Landing is external — TheBTCExperiment.com / thebtcexperiment.pages.dev (built 2026-11-19 in ~/workspace/btc-experiment/) routes into Whop Army with ?ref= preserved; no in-app entry page yet, so ignition is this launcher. No BTC payout address is stored in Whoparmy: the member enters it on DH Media itself during their own registration, and the prompt never asks for seed phrases or private keys. DH Media program terms beyond the official dh.media / dh.media/affiliates pages are Unverified — the prompt says so, and forbids inventing terms, earnings claims and matrix math. JA prompt variant pending native review; the EN prompt is the shipped master (~/workspace/btc-experiment/BTC-AGENT-PROMPT-EN.md).",
   },
   {
     id: "clip-factory",
