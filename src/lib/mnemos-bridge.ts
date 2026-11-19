@@ -36,6 +36,36 @@ function bridgeConfig(): { url: string; token: string } | null {
   return { url, token };
 }
 
+/** Is the bridge configured on this deployment at all? When the token is
+ *  unset every call degrades to null — silence by design, which is why a
+ *  broken deploy used to look identical to an empty store. The health
+ *  route reads this to tell those two states apart. */
+export function mnemosConfigured(): boolean {
+  return bridgeConfig() !== null;
+}
+
+/**
+ * One tool call against the bridge for one person — the single door into
+ * the store. Clips, the Memory tab and the export all come through here,
+ * so what one writes the others can read. Nothing else may open its own
+ * connection: that is how clip taste ended up in a scope the tab never
+ * looked at.
+ */
+export async function bridgeCall(
+  person: string,
+  name: string,
+  args: Record<string, unknown>,
+  opts: { project?: string; timeoutMs?: number } = {},
+): Promise<string | null> {
+  return callTool(
+    person,
+    name,
+    args,
+    opts.timeoutMs ?? 20_000,
+    opts.project ?? "global",
+  );
+}
+
 let rpcId = 0;
 
 async function callTool(
@@ -43,6 +73,7 @@ async function callTool(
   name: string,
   args: Record<string, unknown>,
   timeoutMs = 20_000,
+  project = "global",
 ): Promise<string | null> {
   const cfg = bridgeConfig();
   if (!cfg) return null;
@@ -50,7 +81,7 @@ async function callTool(
   // (observed 2026-11-18); a single retry masks it without hiding a
   // real outage.
   for (let attempt = 0; attempt < 2; attempt++) {
-    const out = await callToolOnce(cfg, person, name, args, timeoutMs);
+    const out = await callToolOnce(cfg, person, name, args, timeoutMs, project);
     if (out !== null) return out;
     if (attempt === 0) await new Promise((r) => setTimeout(r, 800));
   }
@@ -63,6 +94,7 @@ async function callToolOnce(
   name: string,
   args: Record<string, unknown>,
   timeoutMs: number,
+  project: string,
 ): Promise<string | null> {
   try {
     const res = await fetch(cfg.url, {
@@ -71,7 +103,7 @@ async function callToolOnce(
         "Content-Type": "application/json",
         Authorization: `Bearer ${cfg.token}`,
         "X-Mnemos-Person": person,
-        "X-Mnemos-Project": "global",
+        "X-Mnemos-Project": project,
       },
       body: JSON.stringify({
         jsonrpc: "2.0",
