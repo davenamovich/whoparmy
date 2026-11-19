@@ -167,6 +167,12 @@ export const BRIDGE_FREE_TOOLS = new Set([
   "get_usage",
   "list_ad_options",
   "list_services",
+  // The starter brief is the free artifact the Day 0 material hands out. It
+  // renders text and calls nothing, so it costs no credits in either scope —
+  // and it must stay callable by a member who has spent their whole budget,
+  // because handing someone their brief is the point of the free lane.
+  "starter_brief",
+  "starter_brief_language",
 ]);
 
 /** Week-scope generating tools (the /muse-week offer's allowlist). */

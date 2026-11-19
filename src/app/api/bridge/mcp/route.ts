@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { BridgeError, proxyToolCall, proxyToolsList, verifyBridgeToken } from "@/lib/muse-bridge";
 import { CLIP_TOOLS, callClipTool, isClipTool } from "@/lib/clips/tools";
+import { STARTER_TOOLS, callStarterTool, isStarterTool } from "@/lib/starter/brief";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -82,9 +83,13 @@ export async function POST(req: NextRequest) {
     if (method === "tools/list") {
       // The member sees the engine's allowlisted tools plus the Clipper's
       // local family — one list, so Muse does not need to know which side
-      // of the bridge a tool lives on.
+      // of the bridge a tool lives on. The starter brief lives here too: it
+      // renders text and never spends a credit, so it belongs on the free side.
       const proxied = (await proxyToolsList(session)) as { tools?: unknown[] };
-      return rpcResult(id, { ...proxied, tools: [...(proxied.tools ?? []), ...CLIP_TOOLS] });
+      return rpcResult(id, {
+        ...proxied,
+        tools: [...(proxied.tools ?? []), ...CLIP_TOOLS, ...STARTER_TOOLS],
+      });
     }
     if (method === "tools/call") {
       const params = (body.params ?? {}) as { name?: unknown; arguments?: unknown };
@@ -93,6 +98,9 @@ export async function POST(req: NextRequest) {
       const args = (params.arguments && typeof params.arguments === "object" ? params.arguments : {}) as Record<string, unknown>;
       if (isClipTool(name)) {
         return rpcResult(id, await callClipTool(session.user, name, args));
+      }
+      if (isStarterTool(name)) {
+        return rpcResult(id, await callStarterTool(name, args));
       }
       const { reply } = await proxyToolCall(session, name, args);
       if (reply.error) return rpcError(id, reply.error.code ?? -32603, reply.error.message ?? "Engine error");
