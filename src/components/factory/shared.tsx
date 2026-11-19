@@ -19,6 +19,7 @@ import { copyToClipboard, downloadMeme, downloadTextFile, safeFilename } from "@
 import { LANGUAGE_MAP } from "@/lib/languages";
 import { CATEGORY_LABELS, type ContentCategory } from "@/lib/formats";
 import type { AssetDTO } from "@/lib/types";
+import { SocialPostButton } from "./social-post";
 
 // ─── small shared primitives used across every section ──────────────
 
@@ -310,6 +311,7 @@ export function AssetCard({
 
         <div className="flex items-center gap-1.5 pt-1 border-t/50 mt-auto flex-wrap">
           <CopyButton text={fullText} />
+          {asset.status === "DONE" ? <SocialPostButton asset={asset} /> : null}
           {isMeme && asset.imageUrl ? (
             <Button
               variant="outline"
