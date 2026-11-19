@@ -1,7 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { MODEL_TIERS } from "@/lib/game";
-import { getPlan } from "@/lib/plans";
 
 /**
  * ─── AGENT ECONOMY — hire agents with tokens ────────────────────────
@@ -33,15 +32,16 @@ export function walletForPlan(planKey: string): number {
 }
 
 /**
- * Bot rental (pricing decision 2026-11-17): members rent bots by the
- * month and count memes — tokens are NEVER shown to members. Each
- * rented bot gets an internal fuel budget (its share of the plan's
- * token wallet) purely as an ops/abuse ledger; the member only sees
- * the bot, its jobs, and the plan's meme meter.
+ * Agent budgets (pricing model 2026-11-19): seats are gone — agents
+ * are unlimited on every plan and the member's own Muse runs most
+ * of them anyway. Tokens are NEVER shown to members. Each hired
+ * agent carries an internal fuel budget (the plan's token wallet as
+ * its per-agent ops cap) purely as an abuse ledger; the binding
+ * meter is the plan's monthly generations, counted at member level.
+ * The member only sees the agent, its jobs, and the plan's meter.
  */
 export function internalBotBudget(planKey: string): number {
-  const plan = getPlan(planKey);
-  return Math.floor(walletForPlan(planKey) / Math.max(1, plan.botSeats));
+  return walletForPlan(planKey);
 }
 
 export interface AgentTemplate {

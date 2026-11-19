@@ -1,13 +1,19 @@
 // Plan configuration — deliberately configurable, not hardcoded payment
 // logic. Whop manages real subscriptions/entitlements; these constants
 // only drive usage limits and UI display.
+//
+// PRICING MODEL (Dave, 2026-11-19): the engine-meter model. Members'
+// own Muse sets up and runs their agents (the Day-1 prompt does it
+// for free), so seats are NEVER sold or gated — agents are unlimited
+// on every plan. Plans meter what costs us money: generations,
+// clips/rendering, brands, and feature breadth. BYOK past the
+// allowance runs at 1 credit ($0.01) per engine call.
 
 export interface PlanDef {
   key: string;
   name: string;
   price: string;
   priceCents: number; // monthly price in cents (referral basis)
-  botSeats: number; // rented bots (agents) included in the plan
   monthlyItems: number; // max successful generated items (memes) / month on the house lane
   monthlyClips: number; // max successful clips / month (the Clipper; BYOK lifts it)
   maxFormatsPerCampaign: number;
@@ -23,26 +29,24 @@ export const PLANS: PlanDef[] = [
     name: "Trial",
     price: "$0",
     priceCents: 0,
-    botSeats: 1,
     monthlyItems: 25,
     monthlyClips: 3,
     maxFormatsPerCampaign: 2,
     maxLanguagesPerCampaign: 3,
     maxBrands: 1,
-    features: ["1 trial bot", "25 memes / month", "3 clips / month", "Previews only — bring your own key to unlock full generation"],
+    features: ["Your own agents — no seat limits, ever", "25 generations / month on the house key", "3 clips / month", "Blueprint, Day-1 setup, team board + expert panel included", "Previews and packs — bring your own key for full generation"],
   },
   {
     key: "CREATOR",
     name: "Starter",
     price: "$29/mo",
     priceCents: 2900,
-    botSeats: 1,
     monthlyItems: 300,
     monthlyClips: 20,
     maxFormatsPerCampaign: 6,
     maxLanguagesPerCampaign: 23,
     maxBrands: 1,
-    features: ["1 rented meme bot", "300 memes / month", "20 clips / month, no pack needed", "All 23 languages", "Full format catalog", "BYOK upgrade: your key, your fuel, caps lift"],
+    features: ["Your own agents — no seat limits, ever", "300 generations / month", "20 clips / month, no pack needed", "All 23 languages", "Full format catalog", "BYOK: your key, your fuel — 1 credit per call past the allowance"],
     highlight: true,
   },
   {
@@ -50,26 +54,24 @@ export const PLANS: PlanDef[] = [
     name: "Operator",
     price: "$79/mo",
     priceCents: 7900,
-    botSeats: 3,
     monthlyItems: 1500,
     monthlyClips: 60,
     maxFormatsPerCampaign: 12,
     maxLanguagesPerCampaign: 23,
     maxBrands: 5,
-    features: ["3 rented bots", "1,500 memes / month", "60 clips / month", "Campaign marketplace — post and claim", "Advanced variations", "BYOK upgrade: your key, your fuel, caps lift"],
+    features: ["Your own agents — no seat limits, ever", "1,500 generations / month", "60 clips / month + render priority", "Up to 5 brands", "Campaign marketplace — post and claim", "BYOK: your key, your fuel — 1 credit per call past the allowance"],
   },
   {
     key: "AGENCY",
     name: "Agency",
     price: "$199/mo",
     priceCents: 19900,
-    botSeats: 10,
     monthlyItems: 6000,
     monthlyClips: 200,
     maxFormatsPerCampaign: 25,
     maxLanguagesPerCampaign: 23,
     maxBrands: 25,
-    features: ["10 rented bots", "6,000 memes / month", "200 clips / month", "Client brands and workspaces", "Campaign marketplace priority", "BYOK upgrade: your key, your fuel, caps lift"],
+    features: ["Your own agents — no seat limits, ever", "6,000 generations / month", "200 clips / month + top render priority", "Up to 25 brands — client workspaces", "Campaign marketplace priority", "BYOK: your key, your fuel — 1 credit per call past the allowance"],
   },
 ];
 

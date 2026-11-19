@@ -48,15 +48,12 @@ export function composeSetupPrompt(args: {
 
   const agentLine = (a: Blueprint["workforce"][number]) =>
     `- ${a.name} (${a.role})\n  Mission: ${a.mission}\n  Schedule: ${a.schedule}\n  Approval rule: ${a.approval}\n  Success metric: ${a.metric}`;
-  // Panel fix 2: the prompt promises only the seated floor; the
-  // rest is honestly queued, never silently staffed.
-  const floor = bp.workforce.filter((a) => a.seated !== false);
-  const queued = bp.workforce.filter((a) => a.seated === false);
+  // Engine-meter model (2026-11-19): seats are retired, so the
+  // whole workforce staffs — no floor/queued split. (The split
+  // shipped with the panel fixes the same morning and was
+  // retired with the seat model itself.)
   const workforce =
-    `Your floor — these agents are covered by my plan's seats:\n${floor.map(agentLine).join("\n")}` +
-    (queued.length
-      ? `\n\nQueued for a seat — do NOT staff these until I upgrade or free a seat:\n${queued.map(agentLine).join("\n")}`
-      : "");
+    `Your workforce — every agent below is mine to run; my plan meters generations, not agents:\n${bp.workforce.map(agentLine).join("\n")}`;
   const workflows = bp.workflows.map((w) => `- ${w.name}: ${w.flow}`).join("\n");
   const integrations = bp.integrations
     .map((g) => {

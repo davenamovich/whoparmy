@@ -248,9 +248,9 @@ export async function ralphAction(userId: string, locale: string, actionId: Ralp
       const memesUsed = await countMonthlyUsage(userId);
       return {
         text:
-          `You're on ${plan.name} (${plan.price}): ${plan.botSeats} bot seat${plan.botSeats === 1 ? "" : "s"}, ` +
-          `${memesUsed} of ${plan.monthlyItems} memes used this month, ${user?.freeGenBalance ?? 0} free generations banked. ` +
-          `Your own key (BYOK) lifts the caps any time — 1 credit per engine call.`,
+          `You're on ${plan.name} (${plan.price}): agents unlimited — your plan meters generations, not seats. ` +
+          `${memesUsed} of ${plan.monthlyItems} generations used this month, ${user?.freeGenBalance ?? 0} free generations banked. ` +
+          `Your own key (BYOK) runs past the allowance any time — 1 credit per engine call.`,
         actions: ["my_bots", "make_content", "my_claude"],
       };
     }

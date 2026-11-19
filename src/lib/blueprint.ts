@@ -246,22 +246,13 @@ export function voiceSpecFrom(ctx: SystemContext): string {
  * overflow is honestly flagged seated:false (queued for a seat).
  */
 export async function withSeats(user: { id: string; plan: string }, bp: Blueprint): Promise<Blueprint> {
-  const plan = getPlan(user.plan);
-  const existing = await db.hiredAgent.findMany({
-    where: { userId: user.id },
-    select: { templateKey: true, source: true },
-  });
-  const hiredKeys = new Set(existing.map((h) => h.templateKey));
-  let rented = existing.filter((h) => h.source === "RENTAL").length;
-  const workforce = bp.workforce.map((a) => {
-    if (hiredKeys.has(a.templateKey)) return { ...a, seated: true };
-    if (rented < plan.botSeats) {
-      rented += 1;
-      return { ...a, seated: true };
-    }
-    return { ...a, seated: false };
-  });
-  return { ...bp, workforce };
+  // Engine-meter model (Dave, 2026-11-19): seats are retired —
+  // agents are unlimited on every plan, so every workforce agent
+  // is on the floor. The seated flags remain on the type so older
+  // stored blueprints (and the prompt's floor/queued split) keep
+  // working; new drafts simply seat everyone.
+  void user;
+  return { ...bp, workforce: bp.workforce.map((a) => ({ ...a, seated: true })) };
 }
 
 function fallbackBlueprint(ctx: SystemContext): Blueprint {
@@ -301,7 +292,7 @@ function fallbackBlueprint(ctx: SystemContext): Blueprint {
     integrations: ctx.integrations,
     // Panel (Risk): never guarantee "no other costs" — the member's
     // own agent runs on their own accounts, outside P&R credits.
-    budget: `${plan.name} plan (${plan.price}) covers ${plan.botSeats} bot seat${plan.botSeats === 1 ? "" : "s"} and ${plan.monthlyItems} generations a month. Your own P&R key (BYOK) runs at 1 credit ($0.01) per engine call beyond that. Those are the only P&R-side costs switched on — your own Muse or Agent37 usage runs on your own accounts, outside P&R credits.`,
+    budget: `${plan.name} plan (${plan.price}) includes ${plan.monthlyItems} generations a month and ${plan.monthlyClips} clips. Agents are yours — no seat limits; your own Muse runs them. Calls past the plan's generations run on your own P&R key at 1 credit ($0.01) per engine call. Those are the only P&R-side costs switched on — your own Muse or Agent37 usage runs on your own accounts, outside P&R credits.`,
     contentSpec: weeklyContentSpec(ctx.planKey),
     voiceSpec: voiceSpecFrom(ctx),
     autonomy: "copilot",
@@ -341,7 +332,7 @@ export async function draftBlueprint(user: { id: string; plan: string; whopId: s
               `Business: ${ctx.brandName ?? "(unknown)"} ${ctx.brandWebsite ? `(${ctx.brandWebsite})` : ""}\n` +
               `What they promote: ${ctx.promoting ?? "(unknown)"}\n` +
               `Research on file: ${ctx.researchSnippet ?? "(none yet)"}\n` +
-              `Plan: ${ctx.planKey} (${getPlan(ctx.planKey).botSeats} bot seats — the first ${getPlan(ctx.planKey).botSeats} workforce agents are the seated floor)\n\nAgent catalog (templateKey — name: role):\n${catalog}\n\nCustom-agent tools:\n${tools}\n\nDesign the system.`,
+              `Plan: ${ctx.planKey} (${getPlan(ctx.planKey).monthlyItems} generations/month included; agents are unlimited — order the workforce by priority so the most important work is unmistakable)\n\nAgent catalog (templateKey — name: role):\n${catalog}\n\nCustom-agent tools:\n${tools}\n\nDesign the system.`,
           },
         ],
       }),
@@ -425,22 +416,19 @@ async function persist(userId: string, bp: Blueprint): Promise<Blueprint> {
 export async function approveBlueprint(user: { id: string; plan: string; whopId: string | null }): Promise<Blueprint> {
   const bp = await getBlueprint(user.id);
   if (!bp) throw new Error("No blueprint to approve — draft one first.");
-  const plan = getPlan(user.plan);
   const existing = await db.hiredAgent.findMany({
     where: { userId: user.id },
     select: { templateKey: true, source: true },
   });
   const hiredKeys = new Set(existing.map((h) => h.templateKey));
-  let rented = existing.filter((h) => h.source === "RENTAL").length;
   const results: Record<string, string> = {};
 
+  // No seat gate (engine-meter model, 2026-11-19): approval hires
+  // the whole workforce. "needs-seat" survives only in blueprints
+  // approved under the old model.
   for (const agent of bp.workforce) {
     if (hiredKeys.has(agent.templateKey)) {
       results[agent.templateKey] = "existing";
-      continue;
-    }
-    if (rented >= plan.botSeats) {
-      results[agent.templateKey] = "needs-seat";
       continue;
     }
     const tpl = AGENT_CATALOG.find((t) => t.key === agent.templateKey);
@@ -461,7 +449,6 @@ export async function approveBlueprint(user: { id: string; plan: string; whopId:
       },
     });
     hiredKeys.add(agent.templateKey);
-    rented += 1;
     results[agent.templateKey] = "hired";
   }
 

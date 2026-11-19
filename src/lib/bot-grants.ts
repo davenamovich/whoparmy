@@ -15,7 +15,7 @@ import { internalBotBudget } from "@/lib/agents";
  * The bot is a real Meme Smith hire (source = "REFERRAL"): it takes
  * real jobs through the normal Agents job route and the agent runner
  * executes them like any rental. It is NOT a plan seat — it never
- * counts against botSeats, never fires the first-rental conversion,
+ * counts against any plan limit, never fires the first-rental conversion,
  * and its internal fuel is not part of the member's wallet ledger.
  * At expiresAt the bot stops: lazily flipped to PAUSED on read, and
  * the job route refuses it with a specific message. Referring

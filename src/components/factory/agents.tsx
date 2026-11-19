@@ -119,7 +119,7 @@ export function AgentsView() {
   // Job output defaults to the member's UI language when it's one of the
   // 23 content languages; the job form lets them pick any other.
   const defaultJobLanguage = isSupportedLanguage(uiLocale) ? uiLocale : "en";
-  const [planInfo, setPlanInfo] = useState<{ name: string; price: string; botSeats: number; botsRented: number; memesUsed: number; memesLimit: number } | null>(null);
+  const [planInfo, setPlanInfo] = useState<{ name: string; price: string; botsRented: number; memesUsed: number; memesLimit: number } | null>(null);
   const [catalog, setCatalog] = useState<AgentTemplate[]>([]);
   const [hires, setHires] = useState<Hire[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -339,12 +339,9 @@ export function AgentsView() {
                 <pre className="text-xs whitespace-pre-wrap mt-2 max-h-48 overflow-auto rounded-md bg-secondary/40 p-2.5">{archConfig.instructions}</pre>
               </details>
               <div className="flex gap-2 flex-wrap">
-                <Button disabled={busy || (planInfo != null && planInfo.botsRented >= planInfo.botSeats)} onClick={() => void installArchitectAgent()}>
+                <Button disabled={busy} onClick={() => void installArchitectAgent()}>
                   Install agent
                 </Button>
-                {planInfo && planInfo.botsRented >= planInfo.botSeats ? (
-                  <span className="text-[11px] text-muted-foreground self-center">All your plan&apos;s bot seats are rented — free one up or upgrade to install.</span>
-                ) : null}
                 <Button variant="outline" disabled={busy} onClick={() => setArchConfig(null)}>
                   Discard
                 </Button>
@@ -388,8 +385,8 @@ export function AgentsView() {
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-center">
               <div className="rounded-lg border border-border/60 p-3">
-                <div className="text-lg font-black">{planInfo.botsRented} / {planInfo.botSeats}</div>
-                <div className="text-[11px] text-muted-foreground">Bots rented</div>
+                <div className="text-lg font-black">{planInfo.botsRented}</div>
+                <div className="text-[11px] text-muted-foreground">Agents on your floor — no seat limit</div>
               </div>
               <div className="rounded-lg border border-border/60 p-3">
                 <div className="text-lg font-black">{fmt(planInfo.memesUsed)} / {fmt(planInfo.memesLimit)}</div>
@@ -424,7 +421,7 @@ export function AgentsView() {
               <p className="text-xs text-muted-foreground">{t.role}</p>
               <div className="flex items-center gap-2">
                 <Button
-                  disabled={busy || (planInfo != null && planInfo.botsRented >= planInfo.botSeats)}
+                  disabled={busy}
                   onClick={() =>
                     void act(
                       () =>
@@ -439,9 +436,6 @@ export function AgentsView() {
                 >
                   {tA("rentThisBot")}
                 </Button>
-                {planInfo && planInfo.botsRented >= planInfo.botSeats ? (
-                  <span className="text-[11px] text-muted-foreground">{tA("seatsFull")}</span>
-                ) : null}
               </div>
             </div>
           ))}

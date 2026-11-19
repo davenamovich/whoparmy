@@ -328,7 +328,7 @@ export function MySystemView() {
                 {a.seated ? (
                   <span className="rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 text-[11px] font-semibold">On your floor</span>
                 ) : (
-                  <span className="rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 px-2 py-0.5 text-[11px] font-semibold">Queued — gets its name when seated</span>
+                  <span className="rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 px-2 py-0.5 text-[11px] font-semibold">Gets its board name on approval</span>
                 )}
               </p>
             ))}
@@ -421,11 +421,11 @@ export function MySystemView() {
                     ) : blueprint.hireResults?.[a.templateKey] === "existing" ? (
                       <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold">Already on your floor</span>
                     ) : blueprint.hireResults?.[a.templateKey] === "needs-seat" ? (
-                      <span className="rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 px-2 py-0.5 text-[11px] font-semibold">Needs a bot seat — upgrade to hire</span>
+                      <span className="rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 px-2 py-0.5 text-[11px] font-semibold">Not hired yet — re-approve to hire</span>
                     ) : a.seated === false ? (
-                      <span className="rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 px-2 py-0.5 text-[11px] font-semibold">Queued — needs a bot seat</span>
+                      <span className="rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 px-2 py-0.5 text-[11px] font-semibold">Joins on approval</span>
                     ) : a.seated === true ? (
-                      <span className="rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 text-[11px] font-semibold">Seat covered by your plan</span>
+                      <span className="rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 text-[11px] font-semibold">On your floor</span>
                     ) : null}
                   </p>
                   <p className="text-sm text-muted-foreground">{a.mission}</p>

@@ -46,8 +46,8 @@ export async function GET() {
         key: plan.key,
         name: plan.name,
         price: plan.price,
-        botSeats: plan.botSeats,
-        // Referral-grant bots ride on top of the plan's seats.
+        // Engine-meter model (2026-11-19): no seat count exists.
+        // Agents are unlimited; the plan meters generations.
         botsRented: hires.filter((h) => h.source !== "REFERRAL").length,
         memesUsed,
         memesLimit: plan.monthlyItems,
@@ -98,21 +98,9 @@ export async function POST(req: NextRequest) {
         : (template.instructions ?? null),
       toolsJson: isCustom ? toolsToJson(customTools) : null,
     };
-    const plan = getPlan(user.plan);
-    // Seats count rentals only — a referral-grant bot never blocks a seat
-    // and never counts as the member's first rental (conversion).
-    const rented = await db.hiredAgent.count({ where: { userId: user.id, source: "RENTAL" } });
-    if (rented >= plan.botSeats) {
-      return NextResponse.json(
-        {
-          error:
-            plan.botSeats === 1
-              ? `Your ${plan.name} plan includes 1 bot and it's already rented. Upgrade for more bots — or connect your own key (BYOK) to run uncapped.`
-              : `All ${plan.botSeats} bot seats on your ${plan.name} plan are rented. Upgrade for more bots.`,
-        },
-        { status: 402 },
-      );
-    }
+    // No seat gate (engine-meter model, 2026-11-19): hiring is
+    // unlimited on every plan. What the plan meters is monthly
+    // generations, enforced when agents actually run jobs.
     const hire = await db.hiredAgent.create({
       data: {
         userId: user.id,
@@ -127,7 +115,8 @@ export async function POST(req: NextRequest) {
     // Gamification + referral program: renting earns XP; a FIRST rental
     // converts the member — their referrer earns 30% (see referrals.ts).
     void awardXp(user.id, "BOT_RENTED", template.key).catch(() => {});
-    if (rented === 0) {
+    const totalHires = await db.hiredAgent.count({ where: { userId: user.id } });
+    if (totalHires === 1) {
       void recordConversion(user.id).catch(() => {});
     }
     return NextResponse.json({ hire }, { status: 201 });

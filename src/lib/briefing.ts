@@ -39,7 +39,7 @@ export async function launchReport(user: Actor): Promise<LaunchReport | null> {
   const outstanding: string[] = [...summary.attention];
   for (const a of bp.workforce) {
     if (bp.hireResults?.[a.templateKey] === "needs-seat") {
-      outstanding.push(`${a.name} is in the blueprint but still needs a bot seat — upgrade to hire it.`);
+      outstanding.push(`${a.name} is in the blueprint but was not hired under the old seat model — re-approve your blueprint to hire it.`);
     }
   }
   for (const g of bp.integrations) {
@@ -60,7 +60,7 @@ export async function launchReport(user: Actor): Promise<LaunchReport | null> {
           : bp.hireResults?.[a.templateKey] === "existing"
             ? "Already on your floor"
             : bp.hireResults?.[a.templateKey] === "needs-seat"
-              ? "Planned — needs a bot seat"
+              ? "Planned — not hired yet"
               : "Planned",
     })),
     integrations: bp.integrations.map((g) => ({ label: g.label, connected: g.connected, note: g.note })),

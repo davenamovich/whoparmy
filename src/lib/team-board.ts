@@ -106,7 +106,7 @@ export function firstSwarm(bp: Blueprint): SwarmTask[] {
  */
 export function teamBoardSection(bp: Blueprint, business: string): string {
   const roster = bp.workforce
-    .map((a) => `- ${boardNameFor(a)} — ${a.name} (${a.role})${a.seated === false ? " [QUEUED — gets its board name when it gets a seat; do not task it yet]" : ""}`)
+    .map((a) => `- ${boardNameFor(a)} — ${a.name} (${a.role})${a.seated === false ? " [not hired yet — gets its board name once I approve the blueprint]" : ""}`)
     .join("\n");
   const channels = teamChannels(bp).map((c) => `- ${c.name} — ${c.purpose}`).join("\n");
   const swarm = firstSwarm(bp)
