@@ -990,3 +990,22 @@ CREATE INDEX "BtcgameEvent_sessionId_idx" ON "BtcgameEvent"("sessionId");
 
 -- CreateIndex
 CREATE INDEX "BtcgameEvent_type_idx" ON "BtcgameEvent"("type");
+
+-- CreateTable
+CREATE TABLE "AgentTrafficDay" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "agentId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "date" TEXT NOT NULL,
+    "slotsUsed" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "AgentTrafficDay_agentId_fkey" FOREIGN KEY ("agentId") REFERENCES "HiredAgent" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "AgentTrafficDay_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "AgentTrafficDay_agentId_date_key" ON "AgentTrafficDay"("agentId", "date");
+
+-- CreateIndex
+CREATE INDEX "AgentTrafficDay_userId_date_idx" ON "AgentTrafficDay"("userId", "date");

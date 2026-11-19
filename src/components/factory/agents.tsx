@@ -28,6 +28,13 @@ interface Hire {
   toolsJson?: string | null;
 }
 
+interface TrafficPool {
+  total: number;
+  used: number;
+  remaining: number;
+  placements: Array<{ partner: string; partnerName: string; url: string | null }>;
+}
+
 interface FactoryToolView {
   id: string;
   label: string;
@@ -122,6 +129,7 @@ export function AgentsView() {
   const [planInfo, setPlanInfo] = useState<{ name: string; price: string; botsRented: number; memesUsed: number; memesLimit: number } | null>(null);
   const [catalog, setCatalog] = useState<AgentTemplate[]>([]);
   const [hires, setHires] = useState<Hire[]>([]);
+  const [trafficPools, setTrafficPools] = useState<Record<string, TrafficPool>>({});
   const [jobs, setJobs] = useState<Job[]>([]);
   const [listings, setListings] = useState<Listing[]>([]);
   const [myUserId, setMyUserId] = useState<string>("");
@@ -149,6 +157,7 @@ export function AgentsView() {
       setHires(d.hires);
       setJobs(d.jobs);
       setResearch(d.research ?? null);
+      setTrafficPools(d.trafficPools ?? {});
     }
     if (c.ok) {
       const d = await c.json();
@@ -508,6 +517,14 @@ export function AgentsView() {
                     {jobs.filter((j) => j.hireId === h.id && (j.status === "QUEUED" || j.status === "RUNNING")).length} in the queue
                     {h.agent37Ref ? ` · Agent37: ${h.agent37Ref}` : " · runs on the P&R engine"}
                   </div>
+                  {trafficPools[h.id] ? (
+                    <div className="text-[11px] text-muted-foreground">
+                      Traffic pool today: {trafficPools[h.id].used} of {trafficPools[h.id].total} slots used
+                      {trafficPools[h.id].placements.length > 0
+                        ? ` · rotating: ${trafficPools[h.id].placements.map((p) => p.partnerName).join(", ")}`
+                        : ""}
+                    </div>
+                  ) : null}
                   {h.status === "ACTIVE" ? (
                     <div className="flex flex-col sm:flex-row gap-2">
                       <select

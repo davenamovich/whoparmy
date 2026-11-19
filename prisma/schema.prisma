@@ -38,6 +38,7 @@ model User {
   rotatorBids  RotatorBid[]
   rotatorWins  RotatorDay[] @relation("RotatorWins")
   rotatorPlacements RotatorPlacement[]
+  trafficDays  AgentTrafficDay[]
   linksSavedAt DateTime? // first bridge link save — pays the referrer's free generations (lib/bridge.ts)
   // BTC Experiment (Flow v2, 2026-11-19): PUBLIC receive addresses
   // only — receive-only, never a seed phrase or private key. The
@@ -259,6 +260,7 @@ model HiredAgent {
 
   user User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   jobs AgentJob[]
+  trafficDays AgentTrafficDay[]
 
   @@index([userId])
 }
@@ -619,6 +621,29 @@ model RotatorPlacement {
 
   @@unique([userId, partner])
   @@index([date])
+}
+
+// ─── Traffic pool (Dave, 2026-11-19) ────────────────────────────────
+// Every agent has a daily traffic pool (10 placement-slots per ET
+// day, flat) and a brand behind it. The pool is worked through the
+// rotator's free placements; this row is the recorded outcome for
+// one agent on one ET date (lib/traffic-pool.ts) — the weekly
+// report counts pool usage from here. Slots never roll over: a new
+// date is a new row at 0.
+model AgentTrafficDay {
+  id        String   @id @default(cuid())
+  agentId   String
+  userId    String
+  date      String // ET yyyy-mm-dd the allotment applies to
+  slotsUsed Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agent HiredAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, date])
+  @@index([userId, date])
 }
 
 // ─── Trending: the day's default topics ─────────────────────────────

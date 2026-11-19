@@ -8,6 +8,7 @@ import { countMonthlyUsage } from "@/lib/usage-server";
 import { awardXp } from "@/lib/game";
 import { recordConversion } from "@/lib/referrals";
 import { expireReferralBots } from "@/lib/bot-grants";
+import { getTrafficPoolsForUser } from "@/lib/traffic-pool";
 
 export const runtime = "nodejs";
 
@@ -19,11 +20,15 @@ export async function GET() {
     const plan = getPlan(user.plan);
     // Park referral bots whose 24h window closed before reading state.
     await expireReferralBots(user.id);
-    const [wallet, hires, jobs, memesUsed, brand] = await Promise.all([
+    const [wallet, hires, jobs, memesUsed, trafficPools, brand] = await Promise.all([
       getWalletState(user.id, user.plan),
       db.hiredAgent.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" } }),
       db.agentJob.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" }, take: 20 }),
       countMonthlyUsage(user.id),
+      // Traffic pool (2026-11-19): each agent's daily 10-slot pool
+      // state for the control center cards. Best-effort — a pool read
+      // failure must not take the whole agents state down with it.
+      getTrafficPoolsForUser(user.id).catch(() => ({})),
       db.brandProfile.findFirst({
         where: { userId: user.id, researchJson: { not: null } },
         orderBy: { updatedAt: "desc" },
@@ -56,6 +61,7 @@ export async function GET() {
       hires,
       jobs,
       research,
+      trafficPools,
     });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to load agents" }, { status: err instanceof UnauthorizedError ? 401 : 500 });

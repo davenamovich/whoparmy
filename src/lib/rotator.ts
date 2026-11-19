@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { BRIDGE_PARTNERS } from "@/lib/bridge";
+import { filterPlacementsByTrafficPool } from "@/lib/traffic-pool";
 
 /**
  * ─── THE DAILY ROTATOR — auctioned, admin controlled ───────────────
@@ -105,10 +106,16 @@ export async function getRotatorPool(date = etDateString()): Promise<RotatorPool
       userId: day.winnerUserId,
     });
   }
-  const placements = await db.rotatorPlacement.findMany({
+  const earned = await db.rotatorPlacement.findMany({
     where: { date },
     orderBy: { createdAt: "asc" },
   });
+  // Traffic pool (Dave, 2026-11-19): a member's free placements are
+  // worked by their agents, 10 slots per agent per day. Entries past
+  // a member's agents' pools stop rotating for the day; members with
+  // no working agent rotate exactly as before, and the auction entry
+  // above is never filtered. Fail-open inside the filter.
+  const placements = await filterPlacementsByTrafficPool(earned, date);
   for (const pl of placements) {
     const link = await db.engineLink.findUnique({
       where: { userId_partner: { userId: pl.userId, partner: pl.partner } },
