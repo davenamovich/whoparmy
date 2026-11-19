@@ -37,6 +37,12 @@ jobs:
 
       - name: Prisma push
         if: always()
+        # Scratch SQLite file: db push must prove the schema applies
+        # cleanly end to end, but CI has (and should have) no real
+        # DATABASE_URL — without one the step dies on P1012 before
+        # validating anything.
+        env:
+          DATABASE_URL: file:./ci-scratch.db
         run: bun run db:push
 
       - name: Upload build artifacts
