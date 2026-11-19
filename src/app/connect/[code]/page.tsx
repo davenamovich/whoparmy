@@ -12,7 +12,7 @@ import { museWeekCommand, type MuseWeekOfferId } from "@/lib/muse-week-command";
  * plain text in one <pre>, readable by anything that can fetch a URL.
  *
  * The code in the URL is the same one-time bridge code as always:
- * hash-stored, 15-minute TTL, single use at EXCHANGE. Viewing this
+ * hash-stored, 24-hour TTL, single use at EXCHANGE. Viewing this
  * page never consumes it (findLiveBridgeCode is read-only), and
  * exchange re-checks the member's eligibility server-side.
  *
@@ -50,7 +50,7 @@ export default async function ConnectPage({ params }: { params: Promise<{ code: 
         text={`AGENT BRIEF — Plunder & Riffle connection link: DEAD
 
 This link's code is expired, already exchanged, or not valid. Codes
-are single use (spent at EXCHANGE) and live 15 minutes from minting.
+are single use (spent at EXCHANGE) and live 24 hours from minting.
 Do not retry it. Do not guess a replacement.
 
 Tell your member, in your own words: "That connection link has

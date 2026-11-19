@@ -272,7 +272,7 @@ export default function MuseWeekPage() {
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Muse or any AI agent opens it and gets the command below — no copy-paste, no login.
-                  Works once, expires in 15 minutes. Or paste the command yourself:
+                  Works once, expires in 24 hours. Or paste the command yourself:
                 </p>
               </div>
               <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-4 text-xs leading-relaxed">
@@ -293,7 +293,7 @@ export default function MuseWeekPage() {
                 </Button>
               </div>
               <p className="text-muted-foreground">
-                The code inside expires in 15 minutes and works once. The token it issues lasts 7 days — one pairing,
+                The code inside expires in 24 hours and works once. The token it issues lasts 7 days — one pairing,
                 one run. Your agent researches first (free), quotes the exact cost, and waits for your
                 &ldquo;go&rdquo; before spending anything.
               </p>
