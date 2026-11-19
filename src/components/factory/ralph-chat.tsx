@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
  */
 
 export interface RalphNavIntent {
-  view: "create" | "agents" | "campaigns" | "account";
+  view: "create" | "agents" | "campaigns" | "account" | "system";
   memeTopic?: string;
 }
 

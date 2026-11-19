@@ -10,6 +10,7 @@ import {
   Bot,
   MessagesSquare,
   ShieldCheck,
+  Network,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -25,6 +26,7 @@ import { RalphChat, type RalphNavIntent } from "@/components/factory/ralph-chat"
 import { TrendingView } from "@/components/factory/trending";
 import { AgentStart } from "@/components/factory/agent-start";
 import { AdTeardownCard } from "@/components/factory/ad-teardown";
+import { MySystemView } from "@/components/factory/my-system";
 import { CampaignsView } from "@/components/factory/campaigns";
 import { LibraryView } from "@/components/factory/library";
 import { BrandsView } from "@/components/factory/brands";
@@ -44,9 +46,10 @@ type View =
   | "library"
   | "army"
   | "agents"
+  | "system"
   | "account";
 
-type NavKey = "create" | "ralph" | "campaigns" | "library" | "army" | "agents" | "account" | "admin";
+type NavKey = "create" | "ralph" | "campaigns" | "library" | "army" | "agents" | "system" | "account" | "admin";
 
 // Consolidated menu (Dave, 2026-11-17): fewer doors, same rooms.
 // Meme Studio folded into Create; the War Room folded into Meme
@@ -68,6 +71,8 @@ const NAV: { key: View; labelKey: NavKey; icon: React.ComponentType<{ className?
   { key: "library", labelKey: "library", icon: Library },
   { key: "army", labelKey: "army", icon: Swords },
   { key: "agents", labelKey: "agents", icon: Bot },
+  // My AI System (Dave, 2026-11-19): the blueprint + system state.
+  { key: "system", labelKey: "system", icon: Network },
   { key: "account", labelKey: "account", icon: UserRound },
 ];
 
@@ -402,6 +407,7 @@ export default function Home() {
             </div>
           ) : null}
           {view === "agents" ? <AgentsView /> : null}
+          {view === "system" ? <MySystemView /> : null}
           {view === "account" ? <AccountView /> : null}
         </main>
       </div>

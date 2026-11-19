@@ -8,6 +8,7 @@ import { HOUSE_PERSON, mnemosCapture, mnemosPersonFor, mnemosRecall, mnemosSnaps
 import { BridgeError, assertBridgeEligible, bridgeOffer, getMemberEngineKey, mintBridgeCode } from "@/lib/muse-bridge";
 import { redactBridgeSecrets } from "@/lib/bridge-redact";
 import { museWeekCommand } from "@/lib/muse-week-command";
+import { draftBlueprint, getBlueprint } from "@/lib/blueprint";
 
 /**
  * ─── RALPH — the one-click dispatcher inside Whoparmy ───────────────
@@ -25,6 +26,7 @@ import { museWeekCommand } from "@/lib/muse-week-command";
 export type RalphActionId =
   | "make_content"
   | "free_audit"
+  | "build_system"
   | "memory"
   | "trending"
   | "my_bots"
@@ -40,7 +42,7 @@ export interface RalphAction {
 export interface RalphReply {
   text: string;
   actions: RalphActionId[];
-  nav?: { view: "create" | "agents" | "campaigns" | "account"; memeTopic?: string };
+  nav?: { view: "create" | "agents" | "campaigns" | "account" | "system"; memeTopic?: string };
   /** Trending picks: tapping one loads the Meme Studio with the topic. */
   topics?: string[];
 }
@@ -49,6 +51,7 @@ const LABELS: Record<string, Record<RalphActionId, string>> = {
   en: {
     make_content: "Make my free content",
     free_audit: "Run my free AI audit",
+    build_system: "Build my AI system",
     memory: "What do you remember about my business?",
     trending: "What's trending today?",
     my_bots: "My bots & jobs",
@@ -59,6 +62,7 @@ const LABELS: Record<string, Record<RalphActionId, string>> = {
   es: {
     make_content: "Crear mi contenido gratis",
     free_audit: "Haz mi auditoría de IA gratis",
+    build_system: "Crear mi sistema de IA",
     memory: "¿Qué recuerdas de mi negocio?",
     trending: "¿Qué es tendencia hoy?",
     my_bots: "Mis bots y trabajos",
@@ -69,6 +73,7 @@ const LABELS: Record<string, Record<RalphActionId, string>> = {
   ja: {
     make_content: "無料コンテンツを作る",
     free_audit: "無料AI監査を受ける",
+    build_system: "AIシステムを作る",
     memory: "私のビジネスの何を覚えていますか？",
     trending: "今日のトレンドは？",
     my_bots: "マイbotとジョブ",
@@ -79,6 +84,7 @@ const LABELS: Record<string, Record<RalphActionId, string>> = {
   ru: {
     make_content: "Сделать бесплатный контент",
     free_audit: "Запустить бесплатный AI-аудит",
+    build_system: "Собрать мою AI-систему",
     memory: "Что ты помнишь о моём бизнесе?",
     trending: "Что сегодня в тренде?",
     my_bots: "Мои боты и задачи",
@@ -91,6 +97,7 @@ const LABELS: Record<string, Record<RalphActionId, string>> = {
 export const RALPH_MENU: RalphActionId[] = [
   "make_content",
   "free_audit",
+  "build_system",
   "memory",
   "trending",
   "my_bots",
@@ -283,6 +290,35 @@ export async function ralphAction(userId: string, locale: string, actionId: Ralp
         };
       }
     }
+    case "build_system": {
+      // The onboarding architect (Dave, 2026-11-19): Ralph drafts
+      // the member's AI-system blueprint from research on file, or
+      // reports its state. The full plan lives in My AI System.
+      const user = await db.user.findUnique({
+        where: { id: userId },
+        select: { plan: true, whopId: true },
+      });
+      const actor = { id: userId, plan: user?.plan ?? "FREE", whopId: user?.whopId ?? null };
+      const existing = await getBlueprint(userId);
+      if (!existing) {
+        const bp = await draftBlueprint(actor);
+        return {
+          text:
+            `I drafted your AI-system blueprint from what's on file — top play: ${bp.opportunities[0]?.title ?? "daily content"}. ` +
+            `It lines up ${bp.workforce.length} agents (${bp.workforce.map((a) => a.name).join(", ")}) for hire once you approve it. Taking you to My AI System to review.`,
+          actions: ["make_content", "my_bots", "my_plan"],
+          nav: { view: "system" },
+        };
+      }
+      return {
+        text:
+          existing.status === "approved"
+            ? "Your system is live — the blueprint is approved and your workforce is on the floor. Taking you to My AI System for the status board."
+            : "Your blueprint is drafted and waiting on your approval — approving it hires the workforce. Taking you to it.",
+        actions: ["my_bots", "make_content", "my_plan"],
+        nav: { view: "system" },
+      };
+    }
     case "campaigns":
       return {
         text: "Your campaigns — and their publishing state — live here. Taking you over.",
@@ -294,7 +330,7 @@ export async function ralphAction(userId: string, locale: string, actionId: Ralp
 
 const RALPH_SYSTEM = `You are Ralph, the floor manager inside Plunder & Riffle's Whoparmy app. You talk to a small-business owner who rents AI bots that make their marketing content. You are brisk, warm, concrete — a good foreman, not a chatbot. You route work; you never publish, send, or spend anything yourself, and you never promise earnings.
 
-You may offer ONLY these actions (ids): make_content (open Create), free_audit (the free AI audit via The Assessor bot), memory (show what you remember), trending (today's trends), my_bots, my_plan, my_claude (their Muse bridge, on the Account page), campaigns.
+You may offer ONLY these actions (ids): make_content (open Create), free_audit (the free AI audit via The Assessor bot), build_system (their AI-system blueprint — draft it or open My AI System), memory (show what you remember), trending (today's trends), my_bots, my_plan, my_claude (their Muse bridge, on the Account page), campaigns.
 
 Answer using the member's brand facts and remembered facts below when relevant, and say plainly when you're using something you remembered. Keep replies under 120 words. Reply in the member's language.
 
