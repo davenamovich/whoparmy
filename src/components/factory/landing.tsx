@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowRight, Brain, Check, ChevronLeft, ChevronRight, Coins, Lock, Moon, ScanSearch, Search, Sparkles, Sunrise, TrendingUp } from "lucide-react";
+import { ArrowRight, Bot, Brain, Check, ChevronLeft, ChevronRight, Coins, Lock, Moon, ScanSearch, Search, Sparkles, Sunrise, TrendingUp, Users } from "lucide-react";
 import { stashRefFromUrl } from "@/lib/ref-stash";
 import type { BridgePartner } from "@/lib/bridge";
 import { BrandedBotCard } from "@/components/factory/branded-bot-card";
@@ -93,6 +93,29 @@ const RESULTS = [
     icon: Brain,
     title: "Persistent memory — yours",
     line: "Your agents remember your business — every fact, every campaign, every lesson — in a memory stack of your own. One click to deploy on your own infrastructure; we never hold your bots' memories, and you can take them with you.",
+  },
+];
+
+// "Need an agent?" (Dave, 2026-11-18): the two doors, linked.
+// Muse = baby steps + the lead orchestrator (Dave's invite splash
+// carries code 49YNE2). Agent37 = the full team. Both are our
+// referral links — the disclosure line under the cards says so.
+const AGENT_DOORS = [
+  {
+    icon: Bot,
+    title: "Start with Muse — baby steps",
+    line: "No agent yet? Start here. Muse is your first agent and your lead orchestrator: it does the research, runs your content through your connection here, and directs the rest of the crew. One agent, your credits, your approve tap — you can always grow the team later.",
+    cta: "Get Muse",
+    href: "https://www.plunderandriffle.com/muse-invite",
+    note: "Join through our invite and both you and we get 1 billion tokens.",
+  },
+  {
+    icon: Users,
+    title: "Or the full team — Agent37",
+    line: "Already know you want the whole workforce? Agent37 runs a full team of agents on one instance — scouts, creators, reviewers — working your business around the clock, plugged into the same engine and the same memory.",
+    cta: "Meet Agent37",
+    href: "https://agent37.com/?via=riffle",
+    note: "The crew Dana's story runs on, at full strength from day one.",
   },
 ];
 
@@ -216,6 +239,37 @@ export function LandingPage() {
           <p className="text-center text-sm text-muted-foreground flex items-center justify-center gap-1.5">
             <Coins className="h-4 w-4 text-primary" />
             First save pays 25 free generations — and 25 more to whoever sent you.
+          </p>
+        </section>
+
+        <section className="space-y-4">
+          <div className="text-center space-y-1">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
+              Need an agent?
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Two doors, depending on how fast you want to move.
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {AGENT_DOORS.map((d) => (
+              <Card key={d.title}>
+                <CardContent className="py-5 space-y-2.5">
+                  <d.icon className="h-5 w-5 text-primary" />
+                  <p className="font-bold">{d.title}</p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{d.line}</p>
+                  <p className="text-xs text-muted-foreground">{d.note}</p>
+                  <Button asChild variant="outline" size="sm">
+                    <a href={d.href} target="_blank" rel="noreferrer">
+                      {d.cta} <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                    </a>
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <p className="text-center text-[11px] text-muted-foreground">
+            Both are our referral links — we may earn a commission or tokens when you join. The work runs the same either way.
           </p>
         </section>
 
