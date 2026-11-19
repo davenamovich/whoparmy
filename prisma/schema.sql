@@ -161,6 +161,9 @@ CREATE TABLE "HiredAgent" (
     "source" TEXT NOT NULL DEFAULT 'RENTAL',
     "expiresAt" DATETIME,
     "agent37Ref" TEXT,
+    "role" TEXT,
+    "instructions" TEXT,
+    "toolsJson" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "HiredAgent_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE

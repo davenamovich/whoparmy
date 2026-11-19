@@ -132,6 +132,11 @@ async function callStarimg(tierKey: string, system: string, user: string): Promi
   throw lastError instanceof Error ? lastError : new Error("Starimg call failed on every model in the tier");
 }
 
+/** Shared Starimg pass for other server lanes (the Agent Architect). */
+export async function callAgentLLM(tierKey: string, system: string, user: string): Promise<StarimgResult> {
+  return callStarimg(tierKey, system, user);
+}
+
 /** Execute one QUEUED job. Safe to call twice — the claim is atomic. */
 export async function runAgentJob(jobId: string): Promise<void> {
   const claimed = await db.agentJob.updateMany({
@@ -330,8 +335,14 @@ export async function runAgentJob(jobId: string): Promise<void> {
     // Dave's language rule: any language in, selected language out. The
     // instruction scaffold stays English; the output is pinned to the
     // job's selected language no matter what language the brief used.
+    // CUSTOM jobs (SMB Agent Factory) run on the hire's own standing
+    // instructions — that is the whole point of a custom agent.
+    const baseInstructions =
+      job.kind === "CUSTOM" && hire.instructions?.trim()
+        ? hire.instructions.trim()
+        : (KIND_INSTRUCTIONS[job.kind] ?? KIND_INSTRUCTIONS.MEME);
     const system =
-      (KIND_INSTRUCTIONS[job.kind] ?? KIND_INSTRUCTIONS.MEME) +
+      baseInstructions +
       `\n\nOUTPUT LANGUAGE: Write ALL of your output in ${languageLabel(job.language)} (${job.language}), regardless of the language the brief is written in. The brief may arrive in any language; your output language is always the selected one, never the brief's.`;
     const user = `Agent: ${hire.name} (${hire.templateKey})\nPieces requested: ${job.pieces}\nBrief: ${job.brief}`;
     const result = await callStarimg(tierKey, system, user);

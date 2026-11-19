@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getWhopUser } from "@/lib/auth";
 import { AGENT_CATALOG, getWalletState, internalBotBudget, templateByKey } from "@/lib/agents";
+import { toolsFromJson, toolsToJson } from "@/lib/agent-architect-core";
 import { getPlan } from "@/lib/plans";
 import { countMonthlyUsage } from "@/lib/usage-server";
 import { awardXp } from "@/lib/game";
@@ -18,12 +19,27 @@ export async function GET() {
     const plan = getPlan(user.plan);
     // Park referral bots whose 24h window closed before reading state.
     await expireReferralBots(user.id);
-    const [wallet, hires, jobs, memesUsed] = await Promise.all([
+    const [wallet, hires, jobs, memesUsed, brand] = await Promise.all([
       getWalletState(user.id, user.plan),
       db.hiredAgent.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" } }),
       db.agentJob.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" }, take: 20 }),
       countMonthlyUsage(user.id),
+      db.brandProfile.findFirst({
+        where: { userId: user.id, researchJson: { not: null } },
+        orderBy: { updatedAt: "desc" },
+      }).catch(() => null),
     ]);
+    // The control center's Research tab (Factory Slice B): the latest
+    // business research every agent works from, parsed defensively.
+    let research: Record<string, unknown> | null = null;
+    if (brand?.researchJson) {
+      try {
+        const r = JSON.parse(brand.researchJson) as Record<string, unknown>;
+        research = { brandName: brand.name, website: brand.website, ...r };
+      } catch {
+        research = null;
+      }
+    }
     return NextResponse.json({
       wallet,
       plan: {
@@ -39,6 +55,7 @@ export async function GET() {
       catalog: AGENT_CATALOG,
       hires,
       jobs,
+      research,
     });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to load agents" }, { status: 500 });
@@ -50,11 +67,37 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const user = await getWhopUser();
-    const body = (await req.json()) as { templateKey?: string; name?: string };
+    const body = (await req.json()) as {
+      templateKey?: string;
+      name?: string;
+      role?: string;
+      instructions?: string;
+      toolsJson?: string;
+    };
     const template = body.templateKey ? templateByKey(body.templateKey) : undefined;
     if (!template) {
       return NextResponse.json({ error: "Pick a bot from the rental catalog." }, { status: 400 });
     }
+    // SMB Agent Factory (2026-11-18): a "custom" rental carries the
+    // architect's config — role, standing instructions and the tool
+    // selection. Tools are re-validated against the registry here, so
+    // a client can never install a capability that doesn't exist.
+    // Templates with preset instructions (FAQ) carry their own.
+    const isCustom = template.key === "custom";
+    const customTools = isCustom ? toolsFromJson(body.toolsJson) : [];
+    if (isCustom && customTools.length === 0) {
+      return NextResponse.json(
+        { error: "A custom agent needs at least one tool — run the architect first so it can pick them." },
+        { status: 400 },
+      );
+    }
+    const hireConfig = {
+      role: isCustom ? (body.role?.trim().slice(0, 300) || template.role) : template.role,
+      instructions: isCustom
+        ? body.instructions?.trim().slice(0, 4000) || null
+        : (template.instructions ?? null),
+      toolsJson: isCustom ? toolsToJson(customTools) : null,
+    };
     const plan = getPlan(user.plan);
     // Seats count rentals only — a referral-grant bot never blocks a seat
     // and never counts as the member's first rental (conversion).
@@ -76,6 +119,9 @@ export async function POST(req: NextRequest) {
         templateKey: template.key,
         name: body.name?.trim().slice(0, 60) || template.name,
         tokenBudget: internalBotBudget(user.plan),
+        role: hireConfig.role,
+        instructions: hireConfig.instructions,
+        toolsJson: hireConfig.toolsJson,
       },
     });
     // Gamification + referral program: renting earns XP; a FIRST rental

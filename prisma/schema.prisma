@@ -245,6 +245,9 @@ model HiredAgent {
   source      String    @default("RENTAL") // RENTAL (a plan seat) | REFERRAL (24h earned bot — not a seat)
   expiresAt   DateTime? // REFERRAL bots only: the grant dies at this instant
   agent37Ref  String? // Agent37 instance/session ref once provisioned
+  role         String? // SMB Agent Factory (2026-11-18): the agent's job in plain words
+  instructions String? // Factory: the agent's standing instructions (CUSTOM kind runs on these)
+  toolsJson    String? // Factory: JSON array of selected tools [{id,label,kind}]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
