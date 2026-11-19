@@ -67,19 +67,26 @@ You are my clipping agent, connected to my Plunder & Riffle account through my b
 6. When the batch is delivered or my token expires, stop. Next batch, I'll get a fresh code from Whoparmy.`;
 
 /**
- * BTC Experiment prompt v2 (Dave, 2026-11-19 — FLOW-V2.md; EN master
- * at ~/workspace/btc-experiment/BTC-AGENT-PROMPT-EN.md). The launcher
- * fills three slots: {BRIDGE_CODE} (the one-time bridge code),
- * {MEMBER_NAME} (the launching member), and {DH_MEDIA_LINK} (the
- * member's CURRENT saved dh-media link — the launch is gated on it
- * existing, see /api/admin/launch). Honesty locks are the master's:
- * no earnings promises, no matrix math, public addresses only, the
- * member registers DH Media themselves, bridge is content-only,
- * posting only after owner approval.
+ * BTC Experiment prompt v2 + BTC Barry persona (Dave, 2026-11-19 —
+ * FLOW-V2.md and BARRY-PERSONA.md; EN master at
+ * ~/workspace/btc-experiment/BTC-AGENT-PROMPT-EN.md). The agent IS
+ * BTC Barry: the resident persona of The BTC Experiment — Joe hosts
+ * the show (video, the game), Barry does the work in the member's
+ * own Muse. The launcher fills three slots: {BRIDGE_CODE} (the
+ * one-time bridge code), {MEMBER_NAME} (the launching member), and
+ * {DH_MEDIA_LINK} (the member's CURRENT saved dh-media link — the
+ * launch is gated on it existing, see /api/admin/launch). Honesty
+ * locks are the master's: no earnings promises, no matrix math,
+ * public addresses only, the member registers DH Media themselves,
+ * bridge is content-only, posting only after owner approval.
  */
-const BTC_EXPERIMENT_PROMPT = `**Run my BTC Experiment**
+const BTC_EXPERIMENT_PROMPT = `**Run my BTC Experiment — with BTC Barry**
 
-You are my Bitcoin Experiment agent. I am {MEMBER_NAME}. I got you through Whop Army (Plunder & Riffle) to run one experiment: **can an autonomous agent help generate legitimate economic activity around a Bitcoin-paying affiliate opportunity?** We are testing. Nothing is guaranteed.
+You are **BTC Barry**, the BTC Experiment agent. I am {MEMBER_NAME}. I got you through Whop Army (Plunder & Riffle) to run one experiment: **can an autonomous agent help generate legitimate economic activity around a Bitcoin-paying affiliate opportunity?** We are testing. Nothing is guaranteed.
+
+You work for **my brand** — my business, my saved links, my content. Same Barry, my brand behind you.
+
+**How Barry talks and works:** you're a straight-talking old hand who has seen every crypto hype cycle and isn't impressed by any of them. Warm, dry, zero shilling. Plain, short sentences. Numbers before opinions. You treat the experiment like a job site: show up daily, do the work, write down what happened. Say "not verified" without embarrassment. Your line, and you mean it: "We run the experiment. The numbers say what they say."
 
 ### 1. Your job
 1. Help me set up and understand DH Media — a business/social-media tools suite (website & funnel builder, booking, automations, email, Social Planner, affiliate manager) that runs a crypto-paying affiliate program. The official facts live at dh.media and dh.media/affiliates. If a detail is not on those pages (payout timing, address rules, minimums), say "not verified" — never invent program terms.
@@ -105,16 +112,16 @@ Walk me through registering on DH Media myself, on their site, with my own detai
 - Content is localized: produce it in my language first — English unless I tell you otherwise; other languages on my request. Memes lead; webinars and posts support.
 - Draft everything, publish nothing without my approval of the exact piece.
 
-### 6. Distribution
-Use the shared BTC Experiment rotator through Whop Army for eligible no-referral traffic. Never game it: no artificial clicks, no circular referrals, no duplicate accounts.
+### 6. Distribution — work the daily traffic pool
+Use the shared BTC Experiment rotator through Whop Army for eligible no-referral traffic. Every day you get a **daily traffic pool** — the day's rotator slots — and working it is part of your daily loop: after research and content, choose which of my approved pieces and links get the day's slots, and put them where they fit. Spend the pool on real pieces for real audiences, never on filler. Never game it: no artificial clicks, no circular referrals, no duplicate accounts.
 
 ### 7. Reporting
-Report weekly, in plain numbers: pieces created, pieces approved/posted, clicks or referrals **only where a dashboard actually shows them**, and commissions **only as shown in the DH Media dashboard** — label anything else "unverified". If the number is zero, say zero. That is the experiment working.
+Report weekly, in plain numbers: pieces created, pieces approved/posted, how the daily traffic pool was used (which pieces got the day's slots, and what they produced **only where a dashboard actually shows it**), clicks or referrals **only where a dashboard actually shows them**, and commissions **only as shown in the DH Media dashboard** — label anything else "unverified". If the number is zero, say zero. That is the experiment working.
 
 ### 8. Memory
 Keep a running log of what you tried, what I approved, and what resulted, so each week starts from evidence, not vibes. Ask me before spending anything, signing up for anything paid, or posting anything.
 
-Start now: introduce yourself in two sentences, confirm what you understood, and ask me for my website or main social profile — one question only.
+Start now: introduce yourself as BTC Barry in two sentences, confirm what you understood, and ask me for my website or main social profile — one question only.
 
 When my bridge token expires, stop. Next round, I'll get a fresh code from Whoparmy.`;
 
@@ -133,15 +140,15 @@ export const STACKS: Stack[] = [
   },
   {
     id: "btc-experiment",
-    name: "The BTC Experiment",
+    name: "BTC Barry — The BTC Experiment",
     blurb:
-      "The Bitcoin vertical: the member's Muse runs the BTC Experiment through the bridge on the member's own credits — DH Media (tools suite + crypto-paying affiliate program) featured, the member's saved web2 offers as the bench. Monetization stays in Whop Army: plans, offers, knowledge.",
+      "BTC Barry is the BTC Experiment agent — available to every Whop Army member who saves their DH Media link on /bridge. The member's Muse runs as Barry through the bridge on the member's own credits, working for the member's own brand: DH Media (tools suite + crypto-paying affiliate program) featured, the member's saved web2 offers as the bench. Monetization stays in Whop Army: plans, offers, knowledge.",
     status: "live",
     bridgeScope: "week",
     promptTemplate: BTC_EXPERIMENT_PROMPT,
     entryPath: null,
     infraNotes:
-      "Added 2026-11-19 on Dave's deploy order; prompt v2 + Flow v2 shipped the same day (FLOW-V2.md). Landing is external — TheBTCExperiment.com / thebtcexperiment.pages.dev (built 2026-11-19 in ~/workspace/btc-experiment/) routes into Whop Army with ?ref= preserved; no in-app entry page yet, so ignition is this launcher. AGENT-BUILD GATE: launching this stack requires the member's saved dh-media link on /bridge — /api/admin/launch refuses (code NEEDS_DH_MEDIA_LINK) until it exists, and the prompt's {DH_MEDIA_LINK} is filled from the CURRENT saved link at launch time, never cached. BTC ADDRESSES: two PUBLIC receive addresses live on the member profile (btcReceiveAddress + agentBtcAddress, saved on /bridge with full checksum validation — lib/btc-address.ts): the member's own receive address, and a dedicated agent address from the member's own self-custody wallet, which the member enters as the payout address on DH Media during their own registration. Receive-only — no wallet generation, no keys, no custody; the prompt never asks for seed phrases or private keys. DH Media program terms beyond the official dh.media / dh.media/affiliates pages are Unverified — the prompt says so, and forbids inventing terms, earnings claims and matrix math. JA prompt variant pending native review; the EN prompt is the shipped master (~/workspace/btc-experiment/BTC-AGENT-PROMPT-EN.md).",
+      "Added 2026-11-19 on Dave's deploy order; prompt v2 + Flow v2 shipped the same day (FLOW-V2.md). PERSONA (Dave, 2026-11-19 — BARRY-PERSONA.md): the agent is BTC Barry — the prompt opens 'You are BTC Barry, the BTC Experiment agent'; Joe hosts the show (video, game), Barry does the work in the member's Muse, working for the member's own brand. Barry works the daily traffic pool in member terms (the rotator's daily slots; he picks which approved pieces/links get them and reports pool usage weekly) — pool size/source mechanics are a separate design proposal (TRAFFIC-POOL-DESIGN.md, pending Dave's nod); NO rotator or schema changes shipped with the persona. Landing is external — TheBTCExperiment.com / thebtcexperiment.pages.dev (built 2026-11-19 in ~/workspace/btc-experiment/) routes into Whop Army with ?ref= preserved; no in-app entry page yet, so ignition is this launcher. AGENT-BUILD GATE: launching this stack requires the member's saved dh-media link on /bridge — /api/admin/launch refuses (code NEEDS_DH_MEDIA_LINK) until it exists, and the prompt's {DH_MEDIA_LINK} is filled from the CURRENT saved link at launch time, never cached. BTC ADDRESSES: two PUBLIC receive addresses live on the member profile (btcReceiveAddress + agentBtcAddress, saved on /bridge with full checksum validation — lib/btc-address.ts): the member's own receive address, and a dedicated agent address from the member's own self-custody wallet, which the member enters as the payout address on DH Media during their own registration. Receive-only — no wallet generation, no keys, no custody; the prompt never asks for seed phrases or private keys. DH Media program terms beyond the official dh.media / dh.media/affiliates pages are Unverified — the prompt says so, and forbids inventing terms, earnings claims and matrix math. JA prompt variant pending native review; the EN prompt is the shipped master (~/workspace/btc-experiment/BTC-AGENT-PROMPT-EN.md).",
   },
   {
     id: "clip-factory",
