@@ -66,7 +66,7 @@ export const GENERATE_WAIT_SLIDES: WaitSlide[] = [
   },
   {
     title: "What you can do with the pack",
-    body: "Post it yourself, hand it to your rented bots, or let your Meme Army spread it. Pieces can carry your referral links — the ones you saved on the bridge — so shares can pay you back.",
+    body: "Post it yourself, hand it to your agents, or let your Meme Army spread it. Pieces can carry your referral links — the ones you saved on the bridge — so shares can pay you back.",
   },
   {
     title: "What happens next",
