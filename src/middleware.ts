@@ -40,6 +40,10 @@ const PUBLIC_API_PREFIXES = [
   // floor must not block it first (2026-11-19: the daily X-trends cron
   // failed with 401 "Sign in required" until this line was added).
   "/api/trends/ingest",
+  // The public game API carries its own credential (the server-held session
+  // id); picks are validated server-side and claim minting is server-only, so
+  // the auth floor must not block anonymous players (routes reject bad sessions themselves).
+  "/api/doors/pickaphone",
 ];
 
 // Same value as SESSION_COOKIE in lib/whop.ts — duplicated because
