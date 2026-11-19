@@ -106,6 +106,33 @@ export function ReplyGuyButton({ topic }: { topic: TrendTopicLike }) {
 
   const overLimit = text.length > 280;
 
+  /** Post it yourself, no Upload-Post: X's composer opens with the
+   *  reply pre-filled and aimed at the original post (intent with
+   *  in_reply_to). Intents can't carry an image, so the meme goes
+   *  on the clipboard first — the member pastes it into the
+   *  composer. If the clipboard write is refused, the meme page
+   *  opens too so they can grab it manually. */
+  async function openInX() {
+    if (!prep) return;
+    let clipboardOk = false;
+    try {
+      const res = await fetch(prep.meme.imageUrl);
+      const blob = await res.blob();
+      await navigator.clipboard.write([new ClipboardItem({ [blob.type || "image/png"]: blob })]);
+      clipboardOk = true;
+    } catch {
+      clipboardOk = false;
+    }
+    const intent = `https://twitter.com/intent/tweet?in_reply_to=${prep.post.id}&text=${encodeURIComponent(text)}`;
+    window.open(intent, "_blank", "noopener");
+    if (clipboardOk) {
+      toast({ title: "X is open with your reply", description: "The meme is on your clipboard — paste it (Ctrl+V) into the composer to attach it." });
+    } else {
+      window.open(prep.meme.pageUrl, "_blank", "noopener");
+      toast({ title: "X is open with your reply", description: "The meme page opened too — save the image and attach it in the composer." });
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -190,6 +217,9 @@ export function ReplyGuyButton({ topic }: { topic: TrendTopicLike }) {
                   then: copy the words, open the post, paste and attach the meme — still under a minute.
                 </p>
                 <div className="flex gap-2 flex-wrap">
+                  <Button size="sm" onClick={() => void openInX()}>
+                    <ExternalLink className="h-3.5 w-3.5 mr-1" /> Open in X with this reply
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
@@ -199,11 +229,6 @@ export function ReplyGuyButton({ topic }: { topic: TrendTopicLike }) {
                     }}
                   >
                     <Copy className="h-3.5 w-3.5 mr-1" /> Copy text
-                  </Button>
-                  <Button variant="outline" size="sm" asChild>
-                    <a href={prep.post.url} target="_blank" rel="noreferrer">
-                      <ExternalLink className="h-3.5 w-3.5 mr-1" /> Open post
-                    </a>
                   </Button>
                 </div>
               </div>
@@ -236,6 +261,21 @@ export function ReplyGuyButton({ topic }: { topic: TrendTopicLike }) {
                 </p>
               </div>
             )}
+
+            {!done ? (
+              <div className="border-t border-border pt-3 space-y-1.5">
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Or post it yourself — no Upload-Post
+                </p>
+                <Button variant="outline" className="w-full" onClick={() => void openInX()} disabled={overLimit || !text.trim()}>
+                  <ExternalLink className="h-4 w-4 mr-2" /> Open in X with this reply
+                </Button>
+                <p className="text-[11px] text-muted-foreground">
+                  X opens with your reply written and aimed at the post, and the meme copied to your
+                  clipboard — just paste it into the composer and hit Reply.
+                </p>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </DialogContent>
