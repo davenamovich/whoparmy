@@ -35,6 +35,11 @@ const PUBLIC_API_PREFIXES = [
   "/api/telegram/webhook/",
   "/api/telegram/pair/verify",
   "/api/showcase",
+  // The trends ingest route carries its own credential (x-trends-key)
+  // and rejects bad keys with 401 inside the handler; the middleware
+  // floor must not block it first (2026-11-19: the daily X-trends cron
+  // failed with 401 "Sign in required" until this line was added).
+  "/api/trends/ingest",
 ];
 
 // Same value as SESSION_COOKIE in lib/whop.ts — duplicated because
