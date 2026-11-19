@@ -231,7 +231,7 @@ export interface MemberKeyResult {
   period: string;
 }
 
-const keyCache = new Map<string, { result: MemberKeyResult; fetchedAt: number }>();
+const keyCache = new Map<string, { whopId: string; result: MemberKeyResult; fetchedAt: number }>();
 const KEY_CACHE_TTL_MS = 10 * 60_000;
 
 export class BridgeError extends Error {
@@ -263,7 +263,7 @@ export async function getMemberEngineKey(user: User, opts: { fresh?: boolean } =
   }
   if (!opts.fresh) {
     const cached = keyCache.get(user.id);
-    if (cached && Date.now() - cached.fetchedAt < KEY_CACHE_TTL_MS) return cached.result;
+    if (cached?.whopId === whopId && Date.now() - cached.fetchedAt < KEY_CACHE_TTL_MS) return cached.result;
   }
   let res: Response;
   try {
@@ -281,6 +281,7 @@ export async function getMemberEngineKey(user: User, opts: { fresh?: boolean } =
     throw new BridgeError(503, "NOT_CONFIGURED", "The Muse bridge is not configured on the engine side yet.");
   }
   if (res.status === 403) {
+    forgetMemberKey(user.id);
     await markConnection(user.id, "BLOCKED");
     throw new BridgeError(403, "BLOCKED", "No P&R key is available for this account. Contact support.");
   }
@@ -298,7 +299,7 @@ export async function getMemberEngineKey(user: User, opts: { fresh?: boolean } =
     granted: typeof json.granted === "number" ? json.granted : 0,
     period: typeof json.period === "string" ? json.period : "",
   };
-  keyCache.set(user.id, { result, fetchedAt: Date.now() });
+  keyCache.set(user.id, { whopId, result, fetchedAt: Date.now() });
   await db.bridgeConnection.upsert({
     where: { userId: user.id },
     create: {

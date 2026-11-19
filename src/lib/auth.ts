@@ -106,42 +106,50 @@ async function getOperatorUser(): Promise<User> {
  * after the code exchange + userinfo round trip succeeded on the server).
  *
  * - Existing user with this whopId → refresh profile fields.
- * - Existing local user with the same verified email → link the Whop ID.
+ * - Existing local user with the same verified email → link only if unclaimed.
  * - Otherwise create a fresh account on the FREE plan; real entitlements
  *   arrive via Whop webhooks / entitlement sync (never hardcoded).
  */
 export async function upsertWhopUser(info: WhopUserInfo): Promise<User> {
   const name = info.name?.trim() || info.preferred_username?.trim() || "Whop User";
   const username = info.preferred_username?.trim() || null;
-  const email =
-    info.email?.trim() ||
-    `${info.sub}@users.whop.identity`; // deterministic anchor when the email scope is not granted
+  const profile = { name, whopUsername: username, whopAvatarUrl: info.picture ?? null };
+  const identity = { whopId: info.sub };
+  const data = { ...profile, ...identity };
+  const anchorEmail = `${info.sub}@users.whop.identity`;
+  const verifiedEmail = info.email_verified === true ? info.email?.trim() : undefined;
+  const claimable = { OR: [{ whopId: null }, identity] };
 
-  const existingByWhopId = await db.user.findUnique({ where: { whopId: info.sub } });
+  const existingByWhopId = await db.user.findUnique({ where: identity });
   if (existingByWhopId) {
-    return db.user.update({
-      where: { id: existingByWhopId.id },
-      data: { name, whopUsername: username, whopAvatarUrl: info.picture ?? null, whopId: info.sub },
-    });
+    return db.user.update({ where: identity, data: profile });
   }
 
-  const existingByEmail = await db.user.findUnique({ where: { email } });
-  if (existingByEmail) {
-    return db.user.update({
-      where: { id: existingByEmail.id },
-      data: { name, whopId: info.sub, whopUsername: username, whopAvatarUrl: info.picture ?? null },
-    });
+  let email = anchorEmail;
+  if (verifiedEmail && verifiedEmail !== anchorEmail) {
+    const existingByEmail = await db.user.findUnique({ where: { email: verifiedEmail } });
+    if (!existingByEmail) {
+      email = verifiedEmail;
+    } else {
+      const [linked] = await db.user.updateManyAndReturn({
+        where: { id: existingByEmail.id, email: verifiedEmail, ...claimable },
+        data,
+      });
+      if (linked) return linked;
+    }
   }
 
-  return db.user.create({
-    data: {
-      email,
-      name,
-      whopId: info.sub,
-      whopUsername: username,
-      whopAvatarUrl: info.picture ?? null,
-      plan: "FREE",
-      planSource: "default",
-    },
+  if (email === anchorEmail) {
+    const [anchored] = await db.user.updateManyAndReturn({
+      where: { email: anchorEmail, ...claimable },
+      data,
+    });
+    if (anchored) return anchored;
+  }
+
+  return db.user.upsert({
+    where: identity,
+    create: { ...data, email, plan: "FREE", planSource: "default" },
+    update: profile,
   });
 }

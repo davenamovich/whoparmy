@@ -370,7 +370,9 @@ const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
 function sessionSecret(): string {
   const explicit = process.env.SESSION_SECRET?.trim();
   if (explicit) return explicit;
-  // Stable dev fallback — production deployments must set SESSION_SECRET.
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("SESSION_SECRET is required in production");
+  }
   return createHmac("sha256", "p&r-content-factory-session-seed")
     .update(process.env.DATABASE_URL ?? "local")
     .digest("hex");
