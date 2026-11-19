@@ -25,7 +25,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const kind = (body.kind ?? "MEME").toUpperCase();
     if (!(kind in JOB_TIERS)) {
-      return NextResponse.json({ error: "Job kind must be SCOUT, MEME, HOOK, QA, CAMPAIGN, VIDEO or ASSESS." }, { status: 400 });
+      return NextResponse.json({ error: "Job kind must be SCOUT, MEME, HOOK, QA, CAMPAIGN, VIDEO, ASSESS or CUSTOM." }, { status: 400 });
+    }
+    // A CUSTOM job runs on the hire's own instructions — an agent
+    // without any has nothing to run on.
+    if (kind === "CUSTOM") {
+      const hirePeek = await db.hiredAgent.findFirst({ where: { id, userId: user.id }, select: { instructions: true } });
+      if (!hirePeek?.instructions?.trim()) {
+        return NextResponse.json(
+          { error: "This agent has no standing instructions to run a custom job on — add them in its Settings tab first." },
+          { status: 400 },
+        );
+      }
     }
     const brief = body.brief?.trim();
     if (!brief) return NextResponse.json({ error: "Give the agent a brief." }, { status: 400 });

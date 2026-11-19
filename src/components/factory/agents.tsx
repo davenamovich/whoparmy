@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Bot, Wallet, Pause, Play, Store, Briefcase, ListOrdered, Zap, Send, Brain, Download } from "lucide-react";
+import { Bot, Wallet, Pause, Play, Store, Briefcase, ListOrdered, Zap, Send, Brain, Download, Sparkles, Activity, FileSearch, Wrench, Settings2, LayoutGrid, Hammer } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,58 @@ interface Hire {
   source?: string;
   expiresAt?: string | null;
   agent37Ref: string | null;
+  role?: string | null;
+  instructions?: string | null;
+  toolsJson?: string | null;
+}
+
+interface FactoryToolView {
+  id: string;
+  label: string;
+  kind: string;
+}
+
+interface ArchitectConfigView {
+  name: string;
+  role: string;
+  instructions: string;
+  tools: FactoryToolView[];
+  toolsJson: string;
+  defaultKind: string;
+  successMetric: string;
+  summary: string;
+}
+
+interface ResearchView {
+  brandName?: string;
+  website?: string | null;
+  analysisSummary?: string;
+  offer?: string;
+  audience?: string;
+  pains?: string[];
+  angles?: string[];
+  competitors?: string[];
+}
+
+const KIND_LABELS: Record<string, string> = {
+  SCOUT: "Scout report",
+  MEME: "Meme pack",
+  HOOK: "Hooks",
+  QA: "QA pass",
+  CAMPAIGN: "Campaign pack",
+  VIDEO: "Video (engine)",
+  ASSESS: "Assessment offer (bridge)",
+  CUSTOM: "Custom job (its own instructions)",
+};
+
+function hireTools(h: Hire): FactoryToolView[] {
+  if (!h.toolsJson) return [];
+  try {
+    const parsed = JSON.parse(h.toolsJson) as FactoryToolView[];
+    return Array.isArray(parsed) ? parsed.filter((t) => t && typeof t.id === "string") : [];
+  } catch {
+    return [];
+  }
 }
 
 interface Job {
@@ -77,6 +129,16 @@ export function AgentsView() {
   const [campForm, setCampForm] = useState({ title: "", description: "", bounty: "100" });
   const [claimAgent, setClaimAgent] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  // SMB Agent Factory (2026-11-18): research for the control center,
+  // the architect creator, per-agent tabs, and the memory view.
+  const [research, setResearch] = useState<ResearchView | null>(null);
+  const [archForm, setArchForm] = useState({ brief: "", website: "" });
+  const [archBusy, setArchBusy] = useState(false);
+  const [archConfig, setArchConfig] = useState<ArchitectConfigView | null>(null);
+  const [archResearched, setArchResearched] = useState(false);
+  const [hireTabs, setHireTabs] = useState<Record<string, string>>({});
+  const [memoryFacts, setMemoryFacts] = useState<string[] | null>(null);
+  const [settingsForms, setSettingsForms] = useState<Record<string, { name: string; role: string; instructions: string }>>({});
 
   const load = useCallback(async () => {
     const [a, c] = await Promise.all([fetch("/api/agents"), fetch("/api/campaign-market")]);
@@ -86,6 +148,7 @@ export function AgentsView() {
       setCatalog(d.catalog);
       setHires(d.hires);
       setJobs(d.jobs);
+      setResearch(d.research ?? null);
     }
     if (c.ok) {
       const d = await c.json();
@@ -121,6 +184,62 @@ export function AgentsView() {
     }
   }
 
+  async function runArchitect() {
+    setArchBusy(true);
+    try {
+      const res = await fetch("/api/agents/architect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brief: archForm.brief, website: archForm.website || undefined }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "The architect couldn't design that agent");
+      setArchConfig(data.config as ArchitectConfigView);
+      setArchResearched(!!data.researched);
+    } catch (err) {
+      toast({ title: "That didn't work", description: err instanceof Error ? err.message : undefined, variant: "destructive" });
+    } finally {
+      setArchBusy(false);
+    }
+  }
+
+  async function installArchitectAgent() {
+    if (!archConfig) return;
+    await act(
+      () =>
+        fetch("/api/agents", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            templateKey: "custom",
+            name: archConfig.name,
+            role: archConfig.role,
+            instructions: archConfig.instructions,
+            toolsJson: archConfig.toolsJson,
+          }),
+        }),
+      `${archConfig.name} installed — it's on your team`,
+    );
+    setArchConfig(null);
+    setArchForm({ brief: "", website: "" });
+  }
+
+  // Memory is per-member and shared by every agent — load it once,
+  // the first time any agent's Memory tab opens.
+  const anyMemoryTabOpen = Object.values(hireTabs).some((t) => t === "memory");
+  useEffect(() => {
+    if (!anyMemoryTabOpen || memoryFacts !== null) return;
+    void (async () => {
+      try {
+        const res = await fetch("/api/memory/view");
+        const data = await res.json().catch(() => ({}));
+        setMemoryFacts(Array.isArray(data.facts) ? (data.facts as string[]) : []);
+      } catch {
+        setMemoryFacts([]);
+      }
+    })();
+  }, [anyMemoryTabOpen, memoryFacts]);
+
   const activeHires = hires.filter((h) => h.status === "ACTIVE");
 
   return (
@@ -134,6 +253,106 @@ export function AgentsView() {
           learn, no AI math — just memes. Owner approves — bots create.
         </p>
       </div>
+
+      {/* Control-center roll-up (Factory Slice B) */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+        {[
+          { n: hires.filter((h) => h.status === "ACTIVE").length, label: "Agents active" },
+          { n: jobs.filter((j) => j.status === "QUEUED" || j.status === "RUNNING").length, label: "Jobs running / queued" },
+          { n: jobs.filter((j) => j.status === "DONE").length, label: "Jobs finished" },
+          { n: jobs.filter((j) => j.status === "FAILED").length, label: "Jobs failed (never charged)" },
+        ].map((s) => (
+          <div key={s.label} className="rounded-lg border border-border/60 bg-card p-3">
+            <div className="text-lg font-black">{s.n}</div>
+            <div className="text-[11px] text-muted-foreground">{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* ─── BUILD YOUR AI EMPLOYEE (Factory Slice A) ─── */}
+      <Card className="border-primary/40">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" /> Build Your AI Employee
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Describe the job in plain English. The architect researches your business, designs the agent —
+            its role, instructions and tools — and shows you the whole thing before anything is installed.
+            No AI knowledge needed.
+          </p>
+          <textarea
+            className="w-full min-h-20 rounded-md border border-input bg-background px-3 py-2 text-sm"
+            placeholder='e.g. "I own a roofing company. I want an agent that finds commercial roofing opportunities and drafts the outreach for my approval."'
+            value={archForm.brief}
+            onChange={(e) => setArchForm((f) => ({ ...f, brief: e.target.value }))}
+          />
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Input
+              className="flex-1"
+              placeholder="Your business website (optional — the architect researches it)"
+              value={archForm.website}
+              onChange={(e) => setArchForm((f) => ({ ...f, website: e.target.value }))}
+            />
+            <Button disabled={archBusy || archForm.brief.trim().length < 10} onClick={() => void runArchitect()}>
+              <Hammer className="h-4 w-4 mr-1.5" /> {archBusy ? "Designing your agent…" : "Build my agent"}
+            </Button>
+          </div>
+          {archBusy ? (
+            <p className="text-[11px] text-muted-foreground">Researching and designing can take a minute when a website is included.</p>
+          ) : null}
+          {archConfig ? (
+            <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <span className="font-black text-base">Your agent is ready — {archConfig.name}</span>
+                <Badge className="bg-primary/15 text-primary border-0 text-[10px]">ONE-CLICK INSTALL</Badge>
+              </div>
+              <p className="text-sm">{archConfig.summary}</p>
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">What it does</div>
+                <p className="text-sm text-muted-foreground">{archConfig.role}</p>
+              </div>
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Capabilities</div>
+                <ul className="text-sm text-muted-foreground list-disc pl-5">
+                  {archConfig.tools.map((t) => (
+                    <li key={t.id}>{t.label}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">How it runs</div>
+                <p className="text-sm text-muted-foreground">
+                  Whoparmy agent runner · Mnemos business memory (shared with your other agents) ·{" "}
+                  {archResearched ? "designed from live research on your business · " : ""}P&R creative engine
+                  where its tools call for it. It fills one of your plan&apos;s bot seats. Everything it makes is
+                  a draft for your approval — it never publishes, sends or spends on its own.
+                </p>
+              </div>
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">You&apos;ll know it&apos;s working when</div>
+                <p className="text-sm text-muted-foreground">{archConfig.successMetric}</p>
+              </div>
+              <details>
+                <summary className="text-xs font-semibold cursor-pointer">Its standing instructions</summary>
+                <pre className="text-xs whitespace-pre-wrap mt-2 max-h-48 overflow-auto rounded-md bg-secondary/40 p-2.5">{archConfig.instructions}</pre>
+              </details>
+              <div className="flex gap-2 flex-wrap">
+                <Button disabled={busy || (planInfo != null && planInfo.botsRented >= planInfo.botSeats)} onClick={() => void installArchitectAgent()}>
+                  Install agent
+                </Button>
+                {planInfo && planInfo.botsRented >= planInfo.botSeats ? (
+                  <span className="text-[11px] text-muted-foreground self-center">All your plan&apos;s bot seats are rented — free one up or upgrade to install.</span>
+                ) : null}
+                <Button variant="outline" disabled={busy} onClick={() => setArchConfig(null)}>
+                  Discard
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
 
       <BrandedBotCard />
 
@@ -196,7 +415,7 @@ export function AgentsView() {
           </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2">
-          {catalog.map((t) => (
+          {catalog.filter((t) => t.key !== "custom").map((t) => (
             <div key={t.key} className="rounded-lg border border-border/60 p-4 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <span className="font-bold">{t.name}</span>
@@ -257,7 +476,17 @@ export function AgentsView() {
           </CardHeader>
           <CardContent className="space-y-4">
             {hires.map((h) => {
-              const form = jobForms[h.id] ?? { kind: h.templateKey === "assessor" ? "ASSESS" : "MEME", brief: "", pieces: "1", language: defaultJobLanguage };
+              const template = catalog.find((c) => c.key === h.templateKey);
+              const tools = hireTools(h);
+              const form = jobForms[h.id] ?? { kind: template?.defaultKind ?? (h.templateKey === "assessor" ? "ASSESS" : "MEME"), brief: "", pieces: "1", language: defaultJobLanguage };
+              const kindOptions: string[] =
+                tools.length > 0
+                  ? [...new Set([...tools.map((t) => t.kind), ...(h.instructions ? ["CUSTOM"] : [])])]
+                  : ["SCOUT", "MEME", "HOOK", "QA", "CAMPAIGN", "VIDEO", "ASSESS", ...(h.instructions ? ["CUSTOM"] : [])];
+              const effectiveKind = kindOptions.includes(form.kind) ? form.kind : kindOptions[0];
+              const tab = hireTabs[h.id] ?? "overview";
+              const hireJobs = jobs.filter((j) => j.hireId === h.id);
+              const settings = settingsForms[h.id] ?? { name: h.name, role: h.role ?? "", instructions: h.instructions ?? "" };
               return (
                 <div key={h.id} className="rounded-lg border border-border/60 p-4 space-y-3">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -289,15 +518,16 @@ export function AgentsView() {
                     <div className="flex flex-col sm:flex-row gap-2">
                       <select
                         className="h-9 rounded-md border border-input bg-background px-2 text-sm"
-                        value={form.kind}
+                        value={effectiveKind}
                         onChange={(e) => setJobForms((f) => ({ ...f, [h.id]: { ...form, kind: e.target.value } }))}
                       >
-                        <option value="SCOUT">Scout report (volume)</option>
-                        <option value="MEME">Meme pack (mid)</option>
-                        <option value="HOOK">Hooks (final)</option>
-                        <option value="QA">Claude QA pass (quality)</option>
-                        <option value="VIDEO">Video (engine — brief = topic, or JSON {"{format,…}"})</option>
-                        <option value="ASSESS">Assessment offer (bridge — your Muse makes the /before pack + $999 fit on your key)</option>
+                        {kindOptions.map((k) => (
+                          <option key={k} value={k}>
+                            {KIND_LABELS[k] ?? k}
+                            {k === "VIDEO" ? " — brief = topic, or JSON {format,…}" : ""}
+                            {k === "ASSESS" ? " — your Muse makes the /before pack on your key" : ""}
+                          </option>
+                        ))}
                       </select>
                       <select
                         className="h-9 rounded-md border border-input bg-background px-2 text-sm"
@@ -313,7 +543,7 @@ export function AgentsView() {
                       </select>
                       <Input
                         className="flex-1"
-                        placeholder={form.kind === "ASSESS" ? "Your business website — the Assessor hands it to your Muse through the bridge" : "Brief — what should the agent make?"}
+                        placeholder={effectiveKind === "ASSESS" ? "Your business website — the Assessor hands it to your Muse through the bridge" : "Brief — what should the agent make?"}
                         value={form.brief}
                         onChange={(e) => setJobForms((f) => ({ ...f, [h.id]: { ...form, brief: e.target.value } }))}
                       />
@@ -332,7 +562,7 @@ export function AgentsView() {
                               fetch(`/api/agents/${h.id}/jobs`, {
                                 method: "POST",
                                 headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ kind: form.kind, brief: form.brief, pieces: Number(form.pieces || 1), language: form.language }),
+                                body: JSON.stringify({ kind: effectiveKind, brief: form.brief, pieces: Number(form.pieces || 1), language: form.language }),
                               }),
                             "Job queued for your agent",
                           )
@@ -342,6 +572,168 @@ export function AgentsView() {
                       </Button>
                     </div>
                   ) : null}
+
+                  {/* ─── Agent control center tabs (Factory Slice B) ─── */}
+                  <div className="border-t border-border/60 pt-3 space-y-3">
+                    <div className="flex gap-1 flex-wrap">
+                      {[
+                        { id: "overview", label: "Overview", icon: LayoutGrid },
+                        { id: "activity", label: "Activity", icon: Activity },
+                        { id: "research", label: "Research", icon: FileSearch },
+                        { id: "memory", label: "Memory", icon: Brain },
+                        { id: "tools", label: "Tools", icon: Wrench },
+                        { id: "settings", label: "Settings", icon: Settings2 },
+                      ].map((t) => (
+                        <button
+                          key={t.id}
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${tab === t.id ? "bg-primary text-primary-foreground" : "bg-secondary/60 text-muted-foreground"}`}
+                          onClick={() => setHireTabs((s) => ({ ...s, [h.id]: t.id }))}
+                        >
+                          <t.icon className="h-3 w-3" /> {t.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {tab === "overview" ? (
+                      <div className="space-y-2 text-sm">
+                        <p className="text-muted-foreground">{h.role ?? template?.role ?? "A rented bot on your team."}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {hireJobs.filter((j) => j.status === "DONE").length} jobs finished ·{" "}
+                          {hireJobs.filter((j) => j.status === "FAILED").length} failed (never charged) ·{" "}
+                          {hireJobs[0] ? `last job ${new Date(hireJobs[0].createdAt).toLocaleDateString()}` : "no jobs yet"}
+                        </p>
+                        {h.instructions ? (
+                          <details>
+                            <summary className="text-xs font-semibold cursor-pointer">Standing instructions</summary>
+                            <pre className="text-xs whitespace-pre-wrap mt-2 max-h-48 overflow-auto rounded-md bg-secondary/40 p-2.5">{h.instructions}</pre>
+                          </details>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    {tab === "activity" ? (
+                      <div className="space-y-2">
+                        {hireJobs.length === 0 ? <p className="text-xs text-muted-foreground">No jobs yet — order one above.</p> : null}
+                        {hireJobs.map((j) => {
+                          let parsed: { text?: string; error?: string } | null = null;
+                          if (j.result) {
+                            try {
+                              parsed = JSON.parse(j.result) as { text?: string; error?: string };
+                            } catch {
+                              parsed = null;
+                            }
+                          }
+                          return (
+                            <div key={j.id} className="rounded-md border border-border/60 p-2.5 space-y-1">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-[10px]">{j.status}</Badge>
+                                <span className="text-xs font-medium truncate">{KIND_LABELS[j.kind] ?? j.kind} — {j.brief}</span>
+                              </div>
+                              {j.status === "DONE" && parsed?.text ? (
+                                <details>
+                                  <summary className="text-xs font-semibold cursor-pointer">View result</summary>
+                                  <pre className="text-xs whitespace-pre-wrap mt-2 max-h-56 overflow-auto">{parsed.text}</pre>
+                                </details>
+                              ) : null}
+                              {j.status === "FAILED" && parsed?.error ? <p className="text-xs text-destructive">{parsed.error}</p> : null}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+
+                    {tab === "research" ? (
+                      research ? (
+                        <div className="space-y-1.5 text-sm">
+                          <p className="font-semibold">{research.brandName ?? "Your business"}{research.website ? <span className="text-muted-foreground font-normal"> — {research.website}</span> : null}</p>
+                          {research.analysisSummary ? <p className="text-muted-foreground">{research.analysisSummary}</p> : null}
+                          {research.offer ? <p className="text-muted-foreground"><span className="font-semibold text-foreground">Offer:</span> {research.offer}</p> : null}
+                          {research.audience ? <p className="text-muted-foreground"><span className="font-semibold text-foreground">Audience:</span> {research.audience}</p> : null}
+                          {research.pains?.length ? <p className="text-muted-foreground"><span className="font-semibold text-foreground">Customer pains:</span> {research.pains.join("; ")}</p> : null}
+                          {research.angles?.length ? <p className="text-muted-foreground"><span className="font-semibold text-foreground">Angles:</span> {research.angles.join("; ")}</p> : null}
+                          {research.competitors?.length ? <p className="text-muted-foreground"><span className="font-semibold text-foreground">Competitors:</span> {research.competitors.join(", ")}</p> : null}
+                          <p className="text-[11px] text-muted-foreground">Every agent on your team works from this same research.</p>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">No business research yet. Run a brand research from the Create view and every agent here will work from what it finds.</p>
+                      )
+                    ) : null}
+
+                    {tab === "memory" ? (
+                      <div className="space-y-2">
+                        <p className="text-[11px] text-muted-foreground">
+                          One shared business memory (Mnemos) for your whole team — not one per bot.{" "}
+                          <a href="/api/memory/export" className="text-primary underline underline-offset-2">Export it as a file</a>
+                        </p>
+                        {memoryFacts === null ? (
+                          <p className="text-xs text-muted-foreground">Loading memory…</p>
+                        ) : memoryFacts.length === 0 ? (
+                          <p className="text-xs text-muted-foreground">Nothing stored yet — tell Ralph about your business and it lands here.</p>
+                        ) : (
+                          <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
+                            {memoryFacts.slice(0, 30).map((f, i) => (
+                              <li key={i}>{f}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    ) : null}
+
+                    {tab === "tools" ? (
+                      tools.length > 0 ? (
+                        <ul className="space-y-1.5">
+                          {tools.map((t) => (
+                            <li key={t.id} className="flex items-center gap-2 text-sm">
+                              <Badge className="bg-primary/15 text-primary border-0 text-[10px]">{KIND_LABELS[t.kind] ?? t.kind}</Badge>
+                              <span>{t.label}</span>
+                            </li>
+                          ))}
+                          <li className="text-[11px] text-muted-foreground">Plus Mnemos memory and your business research. Publishing and sending are never tools — those stay with your approval.</li>
+                        </ul>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">This bot runs the standard job kinds from the order form above, on the P&R engine, with your business research and memory behind it.</p>
+                      )
+                    ) : null}
+
+                    {tab === "settings" ? (
+                      <div className="space-y-2">
+                        <Input
+                          placeholder="Agent name"
+                          value={settings.name}
+                          onChange={(e) => setSettingsForms((s) => ({ ...s, [h.id]: { ...settings, name: e.target.value } }))}
+                        />
+                        <Input
+                          placeholder="Role — what this agent does, in plain words"
+                          value={settings.role}
+                          onChange={(e) => setSettingsForms((s) => ({ ...s, [h.id]: { ...settings, role: e.target.value } }))}
+                        />
+                        <textarea
+                          className="w-full min-h-24 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                          placeholder="Standing instructions — a custom job runs on these"
+                          value={settings.instructions}
+                          onChange={(e) => setSettingsForms((s) => ({ ...s, [h.id]: { ...settings, instructions: e.target.value } }))}
+                        />
+                        <Button
+                          size="sm"
+                          disabled={busy}
+                          onClick={() =>
+                            void act(
+                              () =>
+                                fetch(`/api/agents/${h.id}`, {
+                                  method: "PATCH",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ name: settings.name, role: settings.role, instructions: settings.instructions }),
+                                }),
+                              "Agent settings saved",
+                            )
+                          }
+                        >
+                          Save settings
+                        </Button>
+                        <p className="text-[11px] text-muted-foreground">Pause and resume live in the header above. There is no schedule yet — agents run when you order a job.</p>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               );
             })}

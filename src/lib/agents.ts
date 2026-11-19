@@ -50,14 +50,91 @@ export interface AgentTemplate {
   role: string;
   tierKey: (typeof MODEL_TIERS)[number]["key"];
   minBudget: number;
+  /** Factory (2026-11-18): the job kind this template's order form opens on. */
+  defaultKind?: string;
+  /** Factory: standing instructions copied onto the hire — the CUSTOM
+   *  job kind runs on these. Only set where the template IS its
+   *  instructions (custom builds, FAQ). */
+  instructions?: string;
 }
 
 export const AGENT_CATALOG: AgentTemplate[] = [
-  { key: "scout", name: "Trend Scout", role: "Watches trends and drafts angles for your niche, every day.", tierKey: "volume", minBudget: 10_000 },
-  { key: "meme-smith", name: "Meme Smith", role: "Turns briefs into meme packs and captions on order.", tierKey: "mid", minBudget: 25_000 },
-  { key: "assessor", name: "The Assessor", role: "Bridge agent: hands your own Muse the Assessor command — it makes your free /before pack on your own credits and writes your $999 assessment offer.", tierKey: "mid", minBudget: 25_000 },
-  { key: "hook-smith", name: "Hook Smith", role: "Writes the hooks and headlines that ship — flagship tier.", tierKey: "final", minBudget: 50_000 },
-  { key: "qa-editor", name: "QA Editor", role: "Claude-grade quality pass on your best pieces. Rare and expensive by design.", tierKey: "quality", minBudget: 100_000 },
+  { key: "scout", name: "Trend Scout", role: "Watches trends and drafts angles for your niche, every day.", tierKey: "volume", minBudget: 10_000, defaultKind: "SCOUT" },
+  { key: "meme-smith", name: "Meme Smith", role: "Turns briefs into meme packs and captions on order.", tierKey: "mid", minBudget: 25_000, defaultKind: "MEME" },
+  { key: "assessor", name: "The Assessor", role: "Bridge agent: hands your own Muse the Assessor command — it makes your free /before pack on your own credits and writes your $999 assessment offer.", tierKey: "mid", minBudget: 25_000, defaultKind: "ASSESS" },
+  { key: "hook-smith", name: "Hook Smith", role: "Writes the hooks and headlines that ship — flagship tier.", tierKey: "final", minBudget: 50_000, defaultKind: "HOOK" },
+  { key: "qa-editor", name: "QA Editor", role: "Claude-grade quality pass on your best pieces. Rare and expensive by design.", tierKey: "quality", minBudget: 100_000, defaultKind: "QA" },
+  // ─── SMB Agent Factory templates (Dave, 2026-11-18) ──────────────
+  // Only templates whose work runs on tools that exist TODAY are
+  // listed. Sales/outreach templates that need prospect discovery +
+  // email (Lead Scout stack, still draft) are deliberately absent —
+  // they ship when that lane does, not before.
+  {
+    key: "custom",
+    name: "Custom AI Employee",
+    role: "Built for you by the Agent Architect from your own description — name, role, instructions and tools picked for the job you described.",
+    tierKey: "mid",
+    minBudget: 25_000,
+    defaultKind: "CUSTOM",
+  },
+  {
+    key: "competitor-monitor",
+    name: "Competitor Monitor",
+    role: "Scout reports on your competitors and your niche: what they're pushing, the angles they're winning with, and the opening for you. Order a report whenever you want one.",
+    tierKey: "volume",
+    minBudget: 10_000,
+    defaultKind: "SCOUT",
+  },
+  {
+    key: "content-creator",
+    name: "Content Creator",
+    role: "Turns a brief into a ready-to-approve campaign pack: announcement post, meme concepts, social posts and CTAs in your brand's voice.",
+    tierKey: "mid",
+    minBudget: 25_000,
+    defaultKind: "CAMPAIGN",
+  },
+  {
+    key: "social-media-agent",
+    name: "Social Media Agent",
+    role: "Drafts your social posts and campaign packs for approval. It creates — you approve and post. Nothing ever publishes on its own.",
+    tierKey: "mid",
+    minBudget: 25_000,
+    defaultKind: "CAMPAIGN",
+  },
+  {
+    key: "video-script-agent",
+    name: "Video Script Agent",
+    role: "Runs the P&R engine's video lane from a topic brief — episodes and pitches that land as previews in your library for your approval.",
+    tierKey: "mid",
+    minBudget: 25_000,
+    defaultKind: "VIDEO",
+  },
+  {
+    key: "local-seo-researcher",
+    name: "Local SEO Researcher",
+    role: "Research reports on how your business shows up locally: your offer, your audience's pains, your competitors, and the content angles that close the gaps it finds.",
+    tierKey: "volume",
+    minBudget: 10_000,
+    defaultKind: "SCOUT",
+  },
+  {
+    key: "lead-researcher",
+    name: "Lead Researcher",
+    role: "Research-only prospect intelligence: from a brief naming a niche and area, it profiles the kinds of businesses worth approaching and the angle that fits each. It does not contact anyone — outreach stays yours.",
+    tierKey: "volume",
+    minBudget: 10_000,
+    defaultKind: "SCOUT",
+  },
+  {
+    key: "faq-agent",
+    name: "FAQ Agent",
+    role: "Answers customer questions from your business facts: paste a question (or a batch) and get accurate, on-brand answers drafted from your brief and your business profile. Drafts for you — it never sends.",
+    tierKey: "mid",
+    minBudget: 25_000,
+    defaultKind: "CUSTOM",
+    instructions:
+      "You are an FAQ agent for the owner's business. Answer each customer question in the brief accurately and in the brand's voice, using only facts the owner has provided in the brief or their business profile. If a question needs a fact you do not have, say exactly what is missing instead of inventing it — never guess prices, hours, policies or availability. Keep answers short, warm and ready to paste. When the brief holds several questions, answer each under its own heading.",
+  },
 ];
 
 export function templateByKey(key: string): AgentTemplate | undefined {
@@ -85,7 +162,17 @@ export const JOB_TIERS: Record<string, (typeof MODEL_TIERS)[number]["key"]> = {
   // generates nothing, so the order cost is 0 and no plan meter is
   // drawn. The tier only satisfies kind validation.
   ASSESS: "mid",
+  // CUSTOM (SMB Agent Factory, 2026-11-18): the job runs on the
+  // hire's own standing instructions instead of a fixed kind prompt.
+  CUSTOM: "mid",
 };
+
+/**
+ * The Factory tool registry lives in the pure architect core
+ * (lib/agent-architect-core.ts) so it unit-tests without the db —
+ * re-exported here for app code that reads the catalog module.
+ */
+export { FACTORY_TOOLS, factoryToolById, type FactoryTool } from "@/lib/agent-architect-core";
 
 export async function getWalletState(userId: string, planKey: string) {
   const allowance = walletForPlan(planKey);
