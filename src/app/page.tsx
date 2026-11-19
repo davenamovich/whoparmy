@@ -24,6 +24,7 @@ import { AgentsView } from "@/components/factory/agents";
 import { RalphChat, type RalphNavIntent } from "@/components/factory/ralph-chat";
 import { TrendingView } from "@/components/factory/trending";
 import { AgentStart } from "@/components/factory/agent-start";
+import { AdTeardownCard } from "@/components/factory/ad-teardown";
 import { CampaignsView } from "@/components/factory/campaigns";
 import { LibraryView } from "@/components/factory/library";
 import { BrandsView } from "@/components/factory/brands";
@@ -310,6 +311,11 @@ export default function Home() {
                   website or CTA — then research + the agent handoff.
                   Everything below this card is the manual stack. */}
               <AgentStart />
+              {/* The teardown card (Dave, 2026-11-19): a working
+                  competitor ad/post in, angles + one agent command
+                  out. Agent-led like the start card — generation
+                  happens in the member's agent. */}
+              <AdTeardownCard />
               {/* Ralph entry card: the button-first door, one tap
                   from the room members land in. */}
               <button
