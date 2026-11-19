@@ -52,6 +52,7 @@ const STATE_COPY: Record<string, string> = {
   rendering: "rendering",
   ready: "ready to review",
   approved: "approved",
+  exporting: "rendering the MP4",
   exported: "exported",
   failed: "failed",
   blocked: "blocked",

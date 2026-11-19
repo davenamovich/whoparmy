@@ -30,7 +30,6 @@ model User {
   usageRecords UsageRecord[]
   bridgeConnection BridgeConnection?
   bridgeCodes  BridgeCode[]
-  telegramPairCodes TelegramPairCode[]
   bridgeTokens BridgeToken[]
   researchJobs ResearchJob[]
   videoJobs    VideoJob[]
@@ -517,8 +516,7 @@ model BridgeCode {
   id            String    @id @default(cuid())
   userId        String
   codeHash      String    @unique
-  budgetCredits Int // the budget this code will approve on exchange
-  scope         String    @default("week") // week (the /muse-week offer) | clips (Clip Factory, any plan on own credits)
+  budgetCredits Int // the week budget this code will approve on exchange
   expiresAt     DateTime
   usedAt        DateTime?
   createdAt     DateTime  @default(now())
@@ -536,7 +534,6 @@ model BridgeToken {
   userId        String
   tokenHash     String    @unique
   budgetCredits Int
-  scope         String    @default("week") // inherited from the code it was exchanged from; enforced on every MCP call
   spentCredits  Int       @default(0)
   expiresAt     DateTime
   revokedAt     DateTime?
@@ -788,6 +785,7 @@ model ClipJob {
   series        String?
   episode       Int?
   engineJobId   String?
+  mp4JobId      String? // request_mp4 job id, once an approved clip is exported
   attempts      Int      @default(0) // the worker retries once, then fails
   blockedReason String? // guard code + hint when status = blocked
   approvedAt    DateTime? // written only by the review desk
