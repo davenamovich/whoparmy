@@ -85,7 +85,20 @@ export function VideoStudio() {
   const [starting, setStarting] = useState(false);
   const [brands, setBrands] = useState<BrandLite[]>([]);
   const [brandId, setBrandId] = useState("");
+  const [keyLinked, setKeyLinked] = useState<boolean | null>(null);
+  const [keyCredits, setKeyCredits] = useState<number | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // BYOK indicator state for the voiced-format panel.
+  useEffect(() => {
+    void fetch("/api/bridge/key-status")
+      .then((r) => r.json())
+      .then((d: { linked?: boolean; credits?: number | null }) => {
+        setKeyLinked(d.linked ?? false);
+        setKeyCredits(d.credits ?? null);
+      })
+      .catch(() => undefined);
+  }, []);
 
   // Brand profile over the studio (Dave, 2026-11-18): the member's
   // saved brand drives the studio's business inputs instead of
@@ -398,6 +411,21 @@ export function VideoStudio() {
               covers — so voiced formats run on your own key. Your Muse can make it today: connect
               once, then just ask it for a Before pack, a best-of reel or a funnel.
             </p>
+            {keyLinked === true ? (
+              <p className="text-sm">
+                <span className="inline-block rounded-full bg-emerald-600 text-white text-xs font-semibold px-2 py-0.5 mr-2">
+                  BYOK active
+                </span>
+                Your P&amp;R key is linked
+                {typeof keyCredits === "number" ? <> — {keyCredits.toLocaleString()} credits on it</> : null}
+                . Your Muse spends from that balance.
+              </p>
+            ) : keyLinked === false ? (
+              <p className="text-sm text-muted-foreground">
+                No P&amp;R key linked yet — it links automatically from your Whop account the first
+                time your Muse connects. See Account → Your P&amp;R key for status.
+              </p>
+            ) : null}
             <Button asChild variant="outline" size="sm">
               <a href="/muse-week">Open the Muse connection</a>
             </Button>

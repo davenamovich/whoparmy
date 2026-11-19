@@ -27,6 +27,7 @@ import { useTranslations } from "next-intl";
 import { SectionHeader, StatCard } from "./shared";
 import { TelegramLinkCard } from "./telegram-link";
 import { UploadPostCard } from "./upload-post-card";
+import { ByokCard } from "./byok-card";
 
 const KIND_LABELS: Record<string, string> = {
   TEXT: "Text generations",
@@ -229,6 +230,8 @@ export function AccountView() {
       />
 
       <WhopConnection />
+
+      <ByokCard />
 
       <TelegramLinkCard />
 
