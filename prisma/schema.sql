@@ -896,3 +896,44 @@ CREATE INDEX "TelegramUpdate_botSlug_idx" ON "TelegramUpdate"("botSlug");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "TelegramUpdate_botSlug_updateId_key" ON "TelegramUpdate"("botSlug", "updateId");
+
+-- CreateTable
+CREATE TABLE "PickaphoneSession" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "assignment" JSONB NOT NULL,
+    "commitmentHash" TEXT NOT NULL,
+    "state" TEXT NOT NULL DEFAULT 'playing',
+    "picks" JSONB NOT NULL DEFAULT [],
+    "bankedTokens" INTEGER NOT NULL DEFAULT 0,
+    "pendingOffer" INTEGER,
+    "offers" JSONB NOT NULL DEFAULT [],
+    "finalTokens" INTEGER,
+    "gensAwarded" INTEGER NOT NULL DEFAULT 0,
+    "claimNonce" TEXT,
+    "claimToken" TEXT,
+    "version" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "finishedAt" DATETIME
+);
+
+-- CreateTable
+CREATE TABLE "PickaphoneEvent" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "sessionId" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "payload" JSONB,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "PickaphoneEvent_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "PickaphoneSession" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "PickaphoneSession_claimNonce_key" ON "PickaphoneSession"("claimNonce");
+
+-- CreateIndex
+CREATE INDEX "PickaphoneSession_createdAt_idx" ON "PickaphoneSession"("createdAt");
+
+-- CreateIndex
+CREATE INDEX "PickaphoneEvent_sessionId_idx" ON "PickaphoneEvent"("sessionId");
+
+-- CreateIndex
+CREATE INDEX "PickaphoneEvent_type_idx" ON "PickaphoneEvent"("type");
