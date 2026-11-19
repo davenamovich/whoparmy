@@ -212,8 +212,12 @@ export async function getAuctionState(now = new Date()): Promise<AuctionState> {
   }
 
   if (!auction) {
-    auction = await db.keyAuction.create({
-      data: { weekKey, prizeLabel: PRIZE_LABEL, opensAt, closesAt, status: "OPEN" },
+    // Upsert, not create: two concurrent first-visits of the week
+    // used to race the create on the unique weekKey.
+    auction = await db.keyAuction.upsert({
+      where: { weekKey },
+      create: { weekKey, prizeLabel: PRIZE_LABEL, opensAt, closesAt, status: "OPEN" },
+      update: {},
     });
   }
   if (auction.status === "CLOSED" || now >= closesAt) {
@@ -246,6 +250,15 @@ export async function placeBid(userId: string, points: number): Promise<BidResul
   const auctionId = state.auctionId;
 
   const result = await db.$transaction(async (tx) => {
+    // Recheck the auction INSIDE the transaction against the fresh
+    // row: the phase check above ran before the tx, and the window
+    // can close (or the auction resolve) in between — a bid landing
+    // after close would stake points on a dead auction.
+    const fresh = await tx.keyAuction.findUnique({ where: { id: auctionId } });
+    const nowTx = new Date();
+    if (!fresh || fresh.status !== "OPEN" || nowTx < fresh.opensAt || nowTx >= fresh.closesAt) {
+      throw new BidError("The auction is not open right now.");
+    }
     const existing = await tx.keyBid.findUnique({
       where: { auctionId_userId: { auctionId, userId } },
     });

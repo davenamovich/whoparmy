@@ -36,10 +36,14 @@ export async function pointsBalance(userId: string): Promise<number> {
 }
 
 /** REF_* points the referrer has already earned on this ET calendar day. */
-async function refEarnedTodayEt(referrerId: string, now: Date): Promise<number> {
+async function refEarnedTodayEt(
+  client: Pick<typeof db, "bidPointEvent">,
+  referrerId: string,
+  now: Date,
+): Promise<number> {
   const todayEt = etDateFor(now);
   const since = new Date(now.getTime() - 36 * 60 * 60_000); // covers any ET day boundary
-  const events = await db.bidPointEvent.findMany({
+  const events = await client.bidPointEvent.findMany({
     where: { userId: referrerId, kind: { in: REF_KINDS }, createdAt: { gte: since } },
     select: { points: true, createdAt: true },
   });
@@ -48,8 +52,13 @@ async function refEarnedTodayEt(referrerId: string, now: Date): Promise<number> 
     .reduce((sum, e) => sum + e.points, 0);
 }
 
-async function alreadyAwarded(kind: RefKind, referrerId: string, refUserId: string): Promise<boolean> {
-  const existing = await db.bidPointEvent.findFirst({
+async function alreadyAwarded(
+  client: Pick<typeof db, "bidPointEvent">,
+  kind: RefKind,
+  referrerId: string,
+  refUserId: string,
+): Promise<boolean> {
+  const existing = await client.bidPointEvent.findFirst({
     where: { kind, userId: referrerId, refUserId },
     select: { id: true },
   });
@@ -78,35 +87,48 @@ export async function awardReferralPoints(
   const referrerId = finisher?.referredById;
   if (!referrerId || referrerId === finisherId) return [];
 
-  const earnedToday = await refEarnedTodayEt(referrerId, now);
-  let remainingCap = Math.max(0, REF_DAILY_CAP - earnedToday);
-  const awarded: ReferralAward[] = [];
+  // The whole award runs in ONE transaction: the daily-cap read and
+  // the once-only checks used to sit outside any transaction, so two
+  // concurrent finishes could both pass them and double-award (and
+  // double-count against the cap). The (kind, referrer, referred)
+  // unique index is the backstop; a violation means a racing award
+  // already landed and this one stands down.
+  try {
+    return await db.$transaction(async (tx) => {
+      const earnedToday = await refEarnedTodayEt(tx, referrerId, now);
+      let remainingCap = Math.max(0, REF_DAILY_CAP - earnedToday);
+      const awarded: ReferralAward[] = [];
 
-  const fire = async (kind: RefKind): Promise<void> => {
-    if (remainingCap <= 0) return;
-    if (await alreadyAwarded(kind, referrerId, finisherId)) return;
-    const points = Math.min(REF_POINTS[kind], remainingCap);
-    if (points <= 0) return;
-    await db.bidPointEvent.create({
-      data: { userId: referrerId, points, kind, refUserId: finisherId },
+      const fire = async (kind: RefKind): Promise<void> => {
+        if (remainingCap <= 0) return;
+        if (await alreadyAwarded(tx, kind, referrerId, finisherId)) return;
+        const points = Math.min(REF_POINTS[kind], remainingCap);
+        if (points <= 0) return;
+        await tx.bidPointEvent.create({
+          data: { userId: referrerId, points, kind, refUserId: finisherId },
+        });
+        remainingCap -= points;
+        awarded.push({ kind, points });
+      };
+
+      // (a) First finish by this referred member.
+      await fire("REF_FINISH");
+
+      // (b) Referred member's finished games span ≥ 3 distinct game dates.
+      const finished = await tx.doorsSession.findMany({
+        where: { userId: finisherId, state: "finished" },
+        select: { gameDate: true },
+      });
+      const distinctDays = new Set(finished.map((s) => s.gameDate)).size;
+      if (distinctDays >= 3) await fire("REF_3DAYS");
+
+      // (c) A finish that actually paid out free generations.
+      if (opts.gensAwarded > 0) await fire("REF_CLAIM");
+
+      return awarded;
     });
-    remainingCap -= points;
-    awarded.push({ kind, points });
-  };
-
-  // (a) First finish by this referred member.
-  await fire("REF_FINISH");
-
-  // (b) Referred member's finished games span ≥ 3 distinct game dates.
-  const finished = await db.doorsSession.findMany({
-    where: { userId: finisherId, state: "finished" },
-    select: { gameDate: true },
-  });
-  const distinctDays = new Set(finished.map((s) => s.gameDate)).size;
-  if (distinctDays >= 3) await fire("REF_3DAYS");
-
-  // (c) A finish that actually paid out free generations.
-  if (opts.gensAwarded > 0) await fire("REF_CLAIM");
-
-  return awarded;
+  } catch {
+    // Unique violation (or a deadlocked race): the other caller won.
+    return [];
+  }
 }

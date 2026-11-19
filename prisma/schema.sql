@@ -196,6 +196,7 @@ CREATE TABLE "CampaignListing" (
     "bountyTokens" INTEGER NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'OPEN',
     "assigneeId" TEXT,
+    "jobId" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "CampaignListing_posterId_fkey" FOREIGN KEY ("posterId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
@@ -467,6 +468,7 @@ CREATE TABLE "DoorsSession" (
     "readGuess" TEXT,
     "result" JSONB,
     "prizeGensAwarded" INTEGER NOT NULL DEFAULT 0,
+    "version" INTEGER NOT NULL DEFAULT 0,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "finishedAt" DATETIME,
     CONSTRAINT "DoorsSession_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
@@ -666,6 +668,9 @@ CREATE INDEX "BidPointEvent_userId_idx" ON "BidPointEvent"("userId");
 
 -- CreateIndex
 CREATE INDEX "BidPointEvent_kind_refUserId_idx" ON "BidPointEvent"("kind", "refUserId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "BidPointEvent_kind_userId_refUserId_key" ON "BidPointEvent"("kind", "userId", "refUserId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "KeyAuction_weekKey_key" ON "KeyAuction"("weekKey");

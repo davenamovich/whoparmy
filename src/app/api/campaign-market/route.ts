@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getWhopUser, UnauthorizedError } from "@/lib/auth";
-import { getWalletState } from "@/lib/agents";
+import { getWalletState, walletForPlan } from "@/lib/agents";
 
 export const runtime = "nodejs";
 
@@ -44,9 +44,29 @@ export async function POST(req: NextRequest) {
         { status: 402 },
       );
     }
-    const listing = await db.campaignListing.create({
-      data: { posterId: user.id, title: title.slice(0, 120), description: description.slice(0, 2000), bountyTokens: bounty },
+    // Reserve conditionally: recompute the wallet INSIDE the create
+    // transaction. Two concurrent posts used to both pass the check
+    // above on the same available figure and over-reserve the plan.
+    const listing = await db.$transaction(async (tx) => {
+      const hires = await tx.hiredAgent.findMany({ where: { userId: user.id, source: "RENTAL" }, select: { tokenBudget: true } });
+      const allocated = hires.reduce((n, h) => n + h.tokenBudget, 0);
+      const open = await tx.campaignListing.findMany({
+        where: { posterId: user.id, status: { in: ["OPEN", "ASSIGNED"] } },
+        select: { bountyTokens: true },
+      });
+      const reserved = open.reduce((n, l) => n + l.bountyTokens, 0);
+      const available = walletForPlan(user.plan) - allocated - reserved;
+      if (bounty > available) return null;
+      return tx.campaignListing.create({
+        data: { posterId: user.id, title: title.slice(0, 120), description: description.slice(0, 2000), bountyTokens: bounty },
+      });
     });
+    if (!listing) {
+      return NextResponse.json(
+        { error: `That bounty is more than your plan can reserve right now. Lower it or upgrade.` },
+        { status: 402 },
+      );
+    }
     return NextResponse.json({ listing }, { status: 201 });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Posting failed" }, { status: err instanceof UnauthorizedError ? 401 : 500 });

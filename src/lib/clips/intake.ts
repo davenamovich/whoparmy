@@ -5,7 +5,8 @@ import {
   dedupeBatch,
   isPublicSource,
 } from "./guards";
-import { assertClipAllowance, type ClipAllowance } from "./usage";
+import { assertClipAllowance, clipMonthStart, reserveClipUnit, type ClipAllowance } from "./usage";
+import { getPlan } from "@/lib/plans";
 
 /**
  * Intake: one implementation, two callers.
@@ -94,43 +95,83 @@ export async function queueClipLinks(
   const created: string[] = [];
   const refused: IntakeRefusal[] = [];
 
-  for (const url of unique) {
-    const link = byUrl.get(url) ?? { url };
-    try {
-      const verdict = isPublicSource(url);
-
-      const handle = (link.credit ?? "").toLowerCase().replace(/^@/, "");
-      if (handle && pageBlock.has(handle)) {
-        throw new ClipGuardError("CREATOR_BLOCKED", `@${handle} is on this page's block list.`);
-      }
-      if (pageAllow.length && handle && !pageAllow.includes(handle)) {
-        throw new ClipGuardError(
-          "CREATOR_BLOCKED",
-          `@${handle} is not on this page's allow list (${pageAllow.map((c) => `@${c}`).join(", ")}).`,
-        );
-      }
-      assertNotTakedown(handle, takedowns);
-
-      const job = await db.clipJob.create({
-        data: {
+  // Create + fund in ONE transaction. Each accepted job reserves its
+  // unit against its funding lane in the same transaction that
+  // inserts the row (the job records lane + grant), and the allowance
+  // is re-verified against fresh in-transaction counts — the check
+  // above is a fast path, and two concurrent batches used to both
+  // pass it while consumeClips sat uncalled in the codebase.
+  await db.$transaction(async (tx) => {
+    let capacity: number;
+    if (user.byok === true) {
+      capacity = Number.POSITIVE_INFINITY;
+    } else {
+      const planUsed = await tx.clipJob.count({
+        where: {
           userId: user.id,
-          pageId: page.id,
-          status: "queued",
-          sourceUrl: url,
-          sourceKind: verdict.kind,
-          sourceHost: verdict.host,
-          bridgeTokenId: bridgeTokenId ?? null,
-          clipSeconds: link.clipSeconds ?? defaultSeconds,
-          hook: link.hook ?? null,
-          creditWho: link.credit ?? null,
-          creditUrl: link.creditUrl ?? null,
+          createdAt: { gte: clipMonthStart() },
+          status: { in: ["queued", "rendering", "ready", "approved", "exported"] },
         },
       });
-      created.push(job.id);
-    } catch (err) {
-      refused.push({ url, ...reasonOf(err) });
+      const grants = await tx.clipCreditGrant.findMany({
+        where: { userId: user.id, spentAt: null },
+        select: { amount: true, spent: true },
+      });
+      const paidLeft = grants.reduce((sum, g) => sum + Math.max(0, g.amount - g.spent), 0);
+      capacity = paidLeft + Math.max(0, getPlan(user.plan).monthlyClips - planUsed);
     }
-  }
+
+    for (const url of unique) {
+      const link = byUrl.get(url) ?? { url };
+      try {
+        const verdict = isPublicSource(url);
+
+        const handle = (link.credit ?? "").toLowerCase().replace(/^@/, "");
+        if (handle && pageBlock.has(handle)) {
+          throw new ClipGuardError("CREATOR_BLOCKED", `@${handle} is on this page's block list.`);
+        }
+        if (pageAllow.length && handle && !pageAllow.includes(handle)) {
+          throw new ClipGuardError(
+            "CREATOR_BLOCKED",
+            `@${handle} is not on this page's allow list (${pageAllow.map((c) => `@${c}`).join(", ")}).`,
+          );
+        }
+        assertNotTakedown(handle, takedowns);
+
+        if (capacity <= 0) {
+          refused.push({
+            url,
+            reason: allowance.error ?? "No clips left this month.",
+            code: "ALLOWANCE",
+          });
+          continue;
+        }
+        capacity -= 1;
+
+        const funding = await reserveClipUnit(tx, user.id, user.byok === true);
+        const job = await tx.clipJob.create({
+          data: {
+            userId: user.id,
+            pageId: page.id,
+            status: "queued",
+            sourceUrl: url,
+            sourceKind: verdict.kind,
+            sourceHost: verdict.host,
+            bridgeTokenId: bridgeTokenId ?? null,
+            fundingLane: funding.lane,
+            grantId: funding.grantId,
+            clipSeconds: link.clipSeconds ?? defaultSeconds,
+            hook: link.hook ?? null,
+            creditWho: link.credit ?? null,
+            creditUrl: link.creditUrl ?? null,
+          },
+        });
+        created.push(job.id);
+      } catch (err) {
+        refused.push({ url, ...reasonOf(err) });
+      }
+    }
+  });
 
   return { ok: created.length > 0, created, refused, allowance };
 }

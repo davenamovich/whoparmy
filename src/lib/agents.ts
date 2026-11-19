@@ -195,3 +195,29 @@ export async function getWalletState(userId: string, planKey: string) {
 }
 
 export type WalletState = Awaited<ReturnType<typeof getWalletState>>;
+
+/**
+ * Settle a marketplace listing when its claimed job finishes.
+ * Exactly once, keyed on the listing's own status transition:
+ * DONE → COMPLETED (the reserved bounty is spent — value is
+ * SIMULATED until real payments exist, so no payout moves; the
+ * reservation simply ends in the terminal state). FAILED → the
+ * listing returns to OPEN with assignee/job cleared so another
+ * agent can claim it; the poster's reservation stays in place.
+ * A listing that is not ASSIGNED to this job is left untouched.
+ */
+export async function settleMarketListingForJob(jobId: string, outcome: "DONE" | "FAILED"): Promise<void> {
+  const listing = await db.campaignListing.findFirst({ where: { jobId }, select: { id: true } });
+  if (!listing) return;
+  if (outcome === "DONE") {
+    await db.campaignListing.updateMany({
+      where: { id: listing.id, status: "ASSIGNED", jobId },
+      data: { status: "COMPLETED" },
+    });
+  } else {
+    await db.campaignListing.updateMany({
+      where: { id: listing.id, status: "ASSIGNED", jobId },
+      data: { status: "OPEN", assigneeId: null, jobId: null },
+    });
+  }
+}

@@ -607,10 +607,14 @@ export async function recordUsage(userId: string, kind: "TEXT" | "IMAGE" | "VIDE
     // free-generation pool (referral rewards). FAILED rows skip this —
     // failures never spend.
     if (kind !== "FAILED") {
-      await applyFreeGens(userId).catch(() => undefined);
+      await applyFreeGens(userId).catch((err) => {
+        console.error("[usage] applyFreeGens failed", { userId, kind, count, meta }, err);
+      });
     }
-  } catch {
-    // usage logging must never break generation
+  } catch (err) {
+    // Usage logging must never break generation — but a lost usage
+    // row is lost accounting, so it is logged loudly, never silent.
+    console.error("[usage] recordUsage failed", { userId, kind, count, meta }, err);
   }
 }
 

@@ -71,27 +71,52 @@ function view(state: GameState) {
 export async function POST(req: NextRequest) {
   try {
     const user = await getWhopUser();
-    const body = (await req.json()) as { pageId?: string; floor?: number };
+    const body = (await req.json()) as { pageId?: string };
 
     if (!body.pageId) return NextResponse.json({ error: "Pick a page first." }, { status: 400 });
-    const floor = Math.trunc(Number(body.floor ?? 0));
-    if (!Number.isFinite(floor) || floor < 1 || floor > 500) {
-      return NextResponse.json({ error: "A pack is between 1 and 500 clips." }, { status: 400 });
-    }
 
     const page = await db.clipPage.findFirst({ where: { id: body.pageId, userId: user.id } });
     if (!page) return NextResponse.json({ error: "No page with that id belongs to you." }, { status: 404 });
 
-    // One open session per page per day: refreshing the page is not a way
-    // to get a new board.
+    // The floor is the member's bought pack — loaded from their own
+    // purchase grants, NEVER from the caller. (The old route accepted
+    // any floor 1–500 from the request body, so a member with no pack
+    // at all could open a 500-clip board and farm its bonus grants.)
+    const purchases = await db.clipCreditGrant.findMany({
+      where: {
+        userId: user.id,
+        source: "purchase",
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      select: { amount: true },
+    });
+    const floor = purchases.reduce((max, g) => Math.max(max, g.amount), 0);
+    if (floor < 1) {
+      return NextResponse.json(
+        { error: "The Box Trade trades up from a pack you own. Buy a clip pack first — its size becomes your floor." },
+        { status: 402 },
+      );
+    }
+
+    // One board per page per day, WHATEVER its state: refreshing the
+    // page is not a way to get a new board, and neither is finishing
+    // one — the old lookup only matched OPEN sessions, so a resolved
+    // board could be re-rolled the same day for a second bonus.
     const seed = sessionSeed(user.id, page.id);
     const existing = await db.clipGameSession.findFirst({
-      where: { userId: user.id, pageId: page.id, status: "open", seed },
+      where: { userId: user.id, pageId: page.id, seed },
       orderBy: { createdAt: "desc" },
     });
     if (existing) {
       const state = hydrate(existing);
-      return NextResponse.json({ id: existing.id, ...view(state), note: "This is today's board — it does not re-roll." });
+      return NextResponse.json({
+        id: existing.id,
+        ...view(state),
+        note:
+          existing.status === "resolved"
+            ? "Today's board is settled — it does not re-roll."
+            : "This is today's board — it does not re-roll.",
+      });
     }
 
     const state = startSession({ floor, seed });
@@ -165,37 +190,53 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ id: updated.id, ...view(next) });
     }
 
-    // Resolving is the one moment that pays out, so it happens exactly once:
-    // claim the transition with a conditional update, and only the caller that
-    // won it writes the grant. A double-tap cannot mint clips twice.
-    const claimed = await db.clipGameSession.updateMany({
-      where: { id: row.id, status: "open" },
-      data: {
-        bonus: next.bonus,
-        briefs: JSON.stringify(next.briefs),
-        round: next.round,
-        chosen: JSON.stringify(next.chosen),
-        status: "resolved",
-        resolvedAt: new Date(),
-      },
-    });
-
-    if (claimed.count === 0) {
-      return NextResponse.json({ id: row.id, ...view(next), note: "That board was already settled." });
-    }
-
+    // Resolving is the one moment that pays out, so it happens exactly
+    // once — and atomically: the state transition AND the grant are
+    // written in ONE transaction, claimed on the session still being
+    // open, with the grant keyed to the board id (a pre-create
+    // existence check inside the tx). The old flow claimed first and
+    // granted after: a crash between them stranded a resolved board
+    // with no bonus, and the two writes were never atomic.
     let granted = 0;
-    if (next.bonus > 0) {
-      await db.clipCreditGrant.create({
+    let alreadySettled = false;
+    await db.$transaction(async (tx) => {
+      const claimed = await tx.clipGameSession.updateMany({
+        where: { id: row.id, status: "open" },
         data: {
-          userId: user.id,
-          amount: next.bonus,
-          source: "game_bonus",
-          label: `Box Trade bonus on a ${next.floor}-clip pack`,
-          reference: row.id,
+          bonus: next.bonus,
+          briefs: JSON.stringify(next.briefs),
+          round: next.round,
+          chosen: JSON.stringify(next.chosen),
+          status: "resolved",
+          resolvedAt: new Date(),
         },
       });
-      granted = next.bonus;
+      if (claimed.count === 0) {
+        alreadySettled = true;
+        return;
+      }
+      if (next.bonus > 0) {
+        const prior = await tx.clipCreditGrant.findFirst({
+          where: { source: "game_bonus", reference: row.id },
+          select: { id: true },
+        });
+        if (!prior) {
+          await tx.clipCreditGrant.create({
+            data: {
+              userId: user.id,
+              amount: next.bonus,
+              source: "game_bonus",
+              label: `Box Trade bonus on a ${next.floor}-clip pack`,
+              reference: row.id,
+            },
+          });
+          granted = next.bonus;
+        }
+      }
+    });
+
+    if (alreadySettled) {
+      return NextResponse.json({ id: row.id, ...view(next), note: "That board was already settled." });
     }
 
     const resolution = resolve(next);

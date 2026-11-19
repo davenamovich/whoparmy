@@ -54,29 +54,35 @@ export async function getFreeGenBalance(userId: string): Promise<number> {
 
 /** Draw down the free-gen pool for successful over-cap generations. */
 export async function applyFreeGens(userId: string): Promise<void> {
-  const user = await db.user.findUnique({
-    where: { id: userId },
-    select: { plan: true, freeGenBalance: true, freeGenMonth: true, freeGenApplied: true },
-  });
-  if (!user) return;
-  const month = freeGenMonthKey();
-  const appliedBefore = user.freeGenMonth === month ? user.freeGenApplied : 0;
-  if (user.freeGenBalance <= 0 && user.freeGenMonth === month) return;
+  // Re-read + write inside one transaction, and move the balance by
+  // a DELTA: the old flow wrote an absolute balance computed from a
+  // read that a concurrent referral grant could already have changed
+  // (a grant landing mid-draw-down was silently erased).
+  await db.$transaction(async (tx) => {
+    const user = await tx.user.findUnique({
+      where: { id: userId },
+      select: { plan: true, freeGenBalance: true, freeGenMonth: true, freeGenApplied: true },
+    });
+    if (!user) return;
+    const month = freeGenMonthKey();
+    const appliedBefore = user.freeGenMonth === month ? user.freeGenApplied : 0;
+    if (user.freeGenBalance <= 0 && user.freeGenMonth === month) return;
 
-  const used = await countMonthlyUsage(userId);
-  const cap = getPlan(user.plan).monthlyItems;
-  const beyondCap = Math.max(0, used - cap);
-  const shouldApply = Math.min(beyondCap, appliedBefore + user.freeGenBalance);
-  const delta = shouldApply - appliedBefore;
+    const used = await countMonthlyUsage(userId);
+    const cap = getPlan(user.plan).monthlyItems;
+    const beyondCap = Math.max(0, used - cap);
+    const shouldApply = Math.min(beyondCap, appliedBefore + user.freeGenBalance);
+    const delta = shouldApply - appliedBefore;
 
-  if (delta <= 0 && user.freeGenMonth === month) return;
-  await db.user.update({
-    where: { id: userId },
-    data: {
-      freeGenBalance: user.freeGenBalance - Math.max(0, delta),
-      freeGenMonth: month,
-      freeGenApplied: shouldApply,
-    },
+    if (delta <= 0 && user.freeGenMonth === month) return;
+    await tx.user.update({
+      where: { id: userId },
+      data: {
+        ...(delta > 0 ? { freeGenBalance: { decrement: delta } } : {}),
+        freeGenMonth: month,
+        freeGenApplied: shouldApply,
+      },
+    });
   });
 }
 

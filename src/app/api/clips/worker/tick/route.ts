@@ -11,6 +11,7 @@ import {
   statusFromEngine,
   type DispatchJob,
 } from "@/lib/clips/dispatch";
+import { releaseClipFunding } from "@/lib/clips/usage";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -118,7 +119,13 @@ export async function POST(req: NextRequest) {
         });
 
         if (next.status === "ready") summary.ready += 1;
-        else summary.failed += 1;
+        else {
+          summary.failed += 1;
+          // A failed render is never charged: release its funding.
+          await releaseClipFunding(clip.id).catch((e) =>
+            console.error("[clips] funding release failed", clip.id, e),
+          );
+        }
       } catch (err) {
         summary.errors.push(`${clip.id}: ${err instanceof Error ? err.message : "poll failed"}`);
       }
@@ -156,6 +163,10 @@ export async function POST(req: NextRequest) {
           where: { id: clip.id },
           data: { status: "blocked", blockedReason: `${check.hint} (${check.code})` },
         });
+        // Blocked by a guard = never rendered = never charged.
+        await releaseClipFunding(clip.id).catch((e) =>
+          console.error("[clips] funding release failed", clip.id, e),
+        );
         summary.blocked += 1;
         continue;
       }
@@ -175,6 +186,9 @@ export async function POST(req: NextRequest) {
             where: { id: clip.id },
             data: { status: "failed", error: "The bridge connection that queued this clip was revoked or expired before it rendered. Nothing was charged." },
           });
+          await releaseClipFunding(clip.id).catch((e) =>
+            console.error("[clips] funding release failed", clip.id, e),
+          );
           summary.failed += 1;
           continue;
         }
@@ -209,10 +223,16 @@ export async function POST(req: NextRequest) {
         const message = err instanceof Error ? err.message : "create_sitdown failed";
         // One retry is allowed by attempts; the row goes back to queued until
         // MAX_ATTEMPTS, then it fails for a human.
+        const finalFailure = job.attempts + 1 >= 2;
         await db.clipJob.update({
           where: { id: clip.id },
-          data: { status: job.attempts + 1 >= 2 ? "failed" : "queued", error: message },
+          data: { status: finalFailure ? "failed" : "queued", error: message },
         });
+        if (finalFailure) {
+          await releaseClipFunding(clip.id).catch((e) =>
+            console.error("[clips] funding release failed", clip.id, e),
+          );
+        }
         summary.errors.push(`${clip.id}: ${message}`);
       }
     }
