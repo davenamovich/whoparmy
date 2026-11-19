@@ -104,6 +104,18 @@ export const STACKS: Stack[] = [
       "No member prompt to launch: ignition is job submission in the Agents board (entryPath), and the runner returns the bridge handoff (ASSESSOR-AGENT.md). It rides the week scope's bridge — there is no dedicated 'assessor' bridge offer yet; that one-click handoff is the noted follow-up in ASSESSOR-AGENT.md.",
   },
   {
+    id: "lead-scout",
+    name: "Lead Scout",
+    blurb:
+      "Populates a lead list for a business: give it a niche + city and it researches real businesses (owner, website, contact email, the angle that fits them) and drafts the outreach. Deep research runs on Exa; email runs on AgentMail — drafts first, sends only on approval.",
+    status: "draft",
+    bridgeScope: null,
+    promptTemplate: null,
+    entryPath: null,
+    infraNotes:
+      "Design: ~/workspace/whoparmy/SCOUT-AGENT.md. Research lane: Exa — Dave's key registered 2026-11-18, deep research (agent_run) unlocked and verified. Email lane: AgentMail connected via the custom.agentmail connector (inboxes joblessjoe@agentmail.to, luckythought5@agentmail.to); send path built but untested, org verification state unknown (unverified orgs can only email the attached human). No bridge scope in v1: the Scout spends no P&R credits; a per-lead /before pack is the follow-up (that is the Grand Openings pattern). Nothing sends without the owner's approval — drafts only until approved.",
+  },
+  {
     id: "token-vault",
     name: "Doors / Token Vault",
     blurb:
@@ -114,6 +126,37 @@ export const STACKS: Stack[] = [
     entryPath: "/",
     infraNotes:
       "No bridge scope and no ignition prompt — the game lives on the home page's War Room section and pays through the doors claim rails, not the Muse bridge. Design: ~/workspace/doors-game/TOKEN-VAULT-V2-SPEC.md (decisions locked; build is a separate gate).",
+  },
+];
+
+/**
+ * What getting a P&R API key unlocks — the BYOK explainer.
+ *
+ * Member-facing copy (shown on /admin today; the same block is the
+ * source for member surfaces when a stack ships its key page).
+ * Every line is a verified house fact — keep it that way: if a line
+ * stops being true, edit it here first.
+ */
+export const API_KEY_UNLOCKS: Array<{ title: string; body: string }> = [
+  {
+    title: "Your key, your credits",
+    body: "On your own key, every engine call costs exactly 1 credit ($0.01) — no per-tool list prices. What a stack will spend is quoted before anything runs; no quote, no spend.",
+  },
+  {
+    title: "The house caps come off",
+    body: "The free tier runs on a capped house key: previews and packs only. Your own key lifts the caps, so stacks can run at full size on your balance.",
+  },
+  {
+    title: "MP4 rendering unlocks",
+    body: "House-key work stops at previews — no MP4s. Rendering unlocks on paid tiers with your own key, so finished pieces come out as real video files.",
+  },
+  {
+    title: "Every stack runs on it",
+    body: "Muse Week, Clip Factory, and every bridge stack spend from your key's balance through the bridge — one key powers the whole army.",
+  },
+  {
+    title: "The key is never pasted",
+    body: "You never hand your key to a chat or a prompt. You generate a one-time pairing code in your hub and paste the code; the key itself stays in the hub, and bridge tokens expire in 7 days.",
   },
 ];
 

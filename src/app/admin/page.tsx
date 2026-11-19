@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getGateState, getSessionOperator } from "@/lib/site-gate";
-import { getStacks } from "@/lib/stacks";
+import { getStacks, API_KEY_UNLOCKS } from "@/lib/stacks";
 import { AdminPanel } from "@/components/admin/admin-panel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -96,6 +96,25 @@ export default async function AdminPage() {
           </Card>
         ))}
       </div>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>What getting an API key unlocks</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            The BYOK explainer — the same copy members see when a stack asks them to bring their own P&amp;R key.
+            Source of truth: API_KEY_UNLOCKS in src/lib/stacks.ts.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <ul className="space-y-3">
+            {API_KEY_UNLOCKS.map((u) => (
+              <li key={u.title} className="text-sm">
+                <strong>{u.title}.</strong> <span className="text-muted-foreground">{u.body}</span>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
 
       <AdminPanel gate={gate} stacks={stacks} />
     </main>
