@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { BridgeError, getMemberEngineKey, hasLinkedCreditAccount } from "@/lib/muse-bridge";
 
 export const runtime = "nodejs";
@@ -81,7 +81,7 @@ export async function POST() {
     }
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Key check failed" },
-      { status: 500 },
+      { status: err instanceof UnauthorizedError ? 401 : 500 },
     );
   }
 }

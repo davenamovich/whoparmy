@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 // Web Crypto, not node:crypto: the repo has no @types/node, and this
 // route runs on the Node runtime anyway (crypto.subtle is global there).
 import { db } from "@/lib/db";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { captureDecision } from "@/lib/clips/memory";
 import { ClipGuardError, assertCredit, assertDisclosure } from "@/lib/clips/guards";
 
@@ -98,7 +98,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Could not approve that clip." },
-      { status: 500 },
+      { status: err instanceof UnauthorizedError ? 401 : 500 },
     );
   }
 }

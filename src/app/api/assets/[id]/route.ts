@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { serializeAsset } from "@/lib/serialize";
 import { deleteMemeImage } from "@/lib/pr-engine";
 
@@ -26,7 +26,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     });
     return NextResponse.json({ asset: serializeAsset(updated) });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to update asset" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to update asset" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }
 
@@ -42,6 +42,6 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
     await db.asset.delete({ where: { id } });
     return NextResponse.json({ ok: true });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to delete asset" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to delete asset" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { getSessionOperator } from "@/lib/site-gate";
 import { RALPH_MENU, ralphAction, ralphActions, ralphFreeText, ralphGreeting, type RalphActionId } from "@/lib/ralph";
 
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     const greeting = await ralphGreeting(user.id, locale, house);
     return NextResponse.json({ reply: greeting, menu: ralphActions(locale) });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Ralph is unavailable" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Ralph is unavailable" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }
 
@@ -61,6 +61,6 @@ export async function POST(req: NextRequest) {
     const reply = await ralphFreeText(user.id, locale, text, history, house);
     return NextResponse.json({ reply, menu: ralphActions(locale) });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Ralph is unavailable" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Ralph is unavailable" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }

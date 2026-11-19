@@ -8,7 +8,7 @@
 import { cookies, headers } from "next/headers";
 import { NextResponse } from "next/server";
 import type { User } from "@prisma/client";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { DEFAULT_LOCALE, LOCALE_COOKIE, isUiLocale, type UiLocale } from "@/i18n/config";
 import { DOORS_TEST_WHOPIID, DoorsError } from "./game";
@@ -47,6 +47,9 @@ export async function doorsContext(): Promise<{ user: User; locale: UiLocale }> 
 }
 
 export function doorsError(err: unknown): NextResponse {
+  if (err instanceof UnauthorizedError) {
+    return NextResponse.json({ error: err.message }, { status: 401 });
+  }
   if (err instanceof DoorsError) {
     return NextResponse.json({ error: err.code }, { status: err.status });
   }

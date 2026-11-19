@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { attributeReferral, getReferralState } from "@/lib/referrals";
 
 export const runtime = "nodejs";
@@ -11,7 +11,7 @@ export async function GET() {
     const state = await getReferralState(user.id);
     return NextResponse.json({ referrals: state });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to load referrals" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to load referrals" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }
 
@@ -24,6 +24,6 @@ export async function POST(req: NextRequest) {
     const result = await attributeReferral(user.id, body.code);
     return NextResponse.json(result, { status: result.ok ? 200 : 400 });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Attribution failed" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Attribution failed" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }

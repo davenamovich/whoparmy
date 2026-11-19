@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { db } from "@/lib/db";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { tierCost } from "@/lib/agents";
 import { runAgentJob } from "@/lib/agent-runner";
 
@@ -57,6 +57,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     });
     return NextResponse.json({ listing: updated, job }, { status: 201 });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Claim failed" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Claim failed" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { serializeMission } from "@/lib/serialize";
 
 export const runtime = "nodejs";
@@ -38,7 +38,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
     return NextResponse.json({ mission: serializeMission(updated) });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to update mission" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to update mission" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }
 
@@ -56,6 +56,6 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
     await db.mission.delete({ where: { id } });
     return NextResponse.json({ ok: true });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to delete mission" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to delete mission" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }

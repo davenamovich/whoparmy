@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { serializeAsset } from "@/lib/serialize";
 
 export const runtime = "nodejs";
@@ -30,6 +30,6 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ assets: assets.map(serializeAsset) });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to load assets" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to load assets" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }

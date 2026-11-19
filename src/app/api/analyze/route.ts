@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { buildProfileFromSignals, researchWebsite } from "@/lib/pr-engine";
 import { runBrandAnalysis } from "@/lib/brand-research";
 import type { AnalyzeResponse } from "@/lib/types";
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
             ? `Business analysis failed: ${err.message}. You can continue with a manual description instead.`
             : "Business analysis failed. You can continue with a manual description instead.",
       },
-      { status: 500 },
+      { status: err instanceof UnauthorizedError ? 401 : 500 },
     );
   }
 }

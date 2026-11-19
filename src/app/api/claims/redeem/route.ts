@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getWhopUserWithMode } from "@/lib/auth";
+import { getWhopUserWithMode, UnauthorizedError } from "@/lib/auth";
 import { claimSecret, redeemClaim } from "@/lib/claims";
 
 export const runtime = "nodejs";
@@ -32,6 +32,6 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json(result);
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Claim failed" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Claim failed" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }

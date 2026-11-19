@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { serializeBrand } from "@/lib/serialize";
 import { getPlan } from "@/lib/plans";
 
@@ -12,7 +12,7 @@ export async function GET() {
     const brands = await db.brandProfile.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" } });
     return NextResponse.json({ brands: brands.map(serializeBrand) });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to load brands" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to load brands" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }
 
@@ -69,6 +69,6 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ brand: serializeBrand(brand) });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to create brand" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to create brand" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }

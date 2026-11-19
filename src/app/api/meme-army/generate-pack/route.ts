@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { chatCompletion, parseJsonSafe, recordUsage } from "@/lib/pr-engine";
 import { languageLabel } from "@/lib/languages";
 import { assertMonthlyAllowance } from "@/lib/usage-server";
@@ -96,7 +96,7 @@ Respond with STRICT JSON only: {"items":[{"kind":string,"title":string,"body":st
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? `Pack generation failed: ${err.message}` : "Pack generation failed" },
-      { status: 500 },
+      { status: err instanceof UnauthorizedError ? 401 : 500 },
     );
   }
 }

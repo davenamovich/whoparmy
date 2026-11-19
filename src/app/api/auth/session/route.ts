@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getWhopUserWithMode } from "@/lib/auth";
+import { getWhopUserWithMode, UnauthorizedError } from "@/lib/auth";
 import { getPlan } from "@/lib/plans";
 import { whopPublicStatus } from "@/lib/whop";
 
@@ -42,9 +42,20 @@ export async function GET() {
       whop: whopPublicStatus(),
     });
   } catch (err) {
+    // Signed out is a normal state, not an error: the UI gates on
+    // `connected`, so report it in-band with a 200.
+    if (err instanceof UnauthorizedError) {
+      return NextResponse.json({
+        mode: "signed-out",
+        admin: false,
+        connected: false,
+        user: null,
+        whop: whopPublicStatus(),
+      });
+    }
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to resolve session" },
-      { status: 500 },
+      { status: err instanceof UnauthorizedError ? 401 : 500 },
     );
   }
 }

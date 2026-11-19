@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getWhopUserWithMode } from "@/lib/auth";
+import { getWhopUserWithMode, UnauthorizedError } from "@/lib/auth";
 import { canCreateArmyBot } from "@/lib/plans";
 import { serializeBot } from "@/lib/serialize";
 import { tgGetMe, tgSetWebhook } from "@/lib/telegram";
@@ -127,6 +127,6 @@ export async function POST(req: NextRequest) {
       webhook: { url: webhookUrl, status: webhookStatus },
     });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Onboarding failed" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Onboarding failed" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }

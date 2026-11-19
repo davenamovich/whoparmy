@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { AGENT_CATALOG, getWalletState, internalBotBudget, templateByKey } from "@/lib/agents";
 import { toolsFromJson, toolsToJson } from "@/lib/agent-architect-core";
 import { getPlan } from "@/lib/plans";
@@ -58,7 +58,7 @@ export async function GET() {
       research,
     });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to load agents" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to load agents" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }
 
@@ -132,6 +132,6 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ hire }, { status: 201 });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Rental failed" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Rental failed" }, { status: err instanceof UnauthorizedError ? 401 : 500 });
   }
 }
