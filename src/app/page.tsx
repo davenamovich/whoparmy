@@ -32,6 +32,7 @@ import { WhopAccountBadge, useWhopSession } from "@/components/factory/whop-auth
 import { LandingPage } from "@/components/factory/landing";
 import { useTranslations } from "next-intl";
 import { LocaleSwitcher } from "@/components/factory/locale-switcher";
+import { QuizCard } from "@/components/factory/quiz-card";
 
 type View =
   | "create"
@@ -78,6 +79,9 @@ export default function Home() {
   const [brandPrefill, setBrandPrefill] = useState<ProfileDTO | null>(null);
   const [brandPrefillName, setBrandPrefillName] = useState<string | null>(null);
   const [memePrefill, setMemePrefill] = useState<{ topic: string; nonce: number } | null>(null);
+  // Front-door quiz (Dave, 2026-11-18): shown until the member's
+  // answers (or a skip) are on file — see lib/quiz.ts.
+  const [quizNeeded, setQuizNeeded] = useState(false);
   const { session, loading: sessionLoading, reload: reloadSession } = useWhopSession();
   const { toast } = useToast();
   const tNav = useTranslations("nav");
@@ -138,6 +142,22 @@ export default function Home() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code }),
     }).catch(() => {});
+  }, [session, sessionLoading]);
+
+  // Quiz state: fetch once a connected session exists. A saved
+  // record (answers or a skip) keeps the card away for good.
+  useEffect(() => {
+    if (sessionLoading || !session?.connected) return;
+    let cancelled = false;
+    void fetch("/api/quiz")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled && !data.quiz) setQuizNeeded(true);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
   }, [session, sessionLoading]);
 
   function openResults(campaignId: string) {
@@ -258,6 +278,16 @@ export default function Home() {
 
         {/* main content */}
         <main className="flex-1 min-w-0 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pb-24 lg:pb-12">
+          {quizNeeded ? (
+            <div className="mb-8">
+              <QuizCard
+                onDone={(v) => {
+                  setQuizNeeded(false);
+                  if (v) setView(v as View);
+                }}
+              />
+            </div>
+          ) : null}
           {view === "create" ? (
             <div className="space-y-12">
               {/* Ralph entry card: the button-first door, one tap
