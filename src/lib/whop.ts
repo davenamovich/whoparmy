@@ -201,39 +201,90 @@ export interface WhopMembershipLite {
   planId: string | null;
 }
 
+const PAID_TIERS = ["AGENCY", "PRO", "CREATOR"] as const;
+const ENTITLED_STATUSES = new Set(["active", "trialing", "past_due", "completed", "canceling"]);
+type TierIds = Record<(typeof PAID_TIERS)[number], string | null>;
+
+export function getWhopTierIds(): { planIds: TierIds; productIds: TierIds } {
+  return {
+    planIds: {
+      AGENCY: process.env.WHOP_PLAN_ID_AGENCY?.trim() || null,
+      PRO: process.env.WHOP_PLAN_ID_PRO?.trim() || null,
+      CREATOR: process.env.WHOP_PLAN_ID_CREATOR?.trim() || null,
+    },
+    productIds: getWhopConfig().productIds,
+  };
+}
+
+export function resolveTierFromMemberships(
+  memberships: readonly { status?: string; planId?: string | null; productId?: string | null }[],
+  { planIds, productIds }: ReturnType<typeof getWhopTierIds>,
+): (typeof PAID_TIERS)[number] | null {
+  const eligible = memberships.filter(({ status }) => status && ENTITLED_STATUSES.has(status));
+  return PAID_TIERS.find((tier) => planIds[tier] && eligible.some((row) => row.planId === planIds[tier]))
+    ?? PAID_TIERS.find((tier) => productIds[tier] && eligible.some((row) => row.productId === productIds[tier]))
+    ?? null;
+}
+
 /**
- * GET {API_BASE}/api/v1/memberships?company_id={biz}
- * The Current API ignores user filters on this endpoint (verified
- * 2026-11-17: a bogus user_id returns the same rows) and has no
- * per-user memberships subresource, so callers filter by userId
- * client-side. First page only — fine at current member counts;
- * revisit if the roster outgrows one page.
+ * Return only complete membership evidence. Callers filter by userId
+ * locally because some Whop API versions ignore the user filter.
  */
 export async function whopListMemberships(): Promise<WhopMembershipLite[]> {
   const cfg = getWhopConfig();
   if (!cfg.apiKey) throw new Error("WHOP_API_KEY is not configured");
   if (!cfg.companyId) throw new Error("WHOP_COMPANY_ID is not configured");
-  const res = await fetch(
-    `${cfg.apiBase}/api/v1/memberships?company_id=${encodeURIComponent(cfg.companyId)}&first=50`,
-    {
+  const url = new URL("/api/v1/memberships", cfg.apiBase);
+  url.searchParams.set("account_id", cfg.companyId);
+  url.searchParams.set("first", "50");
+  const memberships: WhopMembershipLite[] = [];
+  const cursors = new Set<string>();
+  for (let page = 0; page < 10; page++) {
+    const res = await fetch(url.toString(), {
       headers: {
-        Authorization: ["Bearer", cfg.apiKey].join(" "),
+        Authorization: `Bearer ${cfg.apiKey}`,
         "Api-Version-Date": API_VERSION_DATE,
       },
-    },
-  );
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Whop memberships list failed (${res.status}): ${body.slice(0, 200)}`);
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`Whop memberships list failed (${res.status}): ${body.slice(0, 200)}`);
+    }
+    const body = (await res.json()) as {
+      data?: {
+        id: string;
+        status: string;
+        user_id?: string | null;
+        user?: { id: string } | null;
+        product_id?: string;
+        product?: { id: string } | null;
+        variant_id?: string;
+        plan?: { id: string } | null;
+      }[];
+      page_info?: { has_next_page?: boolean; end_cursor?: string | null };
+    } | null;
+    if (!Array.isArray(body?.data) || typeof body.page_info?.has_next_page !== "boolean") {
+      throw new Error("Invalid Whop memberships page");
+    }
+    for (const row of body.data) {
+      const userId = row?.user_id !== undefined ? row.user_id : row?.user === null ? null : row?.user?.id;
+      const productId = row?.product_id ?? row?.product?.id ?? null;
+      const planId = row?.variant_id ?? row?.plan?.id ?? null;
+      if (typeof row?.status !== "string" || (userId !== null && typeof userId !== "string")
+        || (typeof productId !== "string" && typeof planId !== "string")) {
+        throw new Error("Invalid Whop membership");
+      }
+      memberships.push({ id: row.id, status: row.status, userId, productId, planId });
+    }
+    if (!body.page_info.has_next_page) return memberships;
+    const cursor = body.page_info.end_cursor;
+    if (typeof cursor !== "string" || !cursor || cursors.has(cursor)) {
+      throw new Error("Invalid Whop memberships cursor");
+    }
+    cursors.add(cursor);
+    url.searchParams.set("after", cursor);
   }
-  const body = (await res.json()) as { data?: Array<Record<string, unknown>> };
-  return (body.data ?? []).map((m) => ({
-    id: String(m.id ?? ""),
-    status: String(m.status ?? ""),
-    userId: (m.user as { id?: string } | null)?.id ?? null,
-    productId: (m.product as { id?: string } | null)?.id ?? null,
-    planId: (m.plan as { id?: string } | null)?.id ?? null,
-  }));
+  throw new Error("Whop memberships list exceeded 10 pages");
 }
 
 // ─── Webhook verification (Standard Webhooks spec via @whop/sdk) ─────
@@ -246,16 +297,29 @@ export function verifyWhopWebhook(
 ): { type: string; data: unknown; id?: string; accountId?: string } {
   const cfg = getWhopConfig();
   if (!cfg.webhookSecret) throw new WebhookVerificationError("WHOP_WEBHOOK_SECRET is not configured");
-  const event = unwrapWebhook<{ type?: string; data?: unknown; id?: string; account_id?: string; company_id?: string }>(
+  const event = unwrapWebhook<{
+    type?: string;
+    data?: unknown;
+    id?: string;
+    account_id?: string;
+    company_id?: string;
+  }>(
     rawBody,
     { headers, key: cfg.webhookSecret },
   );
+  const payload = event.data as {
+    account_id?: string;
+    company_id?: string;
+    account?: { id?: string } | null;
+    company?: { id?: string } | null;
+  } | null | undefined;
   return {
     type: event.type ?? "",
     data: event.data,
     id: event.id,
     // Dated pins ≥ 2026-08-14 carry account_id; older pins carry company_id.
-    accountId: event.account_id ?? event.company_id,
+    accountId: event.account_id ?? event.company_id ?? payload?.account_id ?? payload?.company_id
+      ?? payload?.account?.id ?? payload?.company?.id,
   };
 }
 
@@ -306,7 +370,9 @@ const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
 function sessionSecret(): string {
   const explicit = process.env.SESSION_SECRET?.trim();
   if (explicit) return explicit;
-  // Stable dev fallback — production deployments must set SESSION_SECRET.
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("SESSION_SECRET is required in production");
+  }
   return createHmac("sha256", "p&r-content-factory-session-seed")
     .update(process.env.DATABASE_URL ?? "local")
     .digest("hex");

@@ -16,10 +16,17 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
     });
     if (!job) return NextResponse.json({ error: "Job not found" }, { status: 404 });
 
-    const assets = await db.asset.findMany({
-      where: { campaignId: job.campaignId },
-      orderBy: { createdAt: "asc" },
-    });
+    // Poll payload is capped: a big campaign's full asset list on
+    // every poll is waste. The first 50 (creation order) plus the
+    // total, so the UI can say "showing 50 of N".
+    const [assets, assetTotal] = await Promise.all([
+      db.asset.findMany({
+        where: { campaignId: job.campaignId },
+        orderBy: { createdAt: "asc" },
+        take: 50,
+      }),
+      db.asset.count({ where: { campaignId: job.campaignId } }),
+    ]);
 
     return NextResponse.json({
       job: {
@@ -34,6 +41,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       },
       campaign: { id: job.campaign.id, name: job.campaign.name, status: job.campaign.status },
       assets: assets.map(serializeAsset),
+      assetTotal,
     });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to load job" }, { status: err instanceof UnauthorizedError ? 401 : 500 });

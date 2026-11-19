@@ -14,11 +14,16 @@ export async function GET() {
   try {
     const { user, mode } = await getWhopUserWithMode();
 
+    // Capped reads: the panel shows the latest 200 missions and the
+    // top 200 members; the totals come from aggregates. The old read
+    // loaded every member and every submission row to sum them in
+    // memory — unbounded as an army grows.
+    const LIST_CAP = 200;
     const bot = await db.armyBot.findUnique({
       where: { userId: user.id },
       include: {
-        missions: { orderBy: { createdAt: "desc" } },
-        members: { orderBy: [{ points: "desc" }, { joinedAt: "asc" }] },
+        missions: { orderBy: { createdAt: "desc" }, take: LIST_CAP },
+        members: { orderBy: [{ points: "desc" }, { joinedAt: "asc" }], take: LIST_CAP },
       },
     });
 
@@ -33,17 +38,28 @@ export async function GET() {
       return NextResponse.json(empty);
     }
 
-    const submissions = await db.submission.findMany({ where: { botId: bot.id }, select: { clicks: true } });
+    const [memberAgg, submissionAgg] = await Promise.all([
+      db.armyMember.aggregate({
+        where: { botId: bot.id },
+        _count: { _all: true },
+        _sum: { shares: true, referrals: true, verifiedClicks: true },
+      }),
+      db.submission.aggregate({
+        where: { botId: bot.id },
+        _count: { _all: true },
+        _sum: { clicks: true },
+      }),
+    ]);
 
     const response: ArmyResponseDTO = {
       bot: serializeBot(bot),
       missions: bot.missions.map(serializeMission),
       members: bot.members.map(serializeMember),
       stats: {
-        participants: bot.members.length,
-        shares: bot.members.reduce((n, m) => n + m.shares, 0) + submissions.length,
-        referrals: bot.members.reduce((n, m) => n + m.referrals, 0),
-        verifiedClicks: bot.members.reduce((n, m) => n + m.verifiedClicks, 0) + submissions.reduce((n, s) => n + s.clicks, 0),
+        participants: memberAgg._count._all,
+        shares: (memberAgg._sum.shares ?? 0) + submissionAgg._count._all,
+        referrals: memberAgg._sum.referrals ?? 0,
+        verifiedClicks: (memberAgg._sum.verifiedClicks ?? 0) + (submissionAgg._sum.clicks ?? 0),
         contentGenerated: bot.missions.reduce((n, m) => n + serializeMission(m).contentPack.length, 0),
       },
     };

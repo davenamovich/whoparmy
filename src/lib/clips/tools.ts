@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { ClipGuardError, clipSeconds } from "./guards";
 import { queueClipLinks, type IntakeLink } from "./intake";
-import { assertClipAllowance, countMonthlyClips } from "./usage";
+import { assertClipAllowance, countMonthlyClips, reserveClipUnit } from "./usage";
 
 /**
  * The Clipper's local tool family, served on the Muse bridge.
@@ -291,7 +291,7 @@ function readLinks(raw: unknown, defaultSeconds: number): LinkInput[] {
   });
 }
 
-async function batch(user: ClipUser, args: Args) {
+async function batch(user: ClipUser, args: Args, bridgeTokenId?: string) {
   const pageId = asString(args.page_id, "page_id", true)!;
   const defaultSeconds = clipSeconds(args.clip_seconds);
   const links = readLinks(args.links, defaultSeconds);
@@ -307,6 +307,7 @@ async function batch(user: ClipUser, args: Args) {
       clipSeconds: l.clipSeconds,
     })),
     defaultSeconds,
+    bridgeTokenId,
   );
 
   if (result.error && result.created.length === 0 && result.refused.length === 0) {
@@ -397,21 +398,46 @@ async function revise(user: ClipUser, args: Args) {
   const caption = asString(args.caption, "caption");
   if (!hook && !caption) return text("Nothing to change: pass a hook or a caption.", true);
 
-  const allowance = await assertClipAllowance(user.id, user.plan, 1);
-  if (!allowance.ok) return text(allowance.error ?? "No allowance left this month.", true);
-
-  await db.clipJob.update({
-    where: { id: clip.id },
-    data: {
-      hook: hook ?? clip.hook,
-      caption: caption ?? clip.caption,
-      status: "queued",
-      approvedAt: null,
-      pageUrl: null,
-      mp4Url: null,
-      error: null,
-    },
-  });
+  // Funding: a clip that still HOLDS its reservation (its lane was
+  // never released — e.g. revising a ready clip) re-renders on the
+  // SAME unit; charging again would double-debit one render slot.
+  // A clip whose funding was released (failed/blocked) or a legacy
+  // row reserves a fresh unit on requeue, in the same transaction.
+  const holdsFunding = clip.fundingLane != null && clip.fundingLane !== "paid-released";
+  if (holdsFunding) {
+    await db.clipJob.update({
+      where: { id: clip.id },
+      data: {
+        hook: hook ?? clip.hook,
+        caption: caption ?? clip.caption,
+        status: "queued",
+        approvedAt: null,
+        pageUrl: null,
+        mp4Url: null,
+        error: null,
+      },
+    });
+  } else {
+    const allowance = await assertClipAllowance(user.id, user.plan, 1, user.byok === true);
+    if (!allowance.ok) return text(allowance.error ?? "No allowance left this month.", true);
+    await db.$transaction(async (tx) => {
+      const funding = await reserveClipUnit(tx, user.id, user.byok === true);
+      await tx.clipJob.update({
+        where: { id: clip.id },
+        data: {
+          hook: hook ?? clip.hook,
+          caption: caption ?? clip.caption,
+          status: "queued",
+          approvedAt: null,
+          pageUrl: null,
+          mp4Url: null,
+          error: null,
+          fundingLane: funding.lane,
+          grantId: funding.grantId,
+        },
+      });
+    });
+  }
   return text("Queued for a fresh render. The old preview is gone — approve the new one at /clips.");
 }
 
@@ -436,7 +462,7 @@ async function markPosted(user: ClipUser, args: Args) {
 
 export type ClipToolResult = { content: Array<{ type: "text"; text: string }>; isError?: boolean };
 
-export async function callClipTool(user: ClipUser, name: string, args: Args = {}): Promise<ClipToolResult> {
+export async function callClipTool(user: ClipUser, name: string, args: Args = {}, bridgeTokenId?: string): Promise<ClipToolResult> {
   try {
     switch (name) {
       case "clip_page_setup":
@@ -444,7 +470,7 @@ export async function callClipTool(user: ClipUser, name: string, args: Args = {}
       case "clip_page_get":
         return await pageGet(user, args);
       case "clip_batch":
-        return await batch(user, args);
+        return await batch(user, args, bridgeTokenId);
       case "clip_queue":
         return await queue(user, args);
       case "clip_get":

@@ -209,9 +209,39 @@ async function executeVideoJob(
   }
 }
 
+/**
+ * Resolve a member-supplied source reference for SCROLL/INFOMERCIAL:
+ * it must be one of the member's OWN finished packs (a DONE video
+ * job or library asset carrying that engine id). Raw engine ids are
+ * never forwarded unverified — an id from someone else's library
+ * would build on (and expose) their pack.
+ */
+export async function resolveOwnedSourceJobId(userId: string, raw: unknown): Promise<string> {
+  const id = typeof raw === "string" ? raw.trim() : "";
+  if (!id) throw new Error("Pick one of your finished packs as the source.");
+  const job = await db.videoJob.findFirst({
+    where: { userId, engineJobId: id, status: "DONE" },
+    select: { id: true },
+  });
+  if (job) return id;
+  const asset = await db.asset.findFirst({
+    where: { userId, engineRef: id, status: "DONE" },
+    select: { id: true },
+  });
+  if (asset) return id;
+  throw new Error("That source isn't one of your finished packs — scrolls and infomercials build on a pack from your own library.");
+}
+
 async function runVideoJob(jobId: string): Promise<void> {
   const job = await db.videoJob.findUnique({ where: { id: jobId } });
   if (!job || job.status !== "RUNNING") return;
+  // Fencing snapshot: terminal writes below claim on (id + still
+  // RUNNING + updatedAt still the value this worker last saw). The
+  // engine-job callback refreshes the snapshot after its own write.
+  // A stale-sweep or a second worker changing the row in the
+  // meantime makes the terminal claim fail instead of overwriting
+  // a newer state.
+  let fence = job.updatedAt;
   const format = job.format as VideoFormat;
   let params: Record<string, unknown> = {};
   try {
@@ -228,44 +258,54 @@ async function runVideoJob(jobId: string): Promise<void> {
       if (!allowance.ok) throw new Error(allowance.error ?? "Monthly allowance reached.");
     }
     const result = await executeVideoJob(format, params, async (engineJobId, engineKind) => {
-      await db.videoJob.update({ where: { id: jobId }, data: { engineJobId, engineKind } });
+      const updated = await db.videoJob.update({ where: { id: jobId }, data: { engineJobId, engineKind } });
+      fence = updated.updatedAt;
     });
     if (!result.pageUrl && !result.shareUrl) throw new Error("The engine finished without a preview page.");
-    await db.videoJob.update({
-      where: { id: jobId },
-      data: {
-        status: "DONE",
-        pageUrl: result.pageUrl,
-        shareUrl: result.shareUrl,
-        engineJobId: result.engineJobId ?? job.engineJobId,
-        engineKind: result.engineKind ?? job.engineKind,
-      },
+    // Terminal write + library asset in ONE transaction, fenced:
+    // no DONE-without-asset window, and no resurrection of a job a
+    // sweep already closed.
+    const landed = await db.$transaction(async (tx) => {
+      const claim = await tx.videoJob.updateMany({
+        where: { id: jobId, status: "RUNNING", updatedAt: fence },
+        data: {
+          status: "DONE",
+          pageUrl: result.pageUrl,
+          shareUrl: result.shareUrl,
+          engineJobId: result.engineJobId ?? job.engineJobId,
+          engineKind: result.engineKind ?? job.engineKind,
+        },
+      });
+      if (claim.count !== 1) return false;
+      await tx.asset.create({
+        data: {
+          userId: job.userId,
+          type: "VIDEO",
+          format: format.toLowerCase(),
+          formatLabel: VIDEO_FORMAT_LABELS[format],
+          title:
+            (typeof params.topic === "string" && params.topic) ||
+            (typeof params.url === "string" && params.url) ||
+            VIDEO_FORMAT_LABELS[format],
+          body: "",
+          pageUrl: result.pageUrl ?? result.shareUrl,
+          engineRef: result.engineJobId,
+          status: "DONE",
+        },
+      });
+      return true;
     });
-    // Land the preview in the member's library.
-    await db.asset.create({
-      data: {
-        userId: job.userId,
-        type: "VIDEO",
-        format: format.toLowerCase(),
-        formatLabel: VIDEO_FORMAT_LABELS[format],
-        title:
-          (typeof params.topic === "string" && params.topic) ||
-          (typeof params.url === "string" && params.url) ||
-          VIDEO_FORMAT_LABELS[format],
-        body: "",
-        pageUrl: result.pageUrl ?? result.shareUrl,
-        engineRef: result.engineJobId,
-        status: "DONE",
-      },
-    });
+    if (!landed) return;
     // Charged units count only on success (failures never spend).
     if (result.chargedSteps > 0) {
       await recordUsage(job.userId, "VIDEO", result.chargedSteps, `video:${format.toLowerCase()}`);
     }
   } catch (e) {
+    // Fenced failure write: only a job still in this worker's state
+    // flips to FAILED; a job already closed by a sweep stays closed.
     await db.videoJob
-      .update({
-        where: { id: jobId },
+      .updateMany({
+        where: { id: jobId, status: "RUNNING", updatedAt: fence },
         data: { status: "FAILED", error: e instanceof Error ? e.message.slice(0, 300) : "Video job failed" },
       })
       .catch(() => undefined);
@@ -277,6 +317,12 @@ export async function startVideoJob(userId: string, format: VideoFormat, params:
   // The audio gate holds at the choke point — the member API, the
   // agent runner, and any future caller all pass through here.
   if (isAudioFormat(format)) throw new Error(BYOK_AUDIO_MESSAGE);
+  // Source ownership holds at the same choke point: SCROLL and
+  // INFOMERCIAL build on a source pack, and the source id must
+  // resolve to the SUBMITTING member's own finished pack.
+  if (format === "SCROLL" || format === "INFOMERCIAL") {
+    params = { ...params, job_id: await resolveOwnedSourceJobId(userId, params.job_id) };
+  }
   const staleBefore = new Date(Date.now() - 12 * 60_000);
   await db.videoJob
     .updateMany({

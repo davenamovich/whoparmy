@@ -196,6 +196,7 @@ CREATE TABLE "CampaignListing" (
     "bountyTokens" INTEGER NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'OPEN',
     "assigneeId" TEXT,
+    "jobId" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "CampaignListing_posterId_fkey" FOREIGN KEY ("posterId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
@@ -387,6 +388,8 @@ CREATE TABLE "BridgeToken" (
     "budgetCredits" INTEGER NOT NULL,
     "scope" TEXT NOT NULL DEFAULT 'week',
     "spentCredits" INTEGER NOT NULL DEFAULT 0,
+    "pendingCredits" INTEGER NOT NULL DEFAULT 0,
+    "pendingSince" DATETIME,
     "expiresAt" DATETIME NOT NULL,
     "revokedAt" DATETIME,
     "lastUsedAt" DATETIME,
@@ -429,6 +432,7 @@ CREATE TABLE "RotatorPlacement" (
     "userId" TEXT NOT NULL,
     "partner" TEXT NOT NULL,
     "date" TEXT NOT NULL,
+    "url" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "RotatorPlacement_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
@@ -464,6 +468,7 @@ CREATE TABLE "DoorsSession" (
     "readGuess" TEXT,
     "result" JSONB,
     "prizeGensAwarded" INTEGER NOT NULL DEFAULT 0,
+    "version" INTEGER NOT NULL DEFAULT 0,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "finishedAt" DATETIME,
     CONSTRAINT "DoorsSession_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
@@ -664,6 +669,7 @@ CREATE INDEX "BidPointEvent_userId_idx" ON "BidPointEvent"("userId");
 -- CreateIndex
 CREATE INDEX "BidPointEvent_kind_refUserId_idx" ON "BidPointEvent"("kind", "refUserId");
 
+
 -- CreateIndex
 CREATE UNIQUE INDEX "KeyAuction_weekKey_key" ON "KeyAuction"("weekKey");
 
@@ -713,3 +719,180 @@ CREATE UNIQUE INDEX "TelegramPairCode_codeHash_key" ON "TelegramPairCode"("codeH
 
 -- CreateIndex
 CREATE INDEX "TelegramPairCode_userId_idx" ON "TelegramPairCode"("userId");
+
+-- ─── Clip Factory tables ─────────────────────────────────────────────
+-- These nine models were missing from this file: the boot applier
+-- creates tables ONLY from schema.sql, so a fresh database had no
+-- clip tables at all (existing databases got them from Prisma).
+-- CreateTable
+CREATE TABLE "ClipPage" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "handle" TEXT NOT NULL,
+    "niche" TEXT NOT NULL,
+    "platforms" TEXT NOT NULL DEFAULT '[]',
+    "timezone" TEXT NOT NULL DEFAULT 'UTC',
+    "approvalHours" TEXT,
+    "cadence" TEXT NOT NULL DEFAULT '{}',
+    "creatorAllow" TEXT NOT NULL DEFAULT '[]',
+    "creatorBlock" TEXT NOT NULL DEFAULT '[]',
+    "disclosure" TEXT,
+    "voiceStyle" TEXT NOT NULL DEFAULT 'captions',
+    "archivedAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "ClipPage_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+-- CreateTable
+CREATE TABLE "ClipJob" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "pageId" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'draft',
+    "sourceUrl" TEXT NOT NULL,
+    "sourceKind" TEXT NOT NULL,
+    "sourceHost" TEXT NOT NULL,
+    "clipSeconds" INTEGER NOT NULL DEFAULT 15,
+    "hook" TEXT,
+    "caption" TEXT,
+    "warnings" TEXT NOT NULL DEFAULT '[]',
+    "pageUrl" TEXT,
+    "mp4Url" TEXT,
+    "creditWho" TEXT,
+    "creditUrl" TEXT,
+    "spoiler" BOOLEAN NOT NULL DEFAULT false,
+    "series" TEXT,
+    "episode" INTEGER,
+    "engineJobId" TEXT,
+    "bridgeTokenId" TEXT,
+    "fundingLane" TEXT,
+    "grantId" TEXT,
+    "attempts" INTEGER NOT NULL DEFAULT 0,
+    "blockedReason" TEXT,
+    "approvedAt" DATETIME,
+    "exportedAt" DATETIME,
+    "error" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "ClipJob_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "ClipJob_pageId_fkey" FOREIGN KEY ("pageId") REFERENCES "ClipPage" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+-- CreateTable
+CREATE TABLE "ClipCredit" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "clipId" TEXT NOT NULL,
+    "who" TEXT NOT NULL,
+    "url" TEXT NOT NULL,
+    "verified" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "ClipCredit_clipId_fkey" FOREIGN KEY ("clipId") REFERENCES "ClipJob" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+-- CreateTable
+CREATE TABLE "ClipTakedown" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "creator" TEXT NOT NULL,
+    "sourceUrl" TEXT,
+    "note" TEXT,
+    "requestedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+-- CreateTable
+CREATE TABLE "ClipExportToken" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "clipId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "tokenHash" TEXT NOT NULL,
+    "expiresAt" DATETIME NOT NULL,
+    "usedAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "ClipExportToken_clipId_fkey" FOREIGN KEY ("clipId") REFERENCES "ClipJob" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+-- CreateTable
+CREATE TABLE "ClipPost" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "clipId" TEXT NOT NULL,
+    "platform" TEXT NOT NULL,
+    "externalUrl" TEXT,
+    "postedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+-- CreateTable
+CREATE TABLE "ClipGameSession" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "pageId" TEXT NOT NULL,
+    "floor" INTEGER NOT NULL,
+    "bonus" INTEGER NOT NULL DEFAULT 0,
+    "briefs" TEXT NOT NULL DEFAULT '[]',
+    "round" INTEGER NOT NULL DEFAULT 0,
+    "maxRounds" INTEGER NOT NULL DEFAULT 3,
+    "seed" INTEGER NOT NULL,
+    "chosen" TEXT NOT NULL DEFAULT '[]',
+    "status" TEXT NOT NULL DEFAULT 'open',
+    "resolvedAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+-- CreateTable
+CREATE TABLE "ClipCreditGrant" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "amount" INTEGER NOT NULL,
+    "spent" INTEGER NOT NULL DEFAULT 0,
+    "source" TEXT NOT NULL,
+    "label" TEXT,
+    "reference" TEXT,
+    "expiresAt" DATETIME,
+    "spentAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+-- CreateTable
+CREATE TABLE "ClipFeedback" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "clipId" TEXT NOT NULL,
+    "verdict" TEXT NOT NULL,
+    "note" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+-- CreateIndex
+CREATE INDEX "ClipPage_userId_idx" ON "ClipPage"("userId");
+-- CreateIndex
+CREATE INDEX "ClipJob_userId_status_idx" ON "ClipJob"("userId", "status");
+-- CreateIndex
+CREATE INDEX "ClipJob_pageId_createdAt_idx" ON "ClipJob"("pageId", "createdAt");
+-- CreateIndex
+CREATE UNIQUE INDEX "ClipCredit_clipId_key" ON "ClipCredit"("clipId");
+-- CreateIndex
+CREATE INDEX "ClipCredit_userId_idx" ON "ClipCredit"("userId");
+-- CreateIndex
+CREATE UNIQUE INDEX "ClipTakedown_creator_key" ON "ClipTakedown"("creator");
+-- CreateIndex
+CREATE UNIQUE INDEX "ClipExportToken_tokenHash_key" ON "ClipExportToken"("tokenHash");
+-- CreateIndex
+CREATE INDEX "ClipExportToken_clipId_idx" ON "ClipExportToken"("clipId");
+-- CreateIndex
+CREATE INDEX "ClipPost_userId_postedAt_idx" ON "ClipPost"("userId", "postedAt");
+-- CreateIndex
+CREATE INDEX "ClipGameSession_userId_status_idx" ON "ClipGameSession"("userId", "status");
+-- CreateIndex
+CREATE INDEX "ClipCreditGrant_userId_spentAt_idx" ON "ClipCreditGrant"("userId", "spentAt");
+-- CreateIndex
+CREATE INDEX "ClipFeedback_userId_createdAt_idx" ON "ClipFeedback"("userId", "createdAt");
+-- CreateIndex
+CREATE UNIQUE INDEX "BidPointEvent_kind_userId_refUserId_key" ON "BidPointEvent"("kind", "userId", "refUserId");
+
+-- CreateTable
+CREATE TABLE "TelegramUpdate" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "botSlug" TEXT NOT NULL,
+    "updateId" INTEGER NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- CreateIndex
+CREATE INDEX "TelegramUpdate_botSlug_idx" ON "TelegramUpdate"("botSlug");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TelegramUpdate_botSlug_updateId_key" ON "TelegramUpdate"("botSlug", "updateId");

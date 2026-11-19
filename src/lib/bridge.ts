@@ -152,8 +152,16 @@ function etTomorrowString(): string {
 /** Grant the free rotator day for one offer; returns true if new. */
 async function grantFreePlacement(userId: string, partner: string): Promise<boolean> {
   try {
+    // Snapshot the URL being saved right now: the earned day serves
+    // THIS link. (The rotator used to resolve the member's current
+    // link at serve time, so editing a link later silently rewrote
+    // the free day the member had already earned.)
+    const link = await db.engineLink.findUnique({
+      where: { userId_partner: { userId, partner } },
+      select: { url: true },
+    });
     await db.rotatorPlacement.create({
-      data: { userId, partner, date: etTomorrowString() },
+      data: { userId, partner, date: etTomorrowString(), url: link?.url ?? null },
     });
     return true;
   } catch {
@@ -331,25 +339,37 @@ export async function saveBridgeLinks(
   if (me && !me.linksSavedAt) {
     const remaining = await db.engineLink.count({ where: { userId } });
     if (remaining > 0) {
-      firstSave = true;
-      await db.user.update({
-        where: { id: userId },
-        data: { linksSavedAt: new Date(), freeGenBalance: { increment: LINK_SAVE_FREE_GENS } },
-      });
-      saverPaid = true;
-      if (me.referredById) {
-        await db.user.update({
-          where: { id: me.referredById },
-          data: { freeGenBalance: { increment: LINK_SAVE_FREE_GENS } },
+      // Claim the first-save flip CONDITIONALLY, in one transaction
+      // with both balance grants: two concurrent saves used to both
+      // read linksSavedAt as null and pay out twice. Only the save
+      // whose claim lands pays anyone.
+      const claimed = await db.$transaction(async (tx) => {
+        const flip = await tx.user.updateMany({
+          where: { id: userId, linksSavedAt: null },
+          data: { linksSavedAt: new Date(), freeGenBalance: { increment: LINK_SAVE_FREE_GENS } },
         });
-        referrerPaid = true;
-        // Dave, 2026-11-17: the referrer also gets a bot for 24 hours,
-        // with real action behind it — the +25 generations above are
-        // its fuel. A grant failure must never fail the link save.
-        try {
-          referrerBotGranted = Boolean(await grantReferralBot(me.referredById));
-        } catch {
-          referrerBotGranted = false;
+        if (flip.count !== 1) return false;
+        if (me.referredById) {
+          await tx.user.update({
+            where: { id: me.referredById },
+            data: { freeGenBalance: { increment: LINK_SAVE_FREE_GENS } },
+          });
+        }
+        return true;
+      });
+      if (claimed) {
+        firstSave = true;
+        saverPaid = true;
+        if (me.referredById) {
+          referrerPaid = true;
+          // Dave, 2026-11-17: the referrer also gets a bot for 24 hours,
+          // with real action behind it — the +25 generations above are
+          // its fuel. A grant failure must never fail the link save.
+          try {
+            referrerBotGranted = Boolean(await grantReferralBot(me.referredById));
+          } catch {
+            referrerBotGranted = false;
+          }
         }
       }
     }

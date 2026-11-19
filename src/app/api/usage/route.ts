@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { getWhopConfig } from "@/lib/whop";
 import { getPlan } from "@/lib/plans";
+import { getFreeGenBalance } from "@/lib/usage-server";
 import type { UsageSummaryDTO } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -44,13 +45,19 @@ export async function GET(_req: NextRequest) {
       distinct: ["language"],
     });
 
-    const usedThisMonth = sum(byKind, "TEXT") + sum(byKind, "IMAGE");
+    // Report the SAME buckets the allowance check enforces
+    // (usage-server counts TEXT + IMAGE + VIDEO, and the limit is
+    // the plan cap plus the free-generation pool). The old report
+    // omitted VIDEO and the pool, so the UI disagreed with the gate.
+    const freeGens = await getFreeGenBalance(user.id);
+    const usedThisMonth = sum(byKind, "TEXT") + sum(byKind, "IMAGE") + sum(byKind, "VIDEO");
+    const limit = plan.monthlyItems + freeGens;
     const payload: UsageSummaryDTO = {
       plan: plan.key,
       planName: plan.name,
       used: usedThisMonth,
-      limit: plan.monthlyItems,
-      remaining: Math.max(plan.monthlyItems - usedThisMonth, 0),
+      limit,
+      remaining: Math.max(limit - usedThisMonth, 0),
       totals: {
         text: sum(totals, "TEXT"),
         image: sum(totals, "IMAGE"),

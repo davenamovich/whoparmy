@@ -271,8 +271,12 @@ export async function openDoor(
   if (state === "opening" && opened.length === 2) state = "banker1";
   else if (state === "opening2" && opened.length === 3) state = "banker2";
 
-  const updated = await db.doorsSession.update({
-    where: { id: s.id },
+  // Conditional claim on the row version: a concurrent open of the
+  // same session (double-tap, two tabs) must not both advance the
+  // game from the same stale read — the loser gets stale_state and
+  // refreshes instead of corrupting streak/peeks.
+  const claim = await db.doorsSession.updateMany({
+    where: { id: s.id, version: s.version },
     data: {
       opened: opened as unknown as object,
       calls: calls as unknown as object,
@@ -281,8 +285,11 @@ export async function openDoor(
       peeksBanked,
       sweatArmed,
       state,
+      version: { increment: 1 },
     },
   });
+  if (claim.count !== 1) fail("stale_state");
+  const updated = await db.doorsSession.findUniqueOrThrow({ where: { id: s.id } });
 
   const set = await getDailySet(s.gameDate, s.language);
   const meme = set.find((m) => m.door === door) ?? set[0]!;
@@ -318,10 +325,13 @@ export async function peekDoor(user: User, input: { sessionId?: unknown; door?: 
   if (peeksUsed.includes(door)) fail("already_peeked");
   if (s.peeksBanked <= 0) fail("no_peeks");
   peeksUsed.push(door);
-  await db.doorsSession.update({
-    where: { id: s.id },
-    data: { peeksBanked: s.peeksBanked - 1, peeksUsed: peeksUsed as unknown as object },
+  // A banked peek is currency: spend it by conditional claim so two
+  // concurrent peeks can't both draw on the same banked peek.
+  const claim = await db.doorsSession.updateMany({
+    where: { id: s.id, version: s.version },
+    data: { peeksBanked: { decrement: 1 }, peeksUsed: peeksUsed as unknown as object, version: { increment: 1 } },
   });
+  if (claim.count !== 1) fail("stale_state");
   const prize = asAssignment(s)[String(door)]!;
   // Band only — never the exact prize. The keeper door may be peeked.
   return { door, band: band4For(prize) as Band4, peeksBanked: s.peeksBanked - 1 };
@@ -334,7 +344,11 @@ export async function readGuess(user: User, input: { sessionId?: unknown; band?:
   assertLive(s);
   if (!isBand4(input.band)) fail("invalid_band");
   if (s.readGuess != null) fail("read_locked");
-  await db.doorsSession.update({ where: { id: s.id }, data: { readGuess: input.band as Band4 } });
+  const claim = await db.doorsSession.updateMany({
+    where: { id: s.id, version: s.version, readGuess: null },
+    data: { readGuess: input.band as Band4, version: { increment: 1 } },
+  });
+  if (claim.count !== 1) fail("read_locked");
   return { ok: true as const, readGuess: input.band as Band4 };
 }
 
@@ -418,10 +432,11 @@ export async function decide(user: User, input: { sessionId?: unknown; decision?
   stored.decision = decision;
 
   if (decision === "no_deal" && s.state === "banker1") {
-    await db.doorsSession.update({
-      where: { id: s.id },
-      data: { offers: offers as unknown as object, state: "opening2" },
+    const claim = await db.doorsSession.updateMany({
+      where: { id: s.id, state: "banker1", version: s.version },
+      data: { offers: offers as unknown as object, state: "opening2", version: { increment: 1 } },
     });
+    if (claim.count !== 1) fail("stale_state");
     return { state: "opening2" as const, opensNeeded: 1 };
   }
 
@@ -459,23 +474,43 @@ export async function decide(user: User, input: { sessionId?: unknown; decision?
     gensAwarded: fm.gensAwarded,
   };
 
-  // Finish the session and pay the free generations in one transaction.
-  await db.$transaction([
-    db.doorsSession.update({
-      where: { id: s.id },
+  // Finish the session and pay the free generations in one
+  // transaction, claimed on the session still being in a banker
+  // state: two concurrent decide calls used to both pass the state
+  // read above and both pay. Only the caller whose claim lands
+  // pays; the loser is shown the finished session's stored result.
+  const paid = await db.$transaction(async (tx) => {
+    const claim = await tx.doorsSession.updateMany({
+      where: { id: s.id, state: { in: ["banker1", "banker2"] } },
       data: {
         offers: offers as unknown as object,
         state: "finished",
         result: result as unknown as object,
         prizeGensAwarded: fm.gensAwarded,
         finishedAt: new Date(),
+        version: { increment: 1 },
       },
-    }),
-    db.user.update({
+    });
+    if (claim.count !== 1) return false;
+    await tx.user.update({
       where: { id: user.id },
       data: { freeGenBalance: { increment: fm.gensAwarded } },
-    }),
-  ]);
+    });
+    return true;
+  });
+  if (!paid) {
+    const fresh = await db.doorsSession.findUnique({ where: { id: s.id } });
+    if (fresh?.state === "finished") {
+      return {
+        state: "finished" as const,
+        result: fresh.result as typeof result,
+        assignment,
+        commitmentHash: s.commitmentHash,
+        referralAwards: [] as ReferralAward[],
+      };
+    }
+    fail("stale_state");
+  }
 
   // XP is a reward, not a gate — never fail the game over it.
   await awardXp(user.id, "DOORS_PLAYED", `doors:${s.gameDate}:${resultType}`).catch(() => {});

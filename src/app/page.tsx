@@ -213,6 +213,21 @@ export default function Home() {
     return <LandingPage />;
   }
 
+  // While the session probe is in flight, render a neutral splash —
+  // never the app shell. The shell's components fire member fetches on
+  // mount; for an anonymous visitor those now correctly 401 (the
+  // operator fallback is closed), and their error toasts would
+  // otherwise bleed onto the landing page.
+  if (sessionLoading) {
+    return (
+      <div className="min-h-screen grid place-items-center bg-background">
+        <p className="text-xs font-bold tracking-[0.25em] uppercase text-muted-foreground animate-pulse">
+          Plunder &amp; Riffle
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* top header — mobile brand row + plan context */}

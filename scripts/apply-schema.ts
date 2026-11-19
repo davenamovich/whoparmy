@@ -51,6 +51,14 @@ const ADDITIVE_COLUMNS: Array<{ table: string; column: string; ddl: string }> = 
   { table: "HiredAgent", column: "expiresAt", ddl: 'ALTER TABLE "HiredAgent" ADD COLUMN "expiresAt" DATETIME' },
   { table: "BridgeCode", column: "scope", ddl: 'ALTER TABLE "BridgeCode" ADD COLUMN "scope" TEXT NOT NULL DEFAULT \'week\'' },
   { table: "BridgeToken", column: "scope", ddl: 'ALTER TABLE "BridgeToken" ADD COLUMN "scope" TEXT NOT NULL DEFAULT \'week\'' },
+  { table: "BridgeToken", column: "pendingCredits", ddl: 'ALTER TABLE "BridgeToken" ADD COLUMN "pendingCredits" INTEGER NOT NULL DEFAULT 0' },
+  { table: "BridgeToken", column: "pendingSince", ddl: 'ALTER TABLE "BridgeToken" ADD COLUMN "pendingSince" DATETIME' },
+  { table: "ClipJob", column: "bridgeTokenId", ddl: 'ALTER TABLE "ClipJob" ADD COLUMN "bridgeTokenId" TEXT' },
+  { table: "RotatorPlacement", column: "url", ddl: 'ALTER TABLE "RotatorPlacement" ADD COLUMN "url" TEXT' },
+  { table: "CampaignListing", column: "jobId", ddl: 'ALTER TABLE "CampaignListing" ADD COLUMN "jobId" TEXT' },
+  { table: "DoorsSession", column: "version", ddl: 'ALTER TABLE "DoorsSession" ADD COLUMN "version" INTEGER NOT NULL DEFAULT 0' },
+  { table: "ClipJob", column: "fundingLane", ddl: 'ALTER TABLE "ClipJob" ADD COLUMN "fundingLane" TEXT' },
+  { table: "ClipJob", column: "grantId", ddl: 'ALTER TABLE "ClipJob" ADD COLUMN "grantId" TEXT' },
 ];
 for (const { table, column, ddl } of ADDITIVE_COLUMNS) {
   const cols = db.query(`PRAGMA table_info("${table}")`).all() as Array<{ name: string }>;

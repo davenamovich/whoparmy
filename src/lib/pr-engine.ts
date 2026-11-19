@@ -6,6 +6,7 @@ import { LANGUAGE_MAP, languageLabel } from "@/lib/languages";
 import { OBJECTIVE_MAP, TONE_MAP } from "@/lib/formats";
 import type { ProfileDTO } from "@/lib/types";
 import { generateEngineMeme, memeBackend, researchBrand, type EngineResearch } from "@/lib/engine";
+import { fetchWithEgress } from "@/lib/egress";
 import { applyFreeGens } from "@/lib/usage-server";
 
 // ─── Text generation backend (Starimg) ──────────────────────────────
@@ -146,10 +147,12 @@ export async function researchWebsite(url: string): Promise<WebsiteResearchResul
   let normalized = url.trim();
   if (!/^https?:\/\//i.test(normalized)) normalized = `https://${normalized}`;
   try {
-    const res = await fetch(normalized, {
+    // Egress policy: the member supplies this URL. Validate it (and
+    // every redirect hop) against the SSRF rules before fetching —
+    // a blocked URL simply yields no research.
+    const res = await fetchWithEgress(normalized, {
       headers: { "User-Agent": "Mozilla/5.0 (compatible; PRContentFactory/1.0; +research-bot)" },
       signal: AbortSignal.timeout(9000),
-      redirect: "follow",
     });
     if (!res.ok) return result;
     const html = (await res.text()).slice(0, 400_000);
@@ -345,6 +348,11 @@ Respond with STRICT JSON only: {"items":[{"title":string,"imagePrompt":string,"t
 // ─── Real image generation ──────────────────────────────────────────
 const GEN_DIR = path.join(process.cwd(), "public", "generated");
 
+/** The legacy image lane is not wired (see generateMemeImage): any
+ *  code path that would reach it fails with this, BEFORE spending. */
+export const IMAGE_PROVIDER_NOT_CONFIGURED =
+  "Image provider not configured on this deployment — meme images are unavailable right now.";
+
 export async function generateMemeImage(assetId: string, imagePrompt: string): Promise<string> {
   // Slice 2 of the rewire (REWIRE-DESIGN.md) — intentionally unwired.
   // The Z.ai image API this used only exists on its home build platform.
@@ -465,43 +473,11 @@ export async function regenerateAsset(assetId: string, variation?: string, langu
         bottomText: asset.bottomText ?? "",
       };
       if (targetLanguage === asset.language) {
-        // fresh concept + fresh image
-        const campaign = asset.campaignId
-          ? await db.campaign.findUnique({ where: { id: asset.campaignId } })
-          : null;
-        const profile = campaign ? (JSON.parse(campaign.profileJson) as ProfileDTO) : ({
-          name: asset.title,
-          description: asset.body,
-          products: [],
-          sellingPoints: [],
-          differentiators: [],
-          primaryLanguage: asset.language,
-          suggestedLanguages: [],
-          suggestedTones: [],
-        } as ProfileDTO);
-        const concepts = await generateMemeConcepts({
-          profile,
-          objectiveLabel: campaign ? objectiveLabel(campaign.objective, campaign.customObjective) : "Promote the business",
-          toneLabel: campaign ? toneLabel(campaign.tone, campaign.customTone) : "Funny",
-          formatInstruction: spec.instruction,
-          languageName: languageLabel(asset.language),
-          count: 1,
-        });
-        const c = concepts[0];
-        const imageUrl = await generateMemeImage(asset.id, c.imagePrompt);
-        await deleteMemeImage(asset.imageUrl);
-        await db.asset.update({
-          where: { id: assetId },
-          data: {
-            title: c.title,
-            topText: c.topText,
-            bottomText: c.bottomText,
-            imageUrl,
-            language: asset.language,
-            languageLabel: asset.languageLabel,
-            status: "DONE",
-          },
-        });
+        // Fresh concept + fresh image needs the image lane, which is
+        // not wired on the legacy backend — fail before the concept
+        // spend. (The localized-captions branch below reuses the
+        // existing visual and still works.)
+        throw new Error(IMAGE_PROVIDER_NOT_CONFIGURED);
       } else {
         // same visual, localized captions
         const campaign = asset.campaignId ? await db.campaign.findUnique({ where: { id: asset.campaignId } }) : null;
@@ -607,10 +583,14 @@ export async function recordUsage(userId: string, kind: "TEXT" | "IMAGE" | "VIDE
     // free-generation pool (referral rewards). FAILED rows skip this —
     // failures never spend.
     if (kind !== "FAILED") {
-      await applyFreeGens(userId).catch(() => undefined);
+      await applyFreeGens(userId).catch((err) => {
+        console.error("[usage] applyFreeGens failed", { userId, kind, count, meta }, err);
+      });
     }
-  } catch {
-    // usage logging must never break generation
+  } catch (err) {
+    // Usage logging must never break generation — but a lost usage
+    // row is lost accounting, so it is logged loudly, never silent.
+    console.error("[usage] recordUsage failed", { userId, kind, count, meta }, err);
   }
 }
 
@@ -720,93 +700,21 @@ export async function runGenerationJob(jobId: string): Promise<void> {
         continue;
       }
 
-      await bump(`Designing ${FORMAT_MAP[f.format]?.label ?? f.format} concepts`);
-      // concepts in primary language (or first available)
-      const conceptLang = langGroups.find((g) => g.lang === primary)?.lang ?? langGroups[0].lang;
-      let concepts: MemeConcept[] = [];
-      try {
-        concepts = await generateMemeConcepts({
-          profile,
-          objectiveLabel: objectiveLabel(campaign.objective, campaign.customObjective),
-          toneLabel: toneLabel(campaign.tone, campaign.customTone),
-          formatInstruction: FORMAT_MAP[f.format]?.instruction ?? "A shareable meme",
-          languageName: languageLabel(conceptLang),
-          count: campaign.piecesPerFormat,
-        });
-      } catch (err) {
-        for (const g of langGroups) {
-          for (const a of g.assets) {
-            await db.asset.update({
-              where: { id: a.id },
-              data: { status: "FAILED", error: err instanceof Error ? err.message : "Meme generation failed" },
-            });
-            failed++;
-          }
-        }
-        await recordUsage(campaign.userId, "FAILED", langGroups.reduce((n, g) => n + g.assets.length, 0));
-        continue;
-      }
-
-      // base visuals (one per concept) on the concept-language assets
-      const conceptCarrier = langGroups.find((g) => g.lang === conceptLang)!;
-      const imageUrls: string[] = [];
-      for (let i = 0; i < conceptCarrier.assets.length; i++) {
-        const asset = conceptCarrier.assets[i];
-        const concept = concepts[i % concepts.length];
-        await bump(`Generating ${FORMAT_MAP[f.format]?.label ?? f.format} imagery (${i + 1}/${conceptCarrier.assets.length})`);
-        await db.asset.update({ where: { id: asset.id }, data: { status: "GENERATING" } });
-        try {
-          if (!concept.imagePrompt) throw new Error("Empty image prompt");
-          const imageUrl = await generateMemeImage(asset.id, concept.imagePrompt + (IMAGE_STYLE_NOTE ? `, ${IMAGE_STYLE_NOTE}` : ""));
-          imageUrls[i] = imageUrl;
+      // Legacy lane: the image generator behind it is not wired and
+      // throws unconditionally — fail every asset in this format
+      // with the honest reason BEFORE the concept spend.
+      for (const g of langGroups) {
+        for (const a of g.assets) {
           await db.asset.update({
-            where: { id: asset.id },
-            data: { title: concept.title, topText: concept.topText, bottomText: concept.bottomText, imageUrl, status: "DONE" },
-          });
-          done++;
-          await recordUsage(campaign.userId, "IMAGE", 1);
-        } catch (err) {
-          await db.asset.update({
-            where: { id: asset.id },
-            data: { status: "FAILED", error: err instanceof Error ? err.message : "Image generation failed" },
+            where: { id: a.id },
+            data: { status: "FAILED", error: IMAGE_PROVIDER_NOT_CONFIGURED },
           });
           failed++;
-          await recordUsage(campaign.userId, "FAILED", 1);
         }
       }
+      await recordUsage(campaign.userId, "FAILED", langGroups.reduce((n, g) => n + g.assets.length, 0));
+      continue;
 
-      // other languages: localize captions onto the shared visuals
-      for (const g of langGroups) {
-        if (g.lang === conceptLang) continue;
-        for (let i = 0; i < g.assets.length; i++) {
-          const asset = g.assets[i];
-          const concept = concepts[i % concepts.length];
-          const imageUrl = imageUrls[i % Math.max(imageUrls.length, 1)] ?? null;
-          await db.asset.update({ where: { id: asset.id }, data: { status: "GENERATING" } });
-          try {
-            const loc = await localizeMemeTexts({
-              concept,
-              profileName: campaign.businessName,
-              businessDescription: profile.description,
-              language: g.lang,
-              languageName: languageLabel(g.lang),
-            });
-            await db.asset.update({
-              where: { id: asset.id },
-              data: { title: loc.title, topText: loc.topText, bottomText: loc.bottomText, imageUrl, status: "DONE" },
-            });
-            done++;
-            await recordUsage(campaign.userId, "TEXT", 1);
-          } catch (err) {
-            await db.asset.update({
-              where: { id: asset.id },
-              data: { status: "FAILED", error: err instanceof Error ? err.message : "Meme localization failed" },
-            });
-            failed++;
-            await recordUsage(campaign.userId, "FAILED", 1);
-          }
-        }
-      }
     }
 
     // ── Phase 2: text formats, one LLM batch per (format, language)

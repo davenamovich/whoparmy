@@ -122,7 +122,14 @@ export async function attributeReferral(userId: string, rawCode: string) {
   const referrer = await db.user.findUnique({ where: { refCode: code }, select: { id: true } });
   if (!referrer) return { ok: false as const, reason: "unknown-code" };
   if (referrer.id === userId) return { ok: false as const, reason: "self" };
-  await db.user.update({ where: { id: userId }, data: { referredById: referrer.id } });
+  // Conditional claim: two concurrent attributions with different
+  // codes must not both win (the read above is only a pre-check).
+  // Only the caller whose update lands pays the join XP.
+  const claimed = await db.user.updateMany({
+    where: { id: userId, referredById: null },
+    data: { referredById: referrer.id },
+  });
+  if (claimed.count !== 1) return { ok: false as const, reason: "already-attributed" };
   await awardXp(referrer.id, "REFERRAL_JOINED", code).catch(() => {});
   return { ok: true as const, referrerId: referrer.id };
 }
@@ -147,33 +154,45 @@ export async function recordConversion(recruitId: string) {
   await awardXp(recruit.referredById, "REFERRAL_CONVERTED", recruit.plan).catch(() => {});
   const priceCents = getPlan(recruit.plan).priceCents;
   if (priceCents <= 0) return null;
-  // Every conversion is recorded (the unique recruitId row is the
-  // idempotency anchor AND the confirmed-sign-up counter for the
-  // unlock gate). It starts QUALIFYING at $0: qualifying sign-ups
-  // earn no commission — commissions are never locked or held back,
-  // they simply begin once the referrer is unlocked.
-  const row = await db.referralEarning.create({
-    data: {
-      referrerId: recruit.referredById,
-      recruitId,
-      basisPlan: recruit.plan,
-      amountCents: 0,
-      status: "QUALIFYING",
-    },
-  });
-  // If this conversion opens the referrer's gates, THIS conversion
-  // earns — commissions flow from the unlocking sign-up onward.
+  const referrerId = recruit.referredById;
+  // One write, final values, inside one transaction. The old flow
+  // inserted a $0 QUALIFYING row and then fixed it up in a second
+  // write when the gate was open — a crash between the two stranded
+  // a permanently-wrong row, and the gate count was read outside
+  // any transaction. Now the gate is evaluated against the
+  // referrer's conversions in createdAt order INCLUDING this one
+  // (commissions flow from the unlocking sign-up onward), and the
+  // row is created once with its computed amount and status.
   // (Legacy LOCKED rows from the short-lived hold build are released
-  // here too; that model was retired the day it shipped.)
-  if (await commissionGateOpen(recruit.referredById)) {
-    await db.referralEarning.update({
-      where: { id: row.id },
-      data: { amountCents: Math.round(priceCents * REFERRAL_RATE), status: "SIMULATED" },
+  // in the same transaction; that model was retired the day it
+  // shipped.) A racing duplicate hits the unique recruitId and
+  // simply reads back the winner's row.
+  try {
+    return await db.$transaction(async (tx) => {
+      const prior = await tx.referralEarning.findMany({
+        where: { referrerId },
+        orderBy: { createdAt: "asc" },
+        select: { id: true },
+      });
+      const gateOpen = prior.length + 1 >= COMMISSION_UNLOCK_CONVERSIONS;
+      const row = await tx.referralEarning.create({
+        data: {
+          referrerId,
+          recruitId,
+          basisPlan: recruit.plan,
+          amountCents: gateOpen ? Math.round(priceCents * REFERRAL_RATE) : 0,
+          status: gateOpen ? "SIMULATED" : "QUALIFYING",
+        },
+      });
+      if (gateOpen) {
+        await tx.referralEarning.updateMany({
+          where: { referrerId, status: "LOCKED" },
+          data: { status: "SIMULATED" },
+        });
+      }
+      return row;
     });
-    await db.referralEarning.updateMany({
-      where: { referrerId: recruit.referredById, status: "LOCKED" },
-      data: { status: "SIMULATED" },
-    });
+  } catch {
+    return db.referralEarning.findUnique({ where: { recruitId } });
   }
-  return db.referralEarning.findUnique({ where: { recruitId } });
 }

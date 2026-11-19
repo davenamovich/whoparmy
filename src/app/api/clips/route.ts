@@ -108,11 +108,23 @@ export async function POST(req: NextRequest) {
     if (result.error && result.created.length === 0) {
       return NextResponse.json({ error: result.error, refused: result.refused }, { status: 400 });
     }
+    // Every link refused by the guards is a refusal, not a success
+    // with zero created — the desk must see why, with a non-2xx.
+    if (result.created.length === 0 && result.refused.length > 0) {
+      return NextResponse.json(
+        { error: "Every link in that batch was refused.", refused: result.refused },
+        { status: 422 },
+      );
+    }
 
+    // `left` is recomputed from committed rows: the pre-flight
+    // allowance snapshot counts the whole batch (including links the
+    // guards then refused), which understated what remains.
+    const usage = await clipUsage(user.id, user.plan);
     return NextResponse.json({
       created: result.created.length,
       refused: result.refused,
-      left: result.allowance ? Math.max(0, result.allowance.left - result.created.length) : null,
+      left: usage.paidLeft + Math.max(0, usage.planLimit - usage.planUsed),
       lane: result.allowance?.lane ?? null,
     });
   } catch (err) {

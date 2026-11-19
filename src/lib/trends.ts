@@ -261,28 +261,40 @@ async function readAnySnapshot(date: string): Promise<DaySnapshot | null> {
  * Store the day's X-sourced topics (POST /api/trends/ingest) and
  * clear the day's per-language rows, so the next read in any
  * language rebuilds its headlines from the X topics instead of
- * serving a wire-built set. The in-process dayCache for other
- * languages can lag until restart — the ingest runs early morning
- * ET, before the day's reads, so this rarely matters.
+ * serving a wire-built set. All of the day's in-process cache keys
+ * are invalidated with the write.
  */
 export async function ingestXTopics(topics: TrendTopic[]): Promise<void> {
   const date = etDayKey();
   const snapshot: DaySnapshot = { builtAt: new Date().toISOString(), topics };
-  await db.$executeRaw`
-    INSERT INTO "TrendDay" ("id", "date", "lang", "topicsJson")
-    VALUES (${randomUUID()}, ${date}, 'x', ${JSON.stringify(snapshot)})
-    ON CONFLICT("date", "lang") DO UPDATE SET "topicsJson" = EXCLUDED."topicsJson"
-  `;
-  await db.$executeRaw`DELETE FROM "TrendDay" WHERE "date" = ${date} AND "lang" <> 'x'`;
-  // The payload's headlines are written in English by the ingest
-  // job — store them as the day's en snapshot too, so English
-  // readers get the crafted headlines instead of regenerated ones.
-  // Other languages still rebuild (localized) from the x topics.
-  await db.$executeRaw`
-    INSERT INTO "TrendDay" ("id", "date", "lang", "topicsJson")
-    VALUES (${randomUUID()}, ${date}, 'en', ${JSON.stringify(snapshot)})
-    ON CONFLICT("date", "lang") DO UPDATE SET "topicsJson" = EXCLUDED."topicsJson"
-  `;
+  const json = JSON.stringify(snapshot);
+  // One transaction: the X write, the localized-row delete and the
+  // English write commit together or not at all. Three separate
+  // writes could strand a mixed day (new X topics beside yesterday's
+  // localized rows) on any mid-sequence failure.
+  await db.$transaction([
+    db.$executeRaw`
+      INSERT INTO "TrendDay" ("id", "date", "lang", "topicsJson")
+      VALUES (${randomUUID()}, ${date}, 'x', ${json})
+      ON CONFLICT("date", "lang") DO UPDATE SET "topicsJson" = EXCLUDED."topicsJson"
+    `,
+    db.$executeRaw`DELETE FROM "TrendDay" WHERE "date" = ${date} AND "lang" <> 'x' AND "lang" <> 'en'`,
+    // The payload's headlines are written in English by the ingest
+    // job — store them as the day's en snapshot too, so English
+    // readers get the crafted headlines instead of regenerated ones.
+    // Other languages still rebuild (localized) from the x topics.
+    db.$executeRaw`
+      INSERT INTO "TrendDay" ("id", "date", "lang", "topicsJson")
+      VALUES (${randomUUID()}, ${date}, 'en', ${json})
+      ON CONFLICT("date", "lang") DO UPDATE SET "topicsJson" = EXCLUDED."topicsJson"
+    `,
+  ]);
+  // Invalidate every cached language for the day, not just x/en:
+  // a localized snapshot built from the old topics would otherwise
+  // keep serving until restart.
+  for (const key of [...dayCache.keys()]) {
+    if (key.startsWith(`${date}:`)) dayCache.delete(key);
+  }
   dayCache.set(`${date}:x`, snapshot);
   dayCache.set(`${date}:en`, snapshot);
 }

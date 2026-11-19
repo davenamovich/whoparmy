@@ -123,6 +123,9 @@ export async function assertClipAllowance(
 /**
  * Spend n clips from the lanes, oldest paid grant first. Called once a batch is
  * accepted for rendering — never from a preview path, never twice per batch.
+ * Writes are DELTAS inside one transaction (the old version wrote an
+ * absolute `spent` computed from a stale read — a concurrent spend or
+ * release landing in between was silently overwritten).
  */
 export async function consumeClips(
   userId: string,
@@ -131,28 +134,85 @@ export async function consumeClips(
 ): Promise<{ fromPaid: number; fromPlan: number }> {
   if (count <= 0 || lane === "byok") return { fromPaid: 0, fromPlan: 0 };
 
-  let remaining = count;
-  let fromPaid = 0;
+  return db.$transaction(async (tx) => {
+    let remaining = count;
+    let fromPaid = 0;
 
-  const grants = await db.clipCreditGrant.findMany({
+    const grants = await tx.clipCreditGrant.findMany({
+      where: { userId, spentAt: null },
+      orderBy: { createdAt: "asc" },
+    });
+    for (const grant of grants) {
+      if (remaining <= 0) break;
+      const available = Math.max(0, grant.amount - grant.spent);
+      if (available === 0) continue;
+      const take = Math.min(available, remaining);
+      const spent = grant.spent + take;
+      await tx.clipCreditGrant.update({
+        where: { id: grant.id },
+        data: { spent: { increment: take }, spentAt: spent >= grant.amount ? new Date() : null },
+      });
+      fromPaid += take;
+      remaining -= take;
+    }
+
+    // Whatever the paid lane could not cover comes from the plan lane, which
+    // is counted from ClipJob rows — no extra bookkeeping to keep consistent.
+    return { fromPaid, fromPlan: remaining };
+  });
+}
+
+type TxClient = Parameters<Parameters<typeof db.$transaction>[0]>[0];
+
+/**
+ * Reserve ONE clip unit inside the caller's transaction and say which
+ * lane funds it. Paid grants go first (FIFO); the plan lane needs no
+ * write — a ClipJob row in a charged status IS the reservation, which
+ * is why intake stamps the lane on the job it creates in the same tx.
+ */
+export async function reserveClipUnit(
+  tx: TxClient,
+  userId: string,
+  byok: boolean,
+): Promise<{ lane: "byok" | "paid" | "plan"; grantId: string | null }> {
+  if (byok) return { lane: "byok", grantId: null };
+  const grants = await tx.clipCreditGrant.findMany({
     where: { userId, spentAt: null },
     orderBy: { createdAt: "asc" },
   });
   for (const grant of grants) {
-    if (remaining <= 0) break;
-    const available = Math.max(0, grant.amount - grant.spent);
-    if (available === 0) continue;
-    const take = Math.min(available, remaining);
-    const spent = grant.spent + take;
-    await db.clipCreditGrant.update({
+    if (grant.spent >= grant.amount) continue;
+    const spent = grant.spent + 1;
+    await tx.clipCreditGrant.update({
       where: { id: grant.id },
-      data: { spent, spentAt: spent >= grant.amount ? new Date() : null },
+      data: { spent: { increment: 1 }, spentAt: spent >= grant.amount ? new Date() : null },
     });
-    fromPaid += take;
-    remaining -= take;
+    return { lane: "paid", grantId: grant.id };
   }
+  return { lane: "plan", grantId: null };
+}
 
-  // Whatever the paid lane could not cover comes from the plan lanes, which
-  // are counted from ClipJob rows — no extra bookkeeping to keep consistent.
-  return { fromPaid, fromPlan: remaining };
+/**
+ * Release a job's paid-lane reservation (failed / blocked renders are
+ * never charged). Idempotent: the job's lane flips paid →
+ * paid-released by conditional update, and only the caller whose
+ * flip lands returns the unit to the grant.
+ */
+export async function releaseClipFunding(jobId: string): Promise<void> {
+  await db.$transaction(async (tx) => {
+    const job = await tx.clipJob.findUnique({ where: { id: jobId }, select: { fundingLane: true, grantId: true } });
+    if (!job || job.fundingLane !== "paid" || !job.grantId) return;
+    const flip = await tx.clipJob.updateMany({
+      where: { id: jobId, fundingLane: "paid" },
+      data: { fundingLane: "paid-released" },
+    });
+    if (flip.count !== 1) return;
+    const grant = await tx.clipCreditGrant.findUnique({ where: { id: job.grantId } });
+    if (!grant) return;
+    const spent = Math.max(0, grant.spent - 1);
+    await tx.clipCreditGrant.update({
+      where: { id: grant.id },
+      data: { spent, spentAt: spent >= grant.amount ? grant.spentAt : null },
+    });
+  });
 }

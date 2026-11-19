@@ -9,8 +9,8 @@ integration surfaces (docs.whop.com). No mock endpoints, no fabricated APIs.
 | --- | --- | --- |
 | Log in with Whop | `/api/auth/whop` → `/api/auth/whop/callback` | OAuth 2.1 + PKCE (`https://api.whop.com/oauth/authorize`, `/oauth/token`, `/oauth/userinfo`) |
 | Session | HMAC-signed httpOnly cookie (`pr_session`) issued by our callback | Our own cookie — Whop access tokens expire in 1h and are never persisted |
-| Live plan updates | `/api/whop/webhook` (signature-verified, idempotent by `webhook-id`) | Standard Webhooks spec via `@whop/sdk` `unwrapWebhook`; events `membership.activated`, `membership.updated`, `payment.succeeded`, `payment.failed` |
-| Entitlement verification | `POST /api/whop/sync-entitlements` | `GET /api/v1/users/{id}/access/{resource_id}` (`access_level: customer \| admin \| no_access`) |
+| Live plan updates | `/api/whop/webhook` (signature-verified, receipt recorded after handling) | Standard Webhooks spec via `@whop/sdk` `unwrapWebhook`; events `membership.activated`, `membership.updated`, `membership.deactivated`, `payment.succeeded`, `payment.failed` |
+| Entitlement verification | `POST /api/whop/sync-entitlements` | Paginated `GET /api/v1/memberships` |
 | Subscriptions | Pricing cards open Whop-hosted checkout links | Dashboard → Checkout links; fulfillment via `payment.succeeded` webhook — never from the browser |
 | Usage limits | `src/lib/plans.ts` + `/api/generate` 402 guards | Local entitlement engine (monthly items, formats, languages per tier) |
 
@@ -28,6 +28,9 @@ integration surfaces (docs.whop.com). No mock endpoints, no fabricated APIs.
 
 - Developer Dashboard → API keys → copy → `WHOP_API_KEY`. Server-side only —
   it is never exposed to the client and never included in any response.
+- Set `WHOP_COMPANY_ID` to the owning account ID (`biz_...`). Both self-sync
+  and cancellation reconciliation need this ID and an API key that can list
+  the account's memberships.
 - Test in sandbox first: set `WHOP_API_ENV=sandbox` and use keys from
   <https://sandbox.whop.com/dashboard/developer> (no real money). Production
   keys live at <https://whop.com/dashboard/developer>. The two share no
@@ -38,15 +41,15 @@ integration surfaces (docs.whop.com). No mock endpoints, no fabricated APIs.
 1. Dashboard → Developer → **Create webhook** → URL
    `https://YOUR-DOMAIN/api/whop/webhook`
 2. Subscribe to events: `membership.activated`, `membership.updated`,
-   `payment.succeeded`, `payment.failed`.
+   `membership.deactivated`, `payment.succeeded`, `payment.failed`.
 3. Copy the signing secret (`ws_...`) → `WHOP_WEBHOOK_SECRET`.
    - Whop rejects localhost targets — use ngrok / Cloudflare Tunnel locally
      (docs.whop.com/developer/guides/webhooks).
-4. The handler verifies the HMAC signature before anything else, stores every
-   `webhook-id` (`WebhookEvent` table) for hard idempotency, and maps the
-   membership's `product_id`/`variant_id` to a plan tier via the env config
-   below. If delivery order matters (upgrades), it re-derives the plan from
-   the live access-check API when `WHOP_API_KEY` is set.
+4. The handler verifies the HMAC signature, rejects a supplied account ID
+   that differs from `WHOP_COMPANY_ID`, and records the receipt in
+   `WebhookEvent` after handling succeeds. It uses the event ID or, if absent,
+   the signed `webhook-id` header. Cancellations re-derive the tier from live
+   memberships; an incomplete listing leaves the plan unchanged.
 
 ## 4. Products per plan tier
 
@@ -62,8 +65,11 @@ WHOP_PLAN_ID_PRO=plan_xxx
 WHOP_PLAN_ID_AGENCY=plan_xxx
 ```
 
-Memberships matching no configured id are recorded but never change
-entitlements — nothing is hardcoded.
+Reconciliation checks eligible memberships against plan IDs first, then
+product IDs, highest tier first in each pass. Active, trialing, past due,
+completed, and canceling memberships qualify; admin access alone does not.
+Self-sync keeps the current tier and reports `incomplete: true` if it cannot
+finish listing memberships within ten pages.
 
 ## 5. Checkout links
 

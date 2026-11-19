@@ -68,15 +68,25 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     const tokenHash = await sha256Hex(token);
     const expiresAt = new Date(Date.now() + TOKEN_TTL_MS);
 
-    await db.$transaction([
-      db.clipJob.update({
-        where: { id: clip.id },
+    // Approve + mint in one transaction, guarded on the clip still
+    // being ready: two concurrent approvals used to both pass the
+    // status reads above and mint two live tokens. Only the caller
+    // whose conditional transition lands creates the token; the
+    // loser gets the already-approved answer.
+    const minted = await db.$transaction(async (tx) => {
+      const claim = await tx.clipJob.updateMany({
+        where: { id: clip.id, status: "ready" },
         data: { status: "approved", approvedAt: new Date() },
-      }),
-      db.clipExportToken.create({
+      });
+      if (claim.count !== 1) return false;
+      await tx.clipExportToken.create({
         data: { clipId: clip.id, userId: user.id, tokenHash, expiresAt },
-      }),
-    ]);
+      });
+      return true;
+    });
+    if (!minted) {
+      return NextResponse.json({ error: "Already approved." }, { status: 409 });
+    }
 
     // The approval is the lesson — captured once, after the row is written,
     // and never allowed to fail the request (see lib/clips/memory.ts).
@@ -93,7 +103,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       // Shown once. The page hands it to the worker; it is never stored raw.
       exportToken: token,
       expiresAt: expiresAt.toISOString(),
-      note: "Approved. Export needs this token — it expires in 24 hours and works once.",
+      note: "Approved — export token issued. It expires in 24 hours and works once; the export itself runs when the worker picks the token up.",
     });
   } catch (err) {
     return NextResponse.json(

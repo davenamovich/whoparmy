@@ -70,18 +70,20 @@ Respond with STRICT JSON only: {"items":[{"kind":string,"title":string,"body":st
       .filter(Boolean)
       .join("\n");
 
-    const raw = await chatCompletion(system, userPrompt).catch((err: unknown) => {
-      // failed generations are never charged
-      void recordUsage(user.id, "FAILED", 1, "meme-army-pack");
+    const raw = await chatCompletion(system, userPrompt).catch(async (err: unknown) => {
+      // failed generations are never charged — and the usage write is
+      // awaited, not floated: a fire-and-forget write raced the
+      // response and could be lost when the invocation ended.
+      await recordUsage(user.id, "FAILED", 1, "meme-army-pack");
       throw err;
     });
     const parsed = parseJsonSafe<{ items?: { kind?: string; title?: string; body?: string }[] }>(raw);
     if (!parsed?.items?.length) {
-      void recordUsage(user.id, "FAILED", 1, "meme-army-pack:unreadable");
+      await recordUsage(user.id, "FAILED", 1, "meme-army-pack:unreadable");
       return NextResponse.json({ error: "The engine returned an unreadable content pack. Try again." }, { status: 502 });
     }
 
-    void recordUsage(user.id, "TEXT", 1, "meme-army-pack");
+    await recordUsage(user.id, "TEXT", 1, "meme-army-pack");
     // War Room: a generated pack is a real work event — it earns XP.
     // XP is a reward, never a gate: a failure here must not fail the pack.
     void awardXp(user.id, "PACK_GENERATED", body.title?.slice(0, 80)).catch(() => {});

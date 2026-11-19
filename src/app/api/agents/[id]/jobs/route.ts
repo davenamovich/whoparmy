@@ -98,16 +98,36 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       );
     }
 
-    const used = hire.tokensUsed + cost;
-    const [job] = await db.$transaction([
-      db.agentJob.create({
-        data: { hireId: hire.id, userId: user.id, kind, brief: brief.slice(0, 2000), language, pieces, tokenCost: cost },
-      }),
-      db.hiredAgent.update({
+    // Reserve the fuel ATOMICALLY: re-read the hire inside the
+    // transaction and increment by delta. The pre-check above is a
+    // fast path only — two concurrent orders used to both pass it on
+    // the same stale tokensUsed and both write absolute totals,
+    // over-reserving the budget.
+    const job = await db.$transaction(async (tx) => {
+      const fresh = await tx.hiredAgent.findUnique({
         where: { id: hire.id },
-        data: { tokensUsed: used, status: used >= hire.tokenBudget ? "DEPLETED" : "ACTIVE" },
-      }),
-    ]);
+        select: { tokensUsed: true, tokenBudget: true },
+      });
+      if (!fresh || cost > fresh.tokenBudget - fresh.tokensUsed) return null;
+      const created = await tx.agentJob.create({
+        data: { hireId: hire.id, userId: user.id, kind, brief: brief.slice(0, 2000), language, pieces, tokenCost: cost },
+      });
+      const used = fresh.tokensUsed + cost;
+      await tx.hiredAgent.update({
+        where: { id: hire.id },
+        data: {
+          tokensUsed: { increment: cost },
+          status: used >= fresh.tokenBudget ? "DEPLETED" : "ACTIVE",
+        },
+      });
+      return created;
+    });
+    if (!job) {
+      return NextResponse.json(
+        { error: "This bot has used up its fuel for the month. Upgrade your plan — or connect your own key (BYOK) and the caps lift." },
+        { status: 402 },
+      );
+    }
     // Execute after the response is sent — the job flips QUEUED →
     // RUNNING → DONE/FAILED in the queue the member watches.
     after(async () => {

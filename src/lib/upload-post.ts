@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { fetchWithEgress } from "@/lib/egress";
 
 /**
  * ─── UPLOAD-POST, MEMBER LANE (Dave, 2026-11-18) ────────────────────
@@ -204,6 +205,27 @@ export interface UpPostInput {
 
 const MAX_MEDIA_BYTES = 200 * 1024 * 1024;
 
+/** Read a response body as a Blob, aborting the moment it passes the cap. */
+async function readBodyCapped(res: Response, cap: number): Promise<Blob> {
+  const declared = Number(res.headers.get("content-length") ?? 0);
+  if (declared > cap) throw new UpError(413, "That file is too large to post through Upload-Post.");
+  if (!res.body) return res.blob();
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > cap) {
+      await reader.cancel().catch(() => undefined);
+      throw new UpError(413, "That file is too large to post through Upload-Post.");
+    }
+    chunks.push(value);
+  }
+  return new Blob(chunks as BlobPart[], { type: res.headers.get("content-type") ?? "" });
+}
+
 export async function upPost(apiKey: string, input: UpPostInput): Promise<unknown> {
   if (!input.platforms.length) throw new UpError(400, "Pick at least one account to post to.");
   const firstComment =
@@ -225,13 +247,17 @@ export async function upPost(apiKey: string, input: UpPostInput): Promise<unknow
   if (!input.mediaUrl) throw new UpError(400, "That piece has no media to post.");
   let media: Response;
   try {
-    media = await fetch(input.mediaUrl, { signal: AbortSignal.timeout(60_000) });
+    // Egress policy on a member-supplied media URL (SSRF), then a
+    // STREAMED download with the size cap enforced while reading —
+    // the old flow buffered the whole body via blob() before the
+    // size check, so an oversized/hostile file landed in memory
+    // unbounded.
+    media = await fetchWithEgress(input.mediaUrl, { signal: AbortSignal.timeout(60_000) });
   } catch {
     throw new UpError(502, "Couldn't fetch that media file to post it. Nothing was posted.");
   }
   if (!media.ok) throw new UpError(502, "Couldn't fetch that media file to post it. Nothing was posted.");
-  const blob = await media.blob();
-  if (blob.size > MAX_MEDIA_BYTES) throw new UpError(413, "That file is too large to post through Upload-Post.");
+  const blob = await readBodyCapped(media, MAX_MEDIA_BYTES);
   const filename = input.mediaUrl.split("/").pop()?.split("?")[0] || (input.kind === "video" ? "video.mp4" : "image.png");
 
   const form = new FormData();

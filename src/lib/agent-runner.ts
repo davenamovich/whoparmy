@@ -1,6 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
-import { JOB_TIERS } from "@/lib/agents";
+import { JOB_TIERS, settleMarketListingForJob } from "@/lib/agents";
 import { MODEL_TIERS, awardXp } from "@/lib/game";
 import { recordUsage } from "@/lib/pr-engine";
 import { languageLabel } from "@/lib/languages";
@@ -156,9 +156,11 @@ export async function runAgentJob(jobId: string): Promise<void> {
   // charge is refunded because video is accounted in VIDEO usage
   // against the plan allowance, not hire tokens.
   if (job.kind === "VIDEO") {
+    // Delta refund of the order-time reservation (never an absolute
+    // value from the load-time snapshot — other jobs settle meanwhile).
     const refund = db.hiredAgent.update({
       where: { id: hire.id },
-      data: { tokensUsed: Math.max(0, hire.tokensUsed - job.tokenCost) },
+      data: { tokensUsed: { decrement: job.tokenCost } },
     });
     try {
       const { startVideoJob, VIDEO_FORMATS } = await import("@/lib/video-jobs");
@@ -223,9 +225,11 @@ export async function runAgentJob(jobId: string): Promise<void> {
   // dies with the lane). The brief is the member's business (a URL, a
   // link, or a sentence — or JSON {input, product, assessmentFit}).
   if (job.kind === "ASSESS") {
+    // Delta refund of the order-time reservation (never an absolute
+    // value from the load-time snapshot — other jobs settle meanwhile).
     const refund = db.hiredAgent.update({
       where: { id: hire.id },
-      data: { tokensUsed: Math.max(0, hire.tokensUsed - job.tokenCost) },
+      data: { tokensUsed: { decrement: job.tokenCost } },
     });
     try {
       let input = job.brief.trim();
@@ -353,11 +357,15 @@ export async function runAgentJob(jobId: string): Promise<void> {
       actualCost = Math.max(1, Math.ceil(result.totalTokens * COEF[result.model]));
     }
     const delta = actualCost - job.tokenCost;
-    const newUsed = Math.max(0, hire.tokensUsed + delta);
 
-    await db.$transaction([
-      db.agentJob.update({
-        where: { id: job.id },
+    // Settle exactly once, keyed on the job leaving RUNNING: only
+    // the caller whose conditional update lands moves the fuel, by
+    // the DELTA between actual and estimate, against a FRESH hire
+    // read (the load-time snapshot goes stale while the job runs).
+    // The floor is zero — a refund never drives tokensUsed negative.
+    await db.$transaction(async (tx) => {
+      const claimed = await tx.agentJob.updateMany({
+        where: { id: job.id, status: "RUNNING" },
         data: {
           status: "DONE",
           tokenCost: actualCost,
@@ -369,16 +377,30 @@ export async function runAgentJob(jobId: string): Promise<void> {
             provider: "starimg",
           }),
         },
-      }),
-      db.hiredAgent.update({
+      });
+      if (claimed.count !== 1) return;
+      const fresh = await tx.hiredAgent.findUnique({
+        where: { id: hire.id },
+        select: { tokensUsed: true, tokenBudget: true, status: true },
+      });
+      if (!fresh) return;
+      const newUsed = Math.max(0, fresh.tokensUsed + delta);
+      await tx.hiredAgent.update({
         where: { id: hire.id },
         data: {
           tokensUsed: newUsed,
-          status: hire.status === "PAUSED" ? "PAUSED" : newUsed >= hire.tokenBudget ? "DEPLETED" : "ACTIVE",
+          status: fresh.status === "PAUSED" ? "PAUSED" : newUsed >= fresh.tokenBudget ? "DEPLETED" : "ACTIVE",
         },
-      }),
-    ]);
+      });
+    });
 
+    // A claimed marketplace campaign settles its listing (exactly
+    // once, keyed on the listing's status transition).
+    if (job.kind === "CAMPAIGN") {
+      await settleMarketListingForJob(job.id, "DONE").catch((err) =>
+        console.error("[market] listing settle (DONE) failed", job.id, err),
+      );
+    }
     // Real finished work earns XP, same as a hand-run pack — and meme
     // output counts on the plan's monthly meme meter (the house lane
     // the member sees), one usage item per piece.
@@ -387,11 +409,12 @@ export async function runAgentJob(jobId: string): Promise<void> {
       await recordUsage(job.userId, "TEXT", job.pieces, "agent-job");
     }
   } catch (err) {
-    // Failed work is never charged: refund the full order-time charge.
-    const refundedUsed = Math.max(0, hire.tokensUsed - job.tokenCost);
-    await db.$transaction([
-      db.agentJob.update({
-        where: { id: job.id },
+    // Failed work is never charged: refund the full order-time
+    // charge — same exactly-once rule as settlement: only the caller
+    // that moves the job out of RUNNING refunds, by delta, floored.
+    await db.$transaction(async (tx) => {
+      const claimed = await tx.agentJob.updateMany({
+        where: { id: job.id, status: "RUNNING" },
         data: {
           status: "FAILED",
           result: JSON.stringify({
@@ -399,20 +422,86 @@ export async function runAgentJob(jobId: string): Promise<void> {
             provider: "starimg",
           }),
         },
-      }),
-      db.hiredAgent.update({
+      });
+      if (claimed.count !== 1) return;
+      const fresh = await tx.hiredAgent.findUnique({
+        where: { id: hire.id },
+        select: { tokensUsed: true, tokenBudget: true, status: true },
+      });
+      if (!fresh) return;
+      const refundedUsed = Math.max(0, fresh.tokensUsed - job.tokenCost);
+      await tx.hiredAgent.update({
         where: { id: hire.id },
         data: {
           tokensUsed: refundedUsed,
-          status: hire.status === "PAUSED" ? "PAUSED" : refundedUsed >= hire.tokenBudget ? "DEPLETED" : "ACTIVE",
+          status: fresh.status === "PAUSED" ? "PAUSED" : refundedUsed >= fresh.tokenBudget ? "DEPLETED" : "ACTIVE",
         },
-      }),
-    ]).catch(() => {});
+      });
+    }).catch(() => {});
+    if (job.kind === "CAMPAIGN") {
+      await settleMarketListingForJob(job.id, "FAILED").catch((err) =>
+        console.error("[market] listing settle (FAILED) failed", job.id, err),
+      );
+    }
   }
+}
+
+/**
+ * Recover stranded jobs: a job left RUNNING for over 20 minutes
+ * belongs to a worker that died mid-flight (deploy, crash). Fail it
+ * and refund its fuel exactly once — the refund rides the same
+ * conditional RUNNING → FAILED transition as a normal failure, so a
+ * worker that turns out to be merely slow cannot double-settle.
+ */
+export async function recoverStrandedJobs(userId: string): Promise<number> {
+  const cutoff = new Date(Date.now() - 20 * 60_000);
+  const stranded = await db.agentJob.findMany({
+    where: { userId, status: "RUNNING", updatedAt: { lt: cutoff } },
+    select: { id: true, hireId: true, tokenCost: true, kind: true },
+    take: 10,
+  });
+  let recovered = 0;
+  for (const job of stranded) {
+    const settled = await db.$transaction(async (tx) => {
+      const claimed = await tx.agentJob.updateMany({
+        where: { id: job.id, status: "RUNNING" },
+        data: {
+          status: "FAILED",
+          result: JSON.stringify({ error: "The run stalled and was recovered — its fuel was refunded.", provider: "runner-recovery" }),
+        },
+      });
+      if (claimed.count !== 1) return false;
+      const fresh = await tx.hiredAgent.findUnique({
+        where: { id: job.hireId },
+        select: { tokensUsed: true, tokenBudget: true, status: true },
+      });
+      if (fresh && job.tokenCost > 0) {
+        const refundedUsed = Math.max(0, fresh.tokensUsed - job.tokenCost);
+        await tx.hiredAgent.update({
+          where: { id: job.hireId },
+          data: {
+            tokensUsed: refundedUsed,
+            status: fresh.status === "PAUSED" ? "PAUSED" : refundedUsed >= fresh.tokenBudget ? "DEPLETED" : "ACTIVE",
+          },
+        });
+      }
+      return true;
+    }).catch(() => false);
+    if (settled) {
+      recovered += 1;
+      if (job.kind === "CAMPAIGN") {
+        await settleMarketListingForJob(job.id, "FAILED").catch((err) =>
+          console.error("[market] listing settle (recovery) failed", job.id, err),
+        );
+      }
+    }
+  }
+  return recovered;
 }
 
 /** Drain up to `limit` of one user's queued jobs (runner endpoint). */
 export async function runQueuedJobsForUser(userId: string, limit = 5): Promise<number> {
+  await recoverStrandedJobs(userId).catch(() => {});
   const queued = await db.agentJob.findMany({
     where: { userId, status: "QUEUED" },
     orderBy: { createdAt: "asc" },
