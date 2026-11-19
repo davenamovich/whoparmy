@@ -23,6 +23,7 @@ import { WarRoom } from "@/components/factory/war-room";
 import { AgentsView } from "@/components/factory/agents";
 import { RalphChat, type RalphNavIntent } from "@/components/factory/ralph-chat";
 import { TrendingView } from "@/components/factory/trending";
+import { AgentStart } from "@/components/factory/agent-start";
 import { CampaignsView } from "@/components/factory/campaigns";
 import { LibraryView } from "@/components/factory/library";
 import { BrandsView } from "@/components/factory/brands";
@@ -290,6 +291,10 @@ export default function Home() {
           ) : null}
           {view === "create" ? (
             <div className="space-y-12">
+              {/* The agent-led start (Dave, 2026-11-18): one input —
+                  website or CTA — then research + the agent handoff.
+                  Everything below this card is the manual stack. */}
+              <AgentStart />
               {/* Ralph entry card: the button-first door, one tap
                   from the room members land in. */}
               <button
@@ -304,6 +309,17 @@ export default function Home() {
                   <span className="block text-xs text-muted-foreground truncate">Free content · free AI audit · he remembers your business</span>
                 </span>
               </button>
+              {/* The manual stack, demoted (Dave, 2026-11-18):
+                  generation belongs in the member's agent; these
+                  stay for anyone who wants to make something by
+                  hand. */}
+              <div className="flex items-center gap-3 pt-2" aria-hidden>
+                <span className="h-px flex-1 bg-border" />
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Manual tools — most members hand this to their agent
+                </span>
+                <span className="h-px flex-1 bg-border" />
+              </div>
               {/* Jump chips (Dave, 2026-11-18: "where is reply guy" —
                   the Create room stacks everything, so the doors get
                   named shortcuts at the top). The row is a plain block
