@@ -182,14 +182,44 @@ const TOOL_IDS = new Set(FACTORY_TOOLS.map((t) => t.id));
  */
 export function weeklyContentSpec(planKey: string): string[] {
   const plan = getPlan(planKey);
-  const perWeek = Math.max(1, Math.round(plan.monthlyItems / 4));
+  // Panel verdict on the house blueprint (2026-11-19): the old
+  // closing line claimed ~23 credits sat "inside ~6 plan
+  // generations a week" on Trial — false, and it conflated two
+  // different meters. Honest accounting: engine CALLS are the
+  // unit; the plan's monthly generations cover calls up to its
+  // allowance, anything past that runs on the member's own key
+  // at 1 credit ($0.01) per call; a week connect link caps at
+  // 805 credits (the week bridge offer's budget).
   return [
-    "5 memes (~5 engine credits on your key)",
-    "3 social posts (~3 credits)",
-    "1 trending-angle pack (~15 credits)",
-    "1 lead-research pass (research time — no engine credits)",
-    `≈23 engine credits a week, inside your ~${perWeek} plan generations a week and the 805-credit bridge cap. These are planning targets — every run is quoted exactly before it spends.`,
+    "5 memes (~5 engine calls)",
+    "3 social posts (~3 calls)",
+    "1 trending-angle pack (~15 calls)",
+    "1 lead-research pass (research time — no engine calls)",
+    `≈23 engine calls a week. Your ${plan.name} plan includes ${plan.monthlyItems} generations a month; calls past that run on your own key at 1 credit ($0.01) each — about $0.23 a week at this rhythm. A week connect link caps at 805 credits; this spec uses ~3% of it. Targets, not charges: every run is quoted exactly before it spends.`,
   ];
+}
+
+/**
+ * Business-aware outcome (panel verdict, 2026-11-19): the old
+ * fallback objective imposed a trades frame ("booked work,
+ * estimate requests") on every business — wrong for a creator,
+ * an affiliate, an agency, or a platform. The outcome follows
+ * what the member promotes (quiz answer on file).
+ */
+export function outcomeFor(promoting: string | null): string {
+  switch (promoting) {
+    case "affiliate":
+      return "clicks through your links that become signups and sales";
+    case "creator":
+      return "viewers who subscribe, follow, and buy";
+    case "clients":
+      return "inquiries and bookings for the businesses you serve";
+    case "idea":
+      return "your first real audience and your first sales";
+    case "business":
+    default:
+      return "customers reaching out, booking, and buying";
+  }
 }
 
 /** Panel fix 5: the brand voice, from research when it names one. */
@@ -240,12 +270,15 @@ function fallbackBlueprint(ctx: SystemContext): Blueprint {
   const now = new Date().toISOString();
   return {
     status: "draft",
-    // Panel fix 1: the objective names the bookable outcome —
-    // content is the means, never the objective.
-    objective: `Turn ${biz}'s presence into booked work: a weekly rhythm of content that ends in inquiries and bookings, competitors watched and leads researched — without the owner doing the marketing by hand.`,
+    // Panel fix 1 + the house verdict: the objective names the
+    // outcome THIS business actually sells — content is the
+    // means, never the objective, and the frame follows the
+    // member's model (no bookings frame on a business that
+    // doesn't sell bookings).
+    objective: `Turn ${biz}'s presence into results: a weekly rhythm of content that ends in ${outcomeFor(ctx.promoting)} — trends watched, leads researched — without the owner doing the marketing by hand.`,
     opportunities: [
-      { title: "Content that ends in a booking", why: "Every week of posts points at one bookable outcome — an inquiry, an estimate request, a call — so the owner can see what the marketing produced." },
-      { title: "Competitor + trend watching", why: "Riding what is already working in your niche beats inventing angles from zero." },
+      { title: "Content that ends in a result", why: `Every week of posts points at the outcome that pays — ${outcomeFor(ctx.promoting)} — so the owner can see what the marketing produced.` },
+      { title: "Trend watching in your niche", why: "Riding what is already working in your niche beats inventing angles from zero — the Trend Scout watches it daily." },
       { title: "A free /before pack as the front door", why: "The Assessor turns your research into a spoken pitch + memes a prospect can say yes to." },
     ],
     // Priority order (panel fixes 1+5): angles → making → leads →
@@ -299,7 +332,7 @@ export async function draftBlueprint(user: { id: string; plan: string; whopId: s
           {
             role: "system",
             content:
-              "You are Muse, the P&R onboarding architect. You design a small AI workforce for a small-business owner from a FIXED catalog — never invent agents, tools, integrations, prices, or results. Plain language, no jargon, no earnings promises. Approval rules must keep a human approving anything that publishes, sends, or spends. The OBJECTIVE must name the member's bookable outcome (bookings, estimate requests, calls, sales) — content is the means, never the objective. Order the workforce: angle-finding first, content-making second, lead/outcome work third, then production support and QA — the first agents are the floor the member's plan seats, so order is a promise. Metrics measure outcomes (leads, inquiries, bookings) for roles that touch them; output counts only for pure production roles. Include a QA/editor step when the catalog offers one. " +
+              "You are Muse, the P&R onboarding architect. You design a small AI workforce for a small-business owner from a FIXED catalog — never invent agents, tools, integrations, prices, or results. Plain language, no jargon, no earnings promises. Approval rules must keep a human approving anything that publishes, sends, or spends. The OBJECTIVE must name the outcome THIS business actually sells — content is the means, never the objective. Match the frame to the business's model, from the research and what they promote: a local service business books jobs and estimate requests; a creator grows subscribers and sales; an affiliate earns signups and sales through their links; an agency wins inquiries for its clients; a software or platform business gets signups and customers. NEVER impose a bookings/estimates frame on a business that does not sell bookings. Opportunities may only promise capabilities the workforce you design actually staffs — never name an agent, monitor, or service in an opportunity that is not in the workforce. Order the workforce: angle-finding first, content-making second, lead/outcome work third, then production support and QA — the first agents are the floor the member's plan seats, so order is a promise. Metrics measure outcomes (leads, inquiries, bookings) for roles that touch them; output counts only for pure production roles. Include a QA/editor step when the catalog offers one. " +
               `Reply with ONLY JSON: {"objective":"...","opportunities":[{"title":"...","why":"..."}],"workforce":[{"templateKey":"<catalog key>","name":"...","mission":"...","schedule":"Daily|Weekly|On demand","approval":"...","metric":"..."}],"workflows":[{"name":"...","flow":"..."}]} — exactly 3 opportunities, 3–5 workforce agents, 2–3 workflows. For a "custom" agent also include "tools":[<tool ids>] and "instructions":"...".`,
           },
           {
