@@ -40,6 +40,10 @@ const PUBLIC_API_PREFIXES = [
   // floor must not block it first (2026-11-19: the daily X-trends cron
   // failed with 401 "Sign in required" until this line was added).
   "/api/trends/ingest",
+  // Expert Panel runner door (2026-11-19): carries its own key
+  // (x-panel-key vs PANEL_RUNNER_KEY), checked inside the handler.
+  // The member-facing /api/panel stays behind the session floor.
+  "/api/panel/runner",
 ];
 
 // Same value as SESSION_COOKIE in lib/whop.ts — duplicated because

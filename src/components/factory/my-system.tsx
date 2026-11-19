@@ -69,11 +69,22 @@ export function MySystemView() {
   const [briefing, setBriefing] = useState<Briefing | null>(null);
   const [setup, setSetup] = useState<{ eligible: boolean; link: string | null; prompt: string } | null>(null);
   const [busySetup, setBusySetup] = useState(false);
+  const [panel, setPanel] = useState<{
+    status: string;
+    verdict?: { summary: string; lenses: { lens: string; findings: string }[]; fixes: string[] };
+  } | null>(null);
+  const [busyPanel, setBusyPanel] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<"draft" | "approve" | null>(null);
 
   const load = useCallback(async () => {
     try {
+      void fetch("/api/panel")
+        .then((r) => r.json())
+        .then((d: { panel?: typeof panel }) => {
+          if (d.panel) setPanel(d.panel);
+        })
+        .catch(() => undefined);
       const res = await fetch("/api/blueprint");
       const data = (await res.json().catch(() => ({}))) as {
         blueprint?: Bp | null;
@@ -119,6 +130,21 @@ export function MySystemView() {
       toast.error(e instanceof Error ? e.message : "Setup failed");
     } finally {
       setBusySetup(false);
+    }
+  }
+
+  async function requestPanelReview() {
+    setBusyPanel(true);
+    try {
+      const res = await fetch("/api/panel", { method: "POST" });
+      const data = (await res.json().catch(() => ({}))) as { panel?: typeof panel; error?: string };
+      if (!res.ok || !data.panel) throw new Error(data.error ?? "Panel request failed");
+      setPanel(data.panel);
+      toast.success("Sent to the expert panel — the verdict lands here.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Panel request failed");
+    } finally {
+      setBusyPanel(false);
     }
   }
 
@@ -209,6 +235,46 @@ export function MySystemView() {
         ) : (
           <Button onClick={() => void craftSetup()} disabled={busySetup}>
             {busySetup ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />} Craft my Day-1 setup prompt
+          </Button>
+        )}
+      </div>
+
+      <div className="rounded-2xl border bg-card p-5 sm:p-6 space-y-3">
+        <p className="font-semibold">Expert panel — four specialists review your system</p>
+        <p className="text-sm text-muted-foreground">
+          Before you run on a plan, send it to the panel: an Offer expert, a Content Engine expert, a
+          Funnel expert, and a Risk &amp; Honesty expert each review your blueprint and Day-1 setup as
+          their own assignment, then a single verdict with fixes comes back here.
+        </p>
+        {panel?.status === "reviewed" && panel.verdict ? (
+          <div className="space-y-3">
+            <p className="text-sm"><span className="font-medium">Verdict:</span> {panel.verdict.summary}</p>
+            {panel.verdict.fixes.length ? (
+              <div className="space-y-1.5">
+                <p className="text-sm font-semibold">Fixes that matter most</p>
+                {panel.verdict.fixes.map((f, i) => (
+                  <p key={i} className="text-sm text-muted-foreground">• {f}</p>
+                ))}
+              </div>
+            ) : null}
+            <div className="space-y-1.5">
+              {panel.verdict.lenses.map((l) => (
+                <p key={l.lens} className="text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">{l.lens}:</span> {l.findings}
+                </p>
+              ))}
+            </div>
+            <Button variant="outline" onClick={() => void requestPanelReview()} disabled={busyPanel}>
+              {busyPanel ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Send it again
+            </Button>
+          </div>
+        ) : panel?.status === "queued" || panel?.status === "in-review" ? (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> With the panel now — the verdict lands here when the four experts are done.
+          </p>
+        ) : (
+          <Button onClick={() => void requestPanelReview()} disabled={busyPanel}>
+            {busyPanel ? <Loader2 className="h-4 w-4 animate-spin" /> : <Network className="h-4 w-4" />} Send to the expert panel
           </Button>
         )}
       </div>
