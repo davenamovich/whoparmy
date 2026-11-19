@@ -291,7 +291,7 @@ function readLinks(raw: unknown, defaultSeconds: number): LinkInput[] {
   });
 }
 
-async function batch(user: ClipUser, args: Args) {
+async function batch(user: ClipUser, args: Args, bridgeTokenId?: string) {
   const pageId = asString(args.page_id, "page_id", true)!;
   const defaultSeconds = clipSeconds(args.clip_seconds);
   const links = readLinks(args.links, defaultSeconds);
@@ -307,6 +307,7 @@ async function batch(user: ClipUser, args: Args) {
       clipSeconds: l.clipSeconds,
     })),
     defaultSeconds,
+    bridgeTokenId,
   );
 
   if (result.error && result.created.length === 0 && result.refused.length === 0) {
@@ -436,7 +437,7 @@ async function markPosted(user: ClipUser, args: Args) {
 
 export type ClipToolResult = { content: Array<{ type: "text"; text: string }>; isError?: boolean };
 
-export async function callClipTool(user: ClipUser, name: string, args: Args = {}): Promise<ClipToolResult> {
+export async function callClipTool(user: ClipUser, name: string, args: Args = {}, bridgeTokenId?: string): Promise<ClipToolResult> {
   try {
     switch (name) {
       case "clip_page_setup":
@@ -444,7 +445,7 @@ export async function callClipTool(user: ClipUser, name: string, args: Args = {}
       case "clip_page_get":
         return await pageGet(user, args);
       case "clip_batch":
-        return await batch(user, args);
+        return await batch(user, args, bridgeTokenId);
       case "clip_queue":
         return await queue(user, args);
       case "clip_get":

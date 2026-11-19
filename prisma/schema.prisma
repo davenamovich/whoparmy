@@ -541,6 +541,8 @@ model BridgeToken {
   budgetCredits Int
   scope         String    @default("week") // inherited from the code it was exchanged from; enforced on every MCP call
   spentCredits  Int       @default(0)
+  pendingCredits Int      @default(0) // budget reserved by in-flight proxied calls; settled or released exactly once per call
+  pendingSince  DateTime? // when the oldest live reservation was placed (stale-reservation sweep)
   expiresAt     DateTime
   revokedAt     DateTime?
   lastUsedAt    DateTime?
@@ -605,6 +607,7 @@ model RotatorPlacement {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   partner   String // BRIDGE_PARTNERS key
   date      String // ET yyyy-mm-dd the placement runs (24h, that day)
+  url       String? // the member's link AS SAVED when the day was earned; later edits don't rewrite an earned day
   createdAt DateTime @default(now())
 
   @@unique([userId, partner])
@@ -791,6 +794,7 @@ model ClipJob {
   series        String?
   episode       Int?
   engineJobId   String?
+  bridgeTokenId String? // set when queued through the Muse bridge; the worker re-checks the token is live before charging
   attempts      Int      @default(0) // the worker retries once, then fails
   blockedReason String? // guard code + hint when status = blocked
   approvedAt    DateTime? // written only by the review desk

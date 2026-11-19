@@ -387,6 +387,8 @@ CREATE TABLE "BridgeToken" (
     "budgetCredits" INTEGER NOT NULL,
     "scope" TEXT NOT NULL DEFAULT 'week',
     "spentCredits" INTEGER NOT NULL DEFAULT 0,
+    "pendingCredits" INTEGER NOT NULL DEFAULT 0,
+    "pendingSince" DATETIME,
     "expiresAt" DATETIME NOT NULL,
     "revokedAt" DATETIME,
     "lastUsedAt" DATETIME,
@@ -429,6 +431,7 @@ CREATE TABLE "RotatorPlacement" (
     "userId" TEXT NOT NULL,
     "partner" TEXT NOT NULL,
     "date" TEXT NOT NULL,
+    "url" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "RotatorPlacement_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );

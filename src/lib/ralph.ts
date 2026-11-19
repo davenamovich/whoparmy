@@ -6,6 +6,7 @@ import { getTrending } from "@/lib/trends";
 import { getLadder, starimgConfig } from "@/lib/llm-policy";
 import { HOUSE_PERSON, mnemosCapture, mnemosPersonFor, mnemosRecall, mnemosSnapshot } from "@/lib/mnemos-bridge";
 import { BridgeError, assertBridgeEligible, bridgeOffer, getMemberEngineKey, mintBridgeCode } from "@/lib/muse-bridge";
+import { redactBridgeSecrets } from "@/lib/bridge-redact";
 import { museWeekCommand } from "@/lib/muse-week-command";
 
 /**
@@ -312,9 +313,12 @@ export async function ralphFreeText(userId: string, locale: string, text: string
     return { text: "My language brain isn't wired on this deployment yet — but the buttons all work. Tap one and I'll route it.", actions: RALPH_MENU.slice(0, 3) };
   }
   const ladder = await getLadder("mid");
+  // Bridge codes and tokens are minted IN this chat, so they sit in
+  // the stored history. Redact them from the model-bound copy: the
+  // prompt (and its logs) must never carry a live bridge secret.
   const context =
     `Member language: ${locale}\nBrand: ${brand ?? "(none on file)"}\nRemembered facts:\n${recalled ?? "(nothing recalled)"}\n\n` +
-    `Recent conversation:\n${history.slice(-6).map((h) => `${h.role}: ${h.text}`).join("\n")}\n\nMember now says: ${text}`;
+    `Recent conversation:\n${history.slice(-6).map((h) => `${h.role}: ${redactBridgeSecrets(h.text)}`).join("\n")}\n\nMember now says: ${redactBridgeSecrets(text)}`;
   for (const model of ladder) {
     try {
       const res = await fetch(`${cfg.base}/chat/completions`, {

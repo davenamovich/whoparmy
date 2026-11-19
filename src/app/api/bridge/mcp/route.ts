@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { BridgeError, proxyToolCall, proxyToolsList, verifyBridgeToken } from "@/lib/muse-bridge";
+import { BridgeError, hasLinkedCreditAccount, proxyToolCall, proxyToolsList, verifyBridgeToken } from "@/lib/muse-bridge";
 import { CLIP_TOOLS, callClipTool, isClipTool } from "@/lib/clips/tools";
 
 export const runtime = "nodejs";
@@ -80,11 +80,13 @@ export async function POST(req: NextRequest) {
 
   try {
     if (method === "tools/list") {
-      // The member sees the engine's allowlisted tools plus the Clipper's
-      // local family — one list, so Muse does not need to know which side
-      // of the bridge a tool lives on.
+      // The member sees the engine's allowlisted tools plus — for a
+      // CLIPS-scope token only — the Clipper's local family. A week
+      // token never sees the clip tools: scopes are separate products
+      // and never mix.
       const proxied = (await proxyToolsList(session)) as { tools?: unknown[] };
-      return rpcResult(id, { ...proxied, tools: [...(proxied.tools ?? []), ...CLIP_TOOLS] });
+      const clipTools = session.scope === "clips" ? CLIP_TOOLS : [];
+      return rpcResult(id, { ...proxied, tools: [...(proxied.tools ?? []), ...clipTools] });
     }
     if (method === "tools/call") {
       const params = (body.params ?? {}) as { name?: unknown; arguments?: unknown };
@@ -92,7 +94,23 @@ export async function POST(req: NextRequest) {
       if (!name) return rpcError(id, -32602, "Missing tool name");
       const args = (params.arguments && typeof params.arguments === "object" ? params.arguments : {}) as Record<string, unknown>;
       if (isClipTool(name)) {
-        return rpcResult(id, await callClipTool(session.user, name, args));
+        // Clip tools are local and were previously dispatched for ANY
+        // bridge session with no scope or eligibility check at all.
+        // They belong to the clips scope, and eligibility (a linked
+        // credit account) is re-checked at dispatch, not just mint.
+        if (session.scope !== "clips") {
+          return rpcResult(id, {
+            isError: true,
+            content: [{ type: "text", text: `${name} belongs to the Clip Factory connection. This is a /muse-week connection; clip tools need their own clips connection from the Clip Factory in Whoparmy.` }],
+          });
+        }
+        if (!hasLinkedCreditAccount(session.user)) {
+          return rpcResult(id, {
+            isError: true,
+            content: [{ type: "text", text: "This clips connection's account is no longer linked to a Plunder & Riffle credit account. Nothing was charged. The member can re-link by signing in with Whop." }],
+          });
+        }
+        return rpcResult(id, await callClipTool(session.user, name, args, session.tokenId));
       }
       const { reply } = await proxyToolCall(session, name, args);
       if (reply.error) return rpcError(id, reply.error.code ?? -32603, reply.error.message ?? "Engine error");

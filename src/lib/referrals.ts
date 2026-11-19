@@ -122,7 +122,14 @@ export async function attributeReferral(userId: string, rawCode: string) {
   const referrer = await db.user.findUnique({ where: { refCode: code }, select: { id: true } });
   if (!referrer) return { ok: false as const, reason: "unknown-code" };
   if (referrer.id === userId) return { ok: false as const, reason: "self" };
-  await db.user.update({ where: { id: userId }, data: { referredById: referrer.id } });
+  // Conditional claim: two concurrent attributions with different
+  // codes must not both win (the read above is only a pre-check).
+  // Only the caller whose update lands pays the join XP.
+  const claimed = await db.user.updateMany({
+    where: { id: userId, referredById: null },
+    data: { referredById: referrer.id },
+  });
+  if (claimed.count !== 1) return { ok: false as const, reason: "already-attributed" };
   await awardXp(referrer.id, "REFERRAL_JOINED", code).catch(() => {});
   return { ok: true as const, referrerId: referrer.id };
 }

@@ -56,6 +56,8 @@ export const BRIDGE_CODE_TTL_MS = 15 * 60_000; // copy → paste → Muse's firs
  *  this number and the bot-quoted balance before anything spends. */
 export const WEEK_BUDGET_CREDITS = 7 * 115;
 export const MAX_BUDGET_CREDITS = 5000;
+/** A budget reservation older than this is presumed abandoned and swept. */
+export const RESERVATION_STALE_MS = 15 * 60_000;
 
 // ─── The offers (Dave, 2026-11-17: add both variants) ───────────────
 // Three sizes of the same special offer, all Operator + Agency. The
@@ -131,6 +133,18 @@ export function normalizeScope(raw: unknown): BridgeScope {
   return raw === "clips" ? "clips" : "week";
 }
 
+/**
+ * Strict scope read for stored rows: only the two real scopes are
+ * valid. Anything else (legacy junk, corruption, a hand-edited row)
+ * is NOT silently upgraded to the week offer — callers treat null as
+ * an invalid code/token and refuse.
+ */
+export function scopeFromStored(raw: unknown): BridgeScope | null {
+  return raw === "week" || raw === "clips" ? raw : null;
+}
+
+export { redactBridgeSecrets } from "./bridge-redact";
+
 // ─── Clips eligibility — any member spending their own credits ──────
 // Dave, 2026-11-18: the Clip Factory is open to ANY signed-in member
 // whose account is linked to a P&R credit account (their derived
@@ -175,11 +189,10 @@ export const BRIDGE_GENERATING_COSTS: Record<string, number> = {
   create_before_pitch: 50,
   generate_ad_creative: 60,
   generate_multilanguage_ads: 60,
-  // The clipping agent: one public clip in, one captioned 9:16 post out, no
-  // host (`.agents/skills/clipping-agent/SKILL.md`). 25 list credits is the
-  // engine's own price for a sit-down; without this entry the Clipper could
-  // queue a batch through the bridge and then be unable to render any of it.
-  create_sitdown: 25,
+  // create_sitdown is deliberately NOT here: it belongs to the Clip
+  // Factory's scope (below). When it also sat in the week table, a
+  // week token could call the engine's general sit-down directly and
+  // walk around both the plan gate and the clip intake.
 };
 
 /**
@@ -199,7 +212,9 @@ export function generatingCostsForScope(scope: BridgeScope): Record<string, numb
 }
 
 export function bridgeToolAllowedForScope(scope: BridgeScope, name: string): boolean {
-  return BRIDGE_FREE_TOOLS.has(name) || name in generatingCostsForScope(scope);
+  // Object.hasOwn, never `in`: `in` walks the prototype chain, so a
+  // tool literally named "constructor" or "toString" would pass.
+  return BRIDGE_FREE_TOOLS.has(name) || Object.hasOwn(generatingCostsForScope(scope), name);
 }
 
 /** Week-scope check (the original behavior, kept for existing callers). */
@@ -210,8 +225,16 @@ export function bridgeToolAllowed(name: string): boolean {
 export function estimateToolCostForScope(scope: BridgeScope, name: string, args: Record<string, unknown>): number {
   const base = generatingCostsForScope(scope)[name] ?? 0;
   if (name === "generate_multilanguage_ads" && Array.isArray(args.languages)) {
-    // List pricing is per language; reserve for every language asked for.
-    return base * Math.max(1, Math.min(10, args.languages.length));
+    // List pricing is per language; reserve per DISTINCT language
+    // (duplicates don't render twice), capped at the engine's six.
+    const distinct = new Set(
+      args.languages.filter((l): l is string => typeof l === "string").map((l) => l.trim().toLowerCase()),
+    ).size;
+    return base * Math.max(1, Math.min(6, distinct));
+  }
+  if (name === "create_before_pitch" && typeof args.song_url === "string" && args.song_url.trim()) {
+    // The engine charges +30 for the bonus song video (song_url arg).
+    return base + 30;
   }
   return base;
 }
@@ -406,14 +429,25 @@ export async function mintBridgeCode(
   budgetCredits: number,
   scope: BridgeScope = "week",
 ): Promise<{ code: string; expiresAt: Date; budgetCredits: number; scope: BridgeScope }> {
-  const budget = Math.max(1, Math.min(MAX_BUDGET_CREDITS, Math.trunc(budgetCredits) || WEEK_BUDGET_CREDITS));
+  // Week codes fall back to the standing offer budget; clips codes
+  // snapshot the member's own balance, where ZERO is a real value
+  // (an empty account gets a zero-budget connection, not the week's
+  // 805-credit default smuggled in by a falsy check).
+  const truncated = Math.trunc(budgetCredits);
+  const budget =
+    scope === "clips"
+      ? Math.max(0, Math.min(MAX_BUDGET_CREDITS, Number.isFinite(truncated) ? truncated : 0))
+      : Math.max(1, Math.min(MAX_BUDGET_CREDITS, truncated || WEEK_BUDGET_CREDITS));
   const code = newBridgeCode();
   const expiresAt = new Date(Date.now() + BRIDGE_CODE_TTL_MS);
   // A fresh code retires every unused one before it: only one live code
   // per member (across BOTH scopes), so a code left on an old page can
-  // never be exchanged.
-  await db.bridgeCode.updateMany({ where: { userId, usedAt: null }, data: { usedAt: new Date() } });
-  await db.bridgeCode.create({ data: { userId, codeHash: sha256(code), budgetCredits: budget, expiresAt, scope } });
+  // never be exchanged. Retire + create run in ONE transaction: two
+  // concurrent mints can no longer interleave into two live codes.
+  await db.$transaction(async (tx) => {
+    await tx.bridgeCode.updateMany({ where: { userId, usedAt: null }, data: { usedAt: new Date() } });
+    await tx.bridgeCode.create({ data: { userId, codeHash: sha256(code), budgetCredits: budget, expiresAt, scope } });
+  });
   return { code, expiresAt, budgetCredits: budget, scope };
 }
 
@@ -422,7 +456,8 @@ export async function exchangeBridgeCode(rawCode: string): Promise<{ token: stri
   if (!code) throw new BridgeError(400, "BAD_CODE", "That bridge code isn't valid.");
   const row = await db.bridgeCode.findUnique({ where: { codeHash: sha256(code) } });
   if (!row || row.usedAt) throw new BridgeError(400, "BAD_CODE", "That bridge code isn't valid.");
-  const scope = normalizeScope(row.scope);
+  const scope = scopeFromStored(row.scope);
+  if (!scope) throw new BridgeError(400, "BAD_CODE", "That bridge code isn't valid.");
   if (row.expiresAt.getTime() <= Date.now()) {
     throw new BridgeError(400, "BAD_CODE", `That bridge code expired. Generate a fresh one ${scope === "clips" ? "in the Clip Factory" : "on /muse-week"}.`);
   }
@@ -435,16 +470,21 @@ export async function exchangeBridgeCode(rawCode: string): Promise<{ token: stri
   if (!owner) throw new BridgeError(400, "BAD_CODE", "That bridge code isn't valid.");
   if (scope === "clips") assertClipsEligible(owner);
   else assertBridgeEligible(owner);
-  // Single-use: claim it before minting, so a raced double exchange fails.
-  const claimed = await db.bridgeCode.updateMany({
-    where: { id: row.id, usedAt: null },
-    data: { usedAt: new Date() },
-  });
-  if (claimed.count !== 1) throw new BridgeError(400, "BAD_CODE", "That bridge code isn't valid.");
+  // Single-use: claim the code AND create the token in one
+  // transaction — a crash between the two used to burn the code
+  // without issuing a token. A raced double exchange fails the
+  // conditional claim and rolls the whole exchange back.
   const token = BRIDGE_TOKEN_PREFIX + randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + BRIDGE_TOKEN_TTL_MS);
-  await db.bridgeToken.create({
-    data: { userId: row.userId, tokenHash: sha256(token), budgetCredits: row.budgetCredits, expiresAt, scope },
+  await db.$transaction(async (tx) => {
+    const claimed = await tx.bridgeCode.updateMany({
+      where: { id: row.id, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+    if (claimed.count !== 1) throw new BridgeError(400, "BAD_CODE", "That bridge code isn't valid.");
+    await tx.bridgeToken.create({
+      data: { userId: row.userId, tokenHash: sha256(token), budgetCredits: row.budgetCredits, expiresAt, scope },
+    });
   });
   return { token, expiresAt, budgetCredits: row.budgetCredits, userId: row.userId, scope };
 }
@@ -463,9 +503,11 @@ export async function findLiveBridgeCode(
   if (!code) return null;
   const row = await db.bridgeCode.findUnique({ where: { codeHash: sha256(code) }, include: { user: true } });
   if (!row || row.usedAt || row.expiresAt.getTime() <= Date.now()) return null;
+  const scope = scopeFromStored(row.scope);
+  if (!scope) return null;
   return {
     budgetCredits: row.budgetCredits,
-    scope: normalizeScope(row.scope),
+    scope,
     expiresAt: row.expiresAt,
     user: row.user,
   };
@@ -484,6 +526,8 @@ export async function verifyBridgeToken(raw: string | null): Promise<BridgeSessi
   if (!raw || !raw.startsWith(BRIDGE_TOKEN_PREFIX)) return null;
   const row = await db.bridgeToken.findUnique({ where: { tokenHash: sha256(raw) }, include: { user: true } });
   if (!row || row.revokedAt || row.expiresAt.getTime() <= Date.now()) return null;
+  const scope = scopeFromStored(row.scope);
+  if (!scope) return null; // unknown stored scope: not a usable token
   await db.bridgeToken.update({ where: { id: row.id }, data: { lastUsedAt: new Date() } }).catch(() => undefined);
   return {
     tokenId: row.id,
@@ -491,7 +535,7 @@ export async function verifyBridgeToken(raw: string | null): Promise<BridgeSessi
     budgetCredits: row.budgetCredits,
     spentCredits: row.spentCredits,
     expiresAt: row.expiresAt,
-    scope: normalizeScope(row.scope),
+    scope,
   };
 }
 
@@ -550,49 +594,114 @@ export async function proxyToolCall(session: BridgeSession, name: string, args: 
   }
 
   const member = await getMemberEngineKey(session.user);
-  const generating = name in costs;
+  const generating = Object.hasOwn(costs, name);
   const reserve = generating ? estimateToolCostForScope(session.scope, name, args) : 0;
 
+  // Budget RESERVATION, before dispatch (generating calls only). The
+  // old flow checked the budget, dispatched, and incremented spent
+  // afterwards — two concurrent calls could both pass the check on
+  // the same stale spent figure and both settle past the cap. Now
+  // the reserve lands atomically first (spent + pending + reserve
+  // must fit), and every exit path settles or releases it exactly
+  // once. A reservation older than the stale window is presumed
+  // abandoned (its caller died mid-flight) and swept back.
+  const settleReservation = async (charged: number): Promise<void> => {
+    if (!generating) return;
+    const apply = async (amount: number) => {
+      await db.$transaction(async (tx) => {
+        const tok = await tx.bridgeToken.findUnique({ where: { id: session.tokenId } });
+        if (!tok) return;
+        const pending = Math.max(0, tok.pendingCredits - reserve);
+        await tx.bridgeToken.update({
+          where: { id: tok.id },
+          data: {
+            pendingCredits: pending,
+            pendingSince: pending > 0 ? tok.pendingSince : null,
+            spentCredits: tok.spentCredits + amount,
+          },
+        });
+      });
+    };
+    try {
+      await apply(charged);
+    } catch {
+      try {
+        await apply(charged);
+      } catch (err) {
+        // Fail closed: if the true settlement cannot be written, the
+        // reserve itself becomes the charge rather than vanishing.
+        console.error("[bridge] settlement failed twice; charging the reserve", session.tokenId, name, err);
+        await apply(reserve).catch((e) => console.error("[bridge] fail-closed settlement also failed", session.tokenId, name, e));
+      }
+    }
+  };
+
   if (generating) {
-    const current = await db.bridgeToken.findUnique({ where: { id: session.tokenId } });
-    const spent = current?.spentCredits ?? session.spentCredits;
-    if (spent + reserve > session.budgetCredits) {
+    const now = Date.now();
+    const reservation = await db.$transaction(async (tx) => {
+      const tok = await tx.bridgeToken.findUnique({ where: { id: session.tokenId } });
+      if (!tok || tok.revokedAt || tok.expiresAt.getTime() <= now) return { ok: false as const, dead: true, spent: 0 };
+      let pending = tok.pendingCredits;
+      let pendingSince = tok.pendingSince;
+      if (pending > 0 && pendingSince && now - pendingSince.getTime() > RESERVATION_STALE_MS) {
+        pending = 0;
+        pendingSince = null;
+      }
+      if (tok.spentCredits + pending + reserve > tok.budgetCredits) {
+        return { ok: false as const, dead: false, spent: tok.spentCredits + pending };
+      }
+      await tx.bridgeToken.update({
+        where: { id: tok.id },
+        data: { pendingCredits: pending + reserve, pendingSince: pendingSince ?? new Date() },
+      });
+      return { ok: true as const, dead: false, spent: tok.spentCredits };
+    });
+    if (!reservation.ok) {
+      if (reservation.dead) {
+        return toolError("This bridge connection has expired or been revoked. Nothing was charged. The member can open a fresh connection in Whoparmy.");
+      }
       return toolError(
         session.scope === "clips"
-          ? `This ${name} call would exceed this connection's approved budget (${session.budgetCredits} credits — the member's own balance when the connection was approved, ${spent} already spent). Nothing was charged. The member can approve a new clips connection in Whoparmy.`
-          : `This ${name} call would exceed the week's approved budget (${session.budgetCredits} credits, ${spent} already spent). Nothing was charged. The member can approve a new week budget on /muse-week.`,
+          ? `This ${name} call would exceed this connection's approved budget (${session.budgetCredits} credits — the member's own balance when the connection was approved, ${reservation.spent} already spent or in flight). Nothing was charged. The member can approve a new clips connection in Whoparmy.`
+          : `This ${name} call would exceed the week's approved budget (${session.budgetCredits} credits, ${reservation.spent} already spent or in flight). Nothing was charged. The member can approve a new week budget on /muse-week.`,
       );
     }
   }
 
   const preCredits = generating ? await getMemberCredits(member.key) : null;
-  const reply = await mcpCall(member.key, "tools/call", { name, arguments: args });
+  let reply: McpReply;
+  try {
+    reply = await mcpCall(member.key, "tools/call", { name, arguments: args });
+  } catch (err) {
+    await settleReservation(0);
+    throw err;
+  }
   if (!generating || reply.result?.isError || reply.error) {
+    await settleReservation(0);
     return { reply, charged: 0 };
   }
 
-  // Settle: prefer the engine's own post-call balance; fall back to a
-  // creditCost field, then to the reserve. A failure refunded bot-side
-  // shows a zero delta and settles at zero.
+  // Settle at the ACTUAL charge for THIS call. The reply's own
+  // creditCost is call-specific and wins; the member's whole-key
+  // balance delta is only the fallback (concurrent activity on the
+  // same key would otherwise be billed to this call). A failure
+  // refunded bot-side settles at zero.
   const payload = resultPayload(reply);
   const reported = payload && typeof payload.creditsRemaining === "number" ? payload.creditsRemaining : null;
   const postCredits = reported ?? (await getMemberCredits(member.key));
   let charged: number;
-  if (preCredits !== null && postCredits !== null && preCredits >= 0 && postCredits >= 0) {
-    charged = Math.max(0, preCredits - postCredits);
-  } else if (payload && typeof payload.creditCost === "number") {
+  if (payload && typeof payload.creditCost === "number") {
     charged = Math.max(0, Math.trunc(payload.creditCost));
+  } else if (preCredits !== null && postCredits !== null && preCredits >= 0 && postCredits >= 0) {
+    charged = Math.max(0, preCredits - postCredits);
   } else if (preCredits === -1 || postCredits === -1) {
     charged = 0; // unlimited key: no balance moves, nothing to settle
   } else {
     charged = reserve;
   }
 
+  await settleReservation(charged);
   if (charged > 0) {
-    await db.bridgeToken.update({
-      where: { id: session.tokenId },
-      data: { spentCredits: { increment: charged } },
-    }).catch(() => undefined);
     await db.usageRecord.create({
       data: { userId: session.user.id, kind: "BRIDGE", count: 1, meta: `muse-bridge:${name}:${charged}cr` },
     }).catch(() => undefined);
@@ -611,7 +720,18 @@ export async function proxyToolsList(session: BridgeSession): Promise<unknown> {
   const member = await getMemberEngineKey(session.user);
   const reply = await mcpCall(member.key, "tools/list", {});
   const tools = (reply.result as unknown as { tools?: Array<{ name?: string }> } | undefined)?.tools;
-  if (!Array.isArray(tools)) return reply.result ?? { tools: [] };
+  if (!Array.isArray(tools)) {
+    // Upstream list unusable: synthesize the allowlist itself rather
+    // than handing the member's agent an empty tool list.
+    const names = [...BRIDGE_FREE_TOOLS, ...Object.keys(generatingCostsForScope(session.scope))];
+    return {
+      tools: names.map((name) => ({
+        name,
+        description: "Plunder & Riffle engine tool, available through the Muse bridge.",
+        inputSchema: { type: "object", properties: {} },
+      })),
+    };
+  }
   return { tools: tools.filter((t) => typeof t.name === "string" && bridgeToolAllowedForScope(session.scope, t.name)) };
 }
 

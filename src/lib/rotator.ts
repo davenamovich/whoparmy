@@ -88,8 +88,9 @@ function etHour(d = new Date()): number {
  * PLUS every free placement earned for that day (Dave, 2026-11-17:
  * signing up for an offer earns 24 hours free in the rotator for
  * that offer — see RotatorPlacement in lib/bridge.ts). A placement
- * features the member's CURRENT saved link for the partner; a
- * deleted link drops out of the pool on its own.
+ * serves the URL snapshotted when the day was earned (later edits
+ * don't rewrite an earned day); legacy rows without a snapshot fall
+ * back to the current link, and a deleted link drops out entirely.
  */
 export async function getRotatorPool(date = etDateString()): Promise<RotatorPoolEntry[]> {
   const pool: RotatorPoolEntry[] = [];
@@ -116,7 +117,7 @@ export async function getRotatorPool(date = etDateString()): Promise<RotatorPool
     if (!link) continue;
     const partner = BRIDGE_PARTNERS.find((p) => p.key === pl.partner);
     pool.push({
-      url: link.url,
+      url: pl.url ?? link.url,
       partner: pl.partner,
       partnerName: partner?.name ?? pl.partner,
       source: "free",

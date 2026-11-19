@@ -55,6 +55,7 @@ export async function queueClipLinks(
   pageId: string,
   links: IntakeLink[],
   defaultSeconds = 15,
+  bridgeTokenId?: string,
 ): Promise<IntakeResult> {
   const page = await db.clipPage.findFirst({ where: { id: pageId, userId: user.id } });
   if (!page) {
@@ -118,6 +119,7 @@ export async function queueClipLinks(
           sourceUrl: url,
           sourceKind: verdict.kind,
           sourceHost: verdict.host,
+          bridgeTokenId: bridgeTokenId ?? null,
           clipSeconds: link.clipSeconds ?? defaultSeconds,
           hook: link.hook ?? null,
           creditWho: link.credit ?? null,

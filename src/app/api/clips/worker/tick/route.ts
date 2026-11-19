@@ -160,6 +160,26 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
+      // Bridge-sourced rows carry the token that queued them. If that
+      // token has been revoked or has expired since, the connection
+      // that authorized this spend no longer exists — fail the row
+      // BEFORE the engine call instead of charging the member's key
+      // on a dead authorization.
+      if (clip.bridgeTokenId) {
+        const token = await db.bridgeToken.findUnique({
+          where: { id: clip.bridgeTokenId },
+          select: { revokedAt: true, expiresAt: true },
+        });
+        if (!token || token.revokedAt || token.expiresAt.getTime() <= Date.now()) {
+          await db.clipJob.update({
+            where: { id: clip.id },
+            data: { status: "failed", error: "The bridge connection that queued this clip was revoked or expired before it rendered. Nothing was charged." },
+          });
+          summary.failed += 1;
+          continue;
+        }
+      }
+
       // Claim it atomically: a second tick must not render the same row.
       const claimed = await db.clipJob.updateMany({
         where: { id: clip.id, status: "queued" },
