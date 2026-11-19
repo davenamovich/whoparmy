@@ -937,3 +937,45 @@ CREATE INDEX "PickaphoneEvent_sessionId_idx" ON "PickaphoneEvent"("sessionId");
 
 -- CreateIndex
 CREATE INDEX "PickaphoneEvent_type_idx" ON "PickaphoneEvent"("type");
+
+-- CreateTable
+CREATE TABLE "BtcgameSession" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "assignment" JSONB NOT NULL,
+    "commitmentHash" TEXT NOT NULL,
+    "state" TEXT NOT NULL DEFAULT 'playing',
+    "picks" JSONB NOT NULL DEFAULT [],
+    "bankedTokens" INTEGER NOT NULL DEFAULT 0,
+    "perks" JSONB NOT NULL DEFAULT [],
+    "pendingOffer" INTEGER,
+    "offers" JSONB NOT NULL DEFAULT [],
+    "finalTokens" INTEGER,
+    "gensAwarded" INTEGER NOT NULL DEFAULT 0,
+    "claimNonce" TEXT,
+    "claimToken" TEXT,
+    "version" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "finishedAt" DATETIME
+);
+
+-- CreateTable
+CREATE TABLE "BtcgameEvent" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "sessionId" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "payload" JSONB,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "BtcgameEvent_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "BtcgameSession" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "BtcgameSession_claimNonce_key" ON "BtcgameSession"("claimNonce");
+
+-- CreateIndex
+CREATE INDEX "BtcgameSession_createdAt_idx" ON "BtcgameSession"("createdAt");
+
+-- CreateIndex
+CREATE INDEX "BtcgameEvent_sessionId_idx" ON "BtcgameEvent"("sessionId");
+
+-- CreateIndex
+CREATE INDEX "BtcgameEvent_type_idx" ON "BtcgameEvent"("type");

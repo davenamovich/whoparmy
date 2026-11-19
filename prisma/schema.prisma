@@ -1017,3 +1017,37 @@ model PickaphoneEvent {
   @@index([sessionId])
   @@index([type])
 }
+
+model BtcgameSession {
+  id              String          @id @default(cuid())
+  assignment      Json // case slot (0-25) -> board tile id; server-only until finished
+  commitmentHash  String
+  state           String          @default("playing") // playing | offer | finished
+  picks           Json            @default("[]") // slot indices in pick order
+  bankedTokens    Int             @default(0) // Vault Tokens banked from reveals; only ever grows
+  perks           Json            @default("[]") // {kind, slot} AGENT BOOST perks banked from reveals; fulfillment is a follow-up
+  pendingOffer    Int? // offer milestone index awaiting a decision
+  offers          Json            @default("[]") // {milestone, gens, decision} records
+  finalTokens     Int?
+  gensAwarded     Int             @default(0)
+  claimNonce      String?         @unique // nonce of the minted W1 claim token (mint-once lock)
+  claimToken      String? // the minted token, returned to the player exactly at finish
+  version         Int             @default(0) // optimistic-concurrency claim, same pattern as DoorsSession
+  createdAt       DateTime        @default(now())
+  finishedAt      DateTime?
+  events          BtcgameEvent[]
+
+  @@index([createdAt])
+}
+
+model BtcgameEvent {
+  id         String         @id @default(cuid())
+  sessionId  String
+  type       String // game_start | case_pick | reveal | offer_presented | offer_accepted | offer_declined | game_finish | claim_minted
+  payload    Json?
+  createdAt  DateTime       @default(now())
+  session    BtcgameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([type])
+}
