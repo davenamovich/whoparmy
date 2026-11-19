@@ -151,7 +151,7 @@ export function MySystemView() {
       const data = (await res.json().catch(() => ({}))) as { panel?: typeof panel; error?: string };
       if (!res.ok || !data.panel) throw new Error(data.error ?? "Panel request failed");
       setPanel(data.panel);
-      toast.success("Sent to the expert panel — the verdict lands here.");
+      toast.success("Sent to the expert panel — the swarm starts on demand, and most verdicts land within about 15 minutes.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Panel request failed");
     } finally {
@@ -274,7 +274,9 @@ export function MySystemView() {
         <p className="text-sm text-muted-foreground">
           Before you run on a plan, send it to the panel: an Offer expert, a Content Engine expert, a
           Funnel expert, and a Risk &amp; Honesty expert each review your blueprint and Day-1 setup as
-          their own assignment, then a single verdict with fixes comes back here.
+          their own assignment, then a single verdict with fixes comes back here. The panel works on
+          demand — it starts within about a minute of your request, and most verdicts land within
+          about 15 minutes.
         </p>
         {panel?.status === "reviewed" && panel.verdict ? (
           <div className="space-y-3">
@@ -300,7 +302,7 @@ export function MySystemView() {
           </div>
         ) : panel?.status === "queued" || panel?.status === "in-review" ? (
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" /> With the panel now — the verdict lands here when the four experts are done.
+            <Loader2 className="h-4 w-4 animate-spin" /> With the panel now — the swarm starts on demand, within about a minute of your request, and most verdicts land within about 15 minutes. Yours appears right here.
           </p>
         ) : (
           <Button onClick={() => void requestPanelReview()} disabled={busyPanel}>
