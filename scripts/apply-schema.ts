@@ -59,6 +59,8 @@ const ADDITIVE_COLUMNS: Array<{ table: string; column: string; ddl: string }> = 
   { table: "DoorsSession", column: "version", ddl: 'ALTER TABLE "DoorsSession" ADD COLUMN "version" INTEGER NOT NULL DEFAULT 0' },
   { table: "ClipJob", column: "fundingLane", ddl: 'ALTER TABLE "ClipJob" ADD COLUMN "fundingLane" TEXT' },
   { table: "ClipJob", column: "grantId", ddl: 'ALTER TABLE "ClipJob" ADD COLUMN "grantId" TEXT' },
+  { table: "User", column: "btcReceiveAddress", ddl: 'ALTER TABLE "User" ADD COLUMN "btcReceiveAddress" TEXT' },
+  { table: "User", column: "agentBtcAddress", ddl: 'ALTER TABLE "User" ADD COLUMN "agentBtcAddress" TEXT' },
 ];
 for (const { table, column, ddl } of ADDITIVE_COLUMNS) {
   const cols = db.query(`PRAGMA table_info("${table}")`).all() as Array<{ name: string }>;

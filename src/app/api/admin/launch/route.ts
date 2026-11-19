@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionOperator } from "@/lib/site-gate";
 import { stackById } from "@/lib/stacks";
+import { BRIDGE_PARTNERS } from "@/lib/bridge";
+import { getSavedDhMediaLink } from "@/lib/btc-addresses";
 import {
   BridgeError,
   MAX_BUDGET_CREDITS,
@@ -37,6 +39,26 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // BTC Experiment gate (Flow v2, 2026-11-19): the agent build
+  // unlocks only once the member's DH Media link is saved on /bridge.
+  // The save is the gate, and access follows the CURRENT saved link —
+  // the prompt below is filled from the link saved right now, never
+  // from a cached copy. No code is minted for a gated launch.
+  let dhMediaLink: string | null = null;
+  if (stack.id === "btc-experiment") {
+    dhMediaLink = await getSavedDhMediaLink(operator.id);
+    if (!dhMediaLink) {
+      return NextResponse.json(
+        {
+          error:
+            "The BTC Experiment unlocks when your DH Media link is saved. Save your link on the bridge page first — the agent build follows your current saved link.",
+          code: "NEEDS_DH_MEDIA_LINK",
+        },
+        { status: 400 },
+      );
+    }
+  }
+
   try {
     let minted: { code: string; expiresAt: Date; budgetCredits: number };
     if (stack.bridgeScope === "clips") {
@@ -50,7 +72,22 @@ export async function POST(req: NextRequest) {
       const offer = bridgeOffer("week");
       minted = await mintBridgeCode(operator.id, offer.budgetCredits, "week");
     }
-    const prompt = stack.promptTemplate.replaceAll("{BRIDGE_CODE}", minted.code);
+    let prompt = stack.promptTemplate.replaceAll("{BRIDGE_CODE}", minted.code);
+    if (prompt.includes("{MEMBER_NAME}")) {
+      prompt = prompt.replaceAll(
+        "{MEMBER_NAME}",
+        operator.name ?? operator.whopUsername ?? "a Whop Army member",
+      );
+    }
+    if (prompt.includes("{DH_MEDIA_LINK}")) {
+      // The gate above guarantees a saved link for the BTC stack; the
+      // fallback is Dave's own link (the /bridge placeholder example)
+      // for any future template that carries the slot ungated.
+      const fallback =
+        BRIDGE_PARTNERS.find((p) => p.key === "dh-media")?.example ??
+        "https://dh.media/?affid=Vesselprotocol";
+      prompt = prompt.replaceAll("{DH_MEDIA_LINK}", dhMediaLink ?? fallback);
+    }
     return NextResponse.json(
       {
         stackId: stack.id,

@@ -13,6 +13,8 @@ CREATE TABLE "User" (
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     "linksSavedAt" DATETIME,
+    "btcReceiveAddress" TEXT,
+    "agentBtcAddress" TEXT,
     "refCode" TEXT,
     "referredById" TEXT,
     "freeGenBalance" INTEGER NOT NULL DEFAULT 0,

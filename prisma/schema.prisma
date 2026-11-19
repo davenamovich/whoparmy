@@ -39,6 +39,12 @@ model User {
   rotatorWins  RotatorDay[] @relation("RotatorWins")
   rotatorPlacements RotatorPlacement[]
   linksSavedAt DateTime? // first bridge link save — pays the referrer's free generations (lib/bridge.ts)
+  // BTC Experiment (Flow v2, 2026-11-19): PUBLIC receive addresses
+  // only — receive-only, never a seed phrase or private key. The
+  // agent address is the payout address the member enters on DH
+  // Media at registration (lib/btc-addresses.ts).
+  btcReceiveAddress String?
+  agentBtcAddress   String?
   assets       Asset[]
   jobs         GenerationJob[]
   army         ArmyBot?
