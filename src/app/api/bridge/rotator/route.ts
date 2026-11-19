@@ -24,7 +24,10 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const user = await getWhopUser();
-    const body = (await req.json()) as { date?: unknown; partner?: unknown; amount?: unknown };
+    // placeRotatorBid validates every field from `unknown`; a key
+    // missing from the JSON body arrives as undefined and fails its
+    // validation, so the required-keys shape is the honest cast.
+    const body = (await req.json()) as { date: unknown; partner: unknown; amount: unknown };
     const result = await placeRotatorBid(user.id, body);
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: 400 });
