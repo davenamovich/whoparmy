@@ -25,6 +25,17 @@ import { narrativePromptBlock } from "@/lib/narrative-hooks";
  *
  * This complements the viral3 Scout's weekly curated trend batches
  * (Video Studio): that is the deep scan; this is the daily wire.
+ *
+ * X LANE (Dave, 2026-11-18): the day's topics can also be seeded
+ * from real X posts — Muse's daily job finds what's moving on X
+ * for small-business owners (search → FxTwitter-verified reads),
+ * writes SMB-ready headlines/hooks, and POSTs them to
+ * /api/trends/ingest. They land here as the day's lang="x" snapshot:
+ * buildDaySnapshot prefers that row's topic list over the RSS wire
+ * for every language (headlines still generated per language from
+ * the X topics), and ingesting clears the day's other rows so a
+ * mid-day X drop replaces the wire everywhere. No X drop that day
+ * → the RSS wire answers exactly as before.
  */
 
 export interface TrendTopic {
@@ -234,13 +245,36 @@ async function readSnapshot(date: string, lang: string): Promise<DaySnapshot | n
 
 async function readAnySnapshot(date: string): Promise<DaySnapshot | null> {
   try {
+    // The X lane (lang "x") wins the day when it exists — its topic
+    // list is the one every language builds headlines from.
     const rows = await db.$queryRaw<{ topicsJson: string }[]>`
-      SELECT "topicsJson" FROM "TrendDay" WHERE "date" = ${date} LIMIT 1
+      SELECT "topicsJson" FROM "TrendDay" WHERE "date" = ${date}
+      ORDER BY CASE WHEN "lang" = 'x' THEN 0 ELSE 1 END LIMIT 1
     `;
     return rows.length > 0 ? parseSnapshot(rows[0].topicsJson) : null;
   } catch {
     return null;
   }
+}
+
+/**
+ * Store the day's X-sourced topics (POST /api/trends/ingest) and
+ * clear the day's per-language rows, so the next read in any
+ * language rebuilds its headlines from the X topics instead of
+ * serving a wire-built set. The in-process dayCache for other
+ * languages can lag until restart — the ingest runs early morning
+ * ET, before the day's reads, so this rarely matters.
+ */
+export async function ingestXTopics(topics: TrendTopic[]): Promise<void> {
+  const date = etDayKey();
+  const snapshot: DaySnapshot = { builtAt: new Date().toISOString(), topics };
+  await db.$executeRaw`
+    INSERT INTO "TrendDay" ("id", "date", "lang", "topicsJson")
+    VALUES (${randomUUID()}, ${date}, 'x', ${JSON.stringify(snapshot)})
+    ON CONFLICT("date", "lang") DO UPDATE SET "topicsJson" = EXCLUDED."topicsJson"
+  `;
+  await db.$executeRaw`DELETE FROM "TrendDay" WHERE "date" = ${date} AND "lang" <> 'x'`;
+  dayCache.set(`${date}:x`, snapshot);
 }
 
 async function storeSnapshot(date: string, lang: string, snapshot: DaySnapshot): Promise<void> {
