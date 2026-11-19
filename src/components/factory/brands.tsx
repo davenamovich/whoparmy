@@ -225,9 +225,13 @@ export function BrandsView({
     // If research for this brand's site is already running in the
     // background, reattach to it instead of leaving the member blind.
     if (b.website) {
+      // Capture the narrowed string: parameter narrowing does not
+      // survive into the async closure below (b.website rewidens to
+      // string | null | undefined there).
+      const website = b.website;
       void (async () => {
         try {
-          const res = await fetch(`/api/research/latest?website=${encodeURIComponent(b.website)}`);
+          const res = await fetch(`/api/research/latest?website=${encodeURIComponent(website)}`);
           const json = (await res.json()) as { job?: ResearchJobDTO | null };
           if (json.job?.status === "running") {
             setResearching(true);
