@@ -200,7 +200,9 @@ export default function BridgePage() {
                 rotator all live behind your Whop membership — the free Trial counts.
               </p>
               <Button asChild size="lg">
-                <a href="/api/auth/whop">
+                {/* Sign-in returns here, not to the gated home page;
+                    ?ref= survives in the stash (lib/ref-stash). */}
+                <a href="/api/auth/whop?next=%2Fbridge">
                   Connect with Whop <ArrowRight className="h-4 w-4 ml-1.5" />
                 </a>
               </Button>

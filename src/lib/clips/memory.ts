@@ -22,22 +22,31 @@
  *      member's taste into another member's output.
  *   3. A memory failure never blocks a clip. Timeout, return empty,
  *      carry on — the batch is more important than the hint.
+ *
+ * The pure helpers (scope labels, page tags, decision text) live in
+ * ./memory-core.ts so they unit-test without the store.
  */
 
 import {
   bridgeCall,
+  bridgeCallResult,
+  type BridgeFailure,
+  MemoryUnavailableError,
   mnemosConfigured,
   mnemosExport,
   mnemosPersonFor,
-  mnemosRecall,
 } from "@/lib/mnemos-bridge";
+import { type DecisionInput, decisionText, pageTag, requireId } from "./memory-core";
 
-export class MemoryScopeError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "MemoryScopeError";
-  }
-}
+export {
+  armyScope,
+  clipScope,
+  type Decision,
+  type DecisionInput,
+  decisionText,
+  MemoryScopeError,
+  pageTag,
+} from "./memory-core";
 
 /**
  * The Memory tab reads the person scope with the global project, so page
@@ -47,44 +56,19 @@ export class MemoryScopeError extends Error {
  */
 const BRIDGE_PROJECT = "global";
 
-function requireId(value: unknown, field: string): string {
-  const id = typeof value === "string" ? value.trim() : "";
-  if (!id) throw new MemoryScopeError(`${field} is required in a memory scope.`);
-  return id;
-}
-
-/** `page:<id>` — the tag that keeps one page's taste apart in the text. */
-export function pageTag(pageId?: string): string {
-  const id = typeof pageId === "string" ? pageId.trim() : "";
-  return id ? `page:${id}` : "";
-}
-
-/**
- * The human-readable label for a scope. Kept because callers and tests
- * read it, and because it is the honest description of what a fact is
- * about — but it is no longer the key the store is addressed by.
- */
-export function clipScope(userId: string, pageId?: string): string {
-  const user = requireId(userId, "userId");
-  if (!pageId) return `clip:${user}`;
-  return `clip:${user}:page:${requireId(pageId, "pageId")}`;
-}
-
-/** House rules for every army bot, or one bot's own lessons. */
-export function armyScope(userId: string, botId?: string): string {
-  const user = requireId(userId, "userId");
-  if (!botId) return `army:${user}`;
-  return `army:${user}:bot:${requireId(botId, "botId")}`;
-}
+/** Writes get a shorter leash than reads: they run after the member's
+ *  action has already been saved, and must not hold the response long. */
+const CAPTURE_TIMEOUT_MS = 8_000;
 
 /** One call for one member. Null means the store was unavailable. */
 async function scopedCall(
   userId: string,
   name: string,
   args: Record<string, unknown>,
+  timeoutMs?: number,
 ): Promise<string | null> {
   const person = mnemosPersonFor(requireId(userId, "userId"));
-  return bridgeCall(person, name, args, { project: BRIDGE_PROJECT });
+  return bridgeCall(person, name, args, { project: BRIDGE_PROJECT, timeoutMs });
 }
 
 /**
@@ -110,52 +94,30 @@ export async function recallForPage(
   return lines.slice(0, 5);
 }
 
-export type Decision = "approved" | "edited" | "rejected";
-
-export interface DecisionInput {
-  pageId?: string;
-  clipId: string;
-  decision: Decision;
-  /** The member's own words. Required for a rejection worth remembering. */
-  note?: string;
-  original?: string;
-  final?: string;
-}
-
-/**
- * What one decision is worth remembering, in one line. Pure so it can be
- * tested without a store: the page tag first (so the fact is findable per
- * page), then the decision, then the member's own words, then the diff.
- */
-export function decisionText(input: DecisionInput): string {
-  const parts: string[] = [];
-  const tag = pageTag(input.pageId);
-  if (tag) parts.push(tag);
-  parts.push(`${input.decision} clip ${input.clipId}`);
-  const note = input.note?.trim();
-  if (note) parts.push(note);
-  if (input.decision === "edited" && input.original && input.final) {
-    parts.push(
-      `was: ${input.original.slice(0, 160)} → now: ${input.final.slice(0, 160)}`,
-    );
-  }
-  return parts.join(" — ");
-}
-
 /**
  * Capture only on a human decision. "The model liked it" is not a lesson;
  * an approval, an edit (the diff is the lesson) or a rejection with a
- * reason is. Returns false when the store was unavailable — the caller
- * ignores it, the log records it.
+ * reason is. Returns false when the store was unavailable; the failure is
+ * logged so a dead bridge shows up in the server log, not just as an
+ * empty Memory tab. Never throws.
  */
 export async function captureDecision(
   input: DecisionInput & { userId: string },
 ): Promise<boolean> {
-  const raw = await scopedCall(input.userId, "mnemos_capture", {
-    content: decisionText(input),
-    context: "clip decision in the P&R review desk",
-  }).catch(() => null);
-  return raw !== null;
+  const raw = await scopedCall(
+    input.userId,
+    "mnemos_capture",
+    {
+      content: decisionText(input),
+      context: "clip decision in the P&R review desk",
+    },
+    CAPTURE_TIMEOUT_MS,
+  ).catch(() => null);
+  if (raw === null) {
+    console.warn("[memory] clip decision not captured", { clipId: input.clipId, decision: input.decision });
+    return false;
+  }
+  return true;
 }
 
 /** Replace a standing preference instead of stacking a contradiction on it. */
@@ -193,29 +155,41 @@ export interface MemoryHealth {
   configured: boolean;
   /** The person scope this member's facts and clips both use. */
   person: string;
-  /** Did a read actually reach the store, or did it fall back to null? */
+  /** Did a read actually reach the store and get a valid answer? */
   reachable: boolean;
-  /** How many facts the export battery can see right now. */
-  facts: number;
+  /** Why it isn't reachable, when it isn't. */
+  error?: BridgeFailure;
+  /** How many facts the export battery can see right now; null when the
+   *  count couldn't be taken (some recall in the battery failed). */
+  facts: number | null;
   checkedAt: string;
 }
 
 /**
  * "Is memory on?" as one call instead of a repo read and a guess.
  *
- * Until now a misconfigured bridge and a working one with nothing to say
- * were indistinguishable: both returned null and both looked fine. This
- * separates them — configured false is a deploy problem, configured true
- * with reachable false is an outage, and both together are silent.
+ * Separates the states a member-facing read can't: configured false is a
+ * deploy problem, `error: "unauthorized"` is a wrong token, any other
+ * error is an outage, and reachable with facts 0 is a working, empty
+ * store. An empty reply used to count as "unreachable", so a healthy
+ * store with nothing in it reported as down.
  */
 export async function memoryHealth(userId: string): Promise<MemoryHealth> {
   const person = mnemosPersonFor(requireId(userId, "userId"));
   const configured = mnemosConfigured();
+  const checkedAt = () => new Date().toISOString();
   if (!configured) {
-    return { configured, person, reachable: false, facts: 0, checkedAt: new Date().toISOString() };
+    return { configured, person, reachable: false, error: "unconfigured", facts: null, checkedAt: checkedAt() };
   }
-  const probe = await mnemosRecall(person, "memory").catch(() => null);
-  const reachable = probe !== null;
-  const facts = reachable ? (await mnemosExport(person).catch(() => [] as string[])).length : 0;
-  return { configured, person, reachable, facts, checkedAt: new Date().toISOString() };
+  const probe = await bridgeCallResult(person, "mnemos_recall", { query: "memory" }, { project: BRIDGE_PROJECT });
+  if (!probe.ok) {
+    return { configured, person, reachable: false, error: probe.reason, facts: null, checkedAt: checkedAt() };
+  }
+  let facts: number | null = null;
+  try {
+    facts = (await mnemosExport(person)).length;
+  } catch (err) {
+    if (!(err instanceof MemoryUnavailableError)) throw err;
+  }
+  return { configured, person, reachable: true, facts, checkedAt: checkedAt() };
 }

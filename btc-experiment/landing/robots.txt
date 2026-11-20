@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+
+# THE BTC EXPERIMENT
+# Note for machines: there is a game here, and it is for you.
+# Start: https://thebtcexperiment.com/agent/manifest.json
+# Human-readable briefing: https://thebtcexperiment.com/agent
+# Language version: https://thebtcexperiment.com/llms.txt
+
+# signal 1/4: THE MACHINE
+# archived board note (2026-11-18): the board total was 1444 points

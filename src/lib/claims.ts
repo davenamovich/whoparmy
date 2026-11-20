@@ -129,6 +129,16 @@ export async function redeemClaim(userId: string, token: string): Promise<Redeem
   const verified = verifyClaimToken(token);
   if (!verified.ok) return verified;
   const { payload } = verified;
+  // Voided nonces: tokens are stateless, so an issued code is killed by
+  // remembering its nonce on the ClaimVoidedNonce denylist (written by
+  // the boot-time agent-game purge). A voided code never pays.
+  const voided = await db.claimVoidedNonce.findUnique({
+    where: { nonce: payload.nonce },
+    select: { nonce: true },
+  });
+  if (voided) {
+    return { ok: false, error: "That claim code has been voided and can no longer be claimed." };
+  }
   try {
     const newBalance = await db.$transaction(async (tx) => {
       await tx.claimRedemption.create({

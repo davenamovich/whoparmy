@@ -85,8 +85,10 @@ export default function ClaimPage() {
                   Your balance is now {claimed.newBalance} free generations. They spend automatically when
                   your plan&apos;s monthly memes run out — or bid them in the rotator.
                 </p>
-                <a href="/" className="inline-block mt-3 text-sm text-primary underline underline-offset-2">
-                  Back to the factory
+                {/* /bridge, not "/": home is closed while the site gate
+                    is up, and the bridge is the next hand-off step. */}
+                <a href="/bridge" className="inline-block mt-3 text-sm text-primary underline underline-offset-2">
+                  Next: get your agent
                 </a>
               </div>
             </div>
@@ -119,14 +121,16 @@ export default function ClaimPage() {
                 minute, and your code stays valid while you do.
               </p>
               <Button asChild className="w-full font-semibold">
-                <a href="/api/auth/whop">
+                {/* Sign-in returns here with the code still in the URL
+                    (lib/gate-paths safeReturnPath), so the win is one
+                    tap away when they come back. */}
+                <a href={`/api/auth/whop?next=${encodeURIComponent(code.trim() ? `/claim?code=${encodeURIComponent(code.trim())}` : "/claim")}`}>
                   <LogIn className="h-4 w-4 mr-1.5" /> Sign in with Whop to claim
                 </a>
               </Button>
               {code ? (
                 <p className="text-xs text-muted-foreground">
-                  Keep the link you arrived with — signing in lands you on the home page, so open this
-                  same link again afterwards and your code loads automatically.
+                  Signing in brings you straight back here with your code filled in.
                 </p>
               ) : null}
             </>

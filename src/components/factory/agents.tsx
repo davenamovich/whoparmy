@@ -137,6 +137,8 @@ export function AgentsView() {
   const [busySetup, setBusySetup] = useState(false);
   const [hireTabs, setHireTabs] = useState<Record<string, string>>({});
   const [memoryFacts, setMemoryFacts] = useState<string[] | null>(null);
+  // "empty" and "couldn't read" used to render the same "Nothing stored yet".
+  const [memoryStatus, setMemoryStatus] = useState<"ok" | "empty" | "unconfigured" | "unavailable">("ok");
   const [settingsForms, setSettingsForms] = useState<Record<string, { name: string; role: string; instructions: string }>>({});
 
   const load = useCallback(async () => {
@@ -217,8 +219,17 @@ export function AgentsView() {
       try {
         const res = await fetch("/api/memory/view");
         const data = await res.json().catch(() => ({}));
-        setMemoryFacts(Array.isArray(data.facts) ? (data.facts as string[]) : []);
+        const facts = Array.isArray(data.facts) ? (data.facts as string[]) : [];
+        const status =
+          data.status === "unconfigured" || data.status === "unavailable" || data.status === "empty"
+            ? data.status
+            : res.ok
+              ? facts.length > 0 ? "ok" : "empty"
+              : "unavailable";
+        setMemoryStatus(status);
+        setMemoryFacts(facts);
       } catch {
+        setMemoryStatus("unavailable");
         setMemoryFacts([]);
       }
     })();
@@ -592,6 +603,10 @@ export function AgentsView() {
                         </p>
                         {memoryFacts === null ? (
                           <p className="text-xs text-muted-foreground">Loading memory…</p>
+                        ) : memoryStatus === "unavailable" ? (
+                          <p className="text-xs text-amber-600">Couldn&apos;t reach your memory just now — it isn&apos;t empty. Try again in a few minutes.</p>
+                        ) : memoryStatus === "unconfigured" ? (
+                          <p className="text-xs text-amber-600">Memory isn&apos;t switched on for this deployment yet.</p>
                         ) : memoryFacts.length === 0 ? (
                           <p className="text-xs text-muted-foreground">Nothing stored yet — tell Ralph about your business and it lands here.</p>
                         ) : (

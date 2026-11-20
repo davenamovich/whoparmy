@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getWhopConfig, exchangeWhopCode, fetchWhopUserInfo } from "@/lib/whop";
 import { readPkceCookie, clearPkceCookie, setSessionCookie, resolveRedirectUri, canonicalOrigin } from "@/lib/session";
 import { upsertWhopUser } from "@/lib/auth";
+import { safeReturnPath } from "@/lib/gate-paths";
 
 export const runtime = "nodejs";
 
@@ -25,8 +26,18 @@ export async function GET(req: NextRequest) {
   // proxy (verified live 2026-11-17) — pin redirects to the canonical
   // public origin so members never land on 0.0.0.0:8080.
   const origin = canonicalOrigin(req.nextUrl.origin);
-  const fail = (message: string) =>
-    NextResponse.redirect(`${origin}/?auth_error=${encodeURIComponent(message)}`, { status: 302 });
+  // Land where the sign-in started (Dave, 2026-11-20): a player who
+  // signed in from /claim or /bridge goes back there, not to "/",
+  // which the site gate closes. Re-validated here — the cookie is not
+  // signed — so only the hand-off pages are ever a destination.
+  const stored = await readPkceCookie();
+  const back = safeReturnPath(stored?.next) ?? "/";
+  const land = (param: string, value: string) => {
+    const url = new URL(back, origin);
+    url.searchParams.set(param, value);
+    return NextResponse.redirect(url.toString(), { status: 302 });
+  };
+  const fail = (message: string) => land("auth_error", message);
 
   try {
     const cfg = getWhopConfig();
@@ -42,7 +53,6 @@ export async function GET(req: NextRequest) {
     const returnedState = params.get("state");
     if (!code || !returnedState) return fail("Missing code/state in the Whop redirect.");
 
-    const stored = await readPkceCookie();
     await clearPkceCookie();
     if (!stored || returnedState !== stored.state) {
       return fail("Invalid OAuth state — possible CSRF. Please try logging in again.");
@@ -61,7 +71,7 @@ export async function GET(req: NextRequest) {
     const user = await upsertWhopUser(userInfo);
     await setSessionCookie(user.id);
 
-    return NextResponse.redirect(`${origin}/?welcome=whop`, { status: 302 });
+    return land("welcome", "whop");
   } catch (err) {
     return fail(err instanceof Error ? err.message : "Whop sign-in failed.");
   }

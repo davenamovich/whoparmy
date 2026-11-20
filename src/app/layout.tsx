@@ -7,6 +7,7 @@ import { getLocale, getMessages } from "next-intl/server";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { getGateState, getSessionOperator } from "@/lib/site-gate";
+import { isGateExempt } from "@/lib/gate-paths";
 
 // Self-hosted Geist fonts (latin variable woff2, downloaded 2026-11-16 from
 // Google Fonts). next/font/google fetches at build time, which fails on
@@ -53,13 +54,15 @@ export default async function RootLayout({
   // keep working; static assets bypass it too. The pathname arrives
   // via the x-pathname header stamped in middleware.ts.
   const pathname = (await headers()).get("x-pathname") ?? "/";
-  // The agent link (/connect/<code>) stays reachable while the gate is ON.
-  // The code inside the URL IS the credential: viewing never consumes it
-  // (findLiveBridgeCode is read-only) and /api/bridge/exchange re-checks
-  // eligibility server-side, so this page must not need an operator session.
-  const gateExempt =
-    pathname === "/gate" || pathname === "/connect" || pathname.startsWith("/connect/");
-  if (!gateExempt) {
+  // Pages reachable while the gate is ON (lib/gate-paths.ts):
+  // - the agent link (/connect/<code>): the code inside the URL IS the
+  //   credential; viewing never consumes it (findLiveBridgeCode is
+  //   read-only) and /api/bridge/exchange re-checks eligibility.
+  // - the game hand-off (/bridge, /claim — Dave, 2026-11-20): the BTC
+  //   Experiment's "ACTIVATE YOUR AGENT" and claim links land here, and
+  //   both pages carry their own Whop sign-in. Gated, every player who
+  //   finished the game hit "closed for now".
+  if (!isGateExempt(pathname)) {
     const gate = await getGateState();
     if (gate.on && !(await getSessionOperator())) {
       redirect("/gate");

@@ -50,9 +50,14 @@ export function generateState(): string {
   return randomBytes(16).toString("base64url");
 }
 
-export async function setPkceCookie(state: string, verifier: string): Promise<void> {
+/**
+ * `next` is the page to land on after sign-in (validated by the caller
+ * with lib/gate-paths safeReturnPath, and again by the callback — the
+ * cookie is httpOnly but not signed, so it is never trusted as-is).
+ */
+export async function setPkceCookie(state: string, verifier: string, next?: string | null): Promise<void> {
   const jar = await cookies();
-  jar.set(PKCE_COOKIE, b64urlJson({ state, verifier }), {
+  jar.set(PKCE_COOKIE, b64urlJson(next ? { state, verifier, next } : { state, verifier }), {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
@@ -61,14 +66,14 @@ export async function setPkceCookie(state: string, verifier: string): Promise<vo
   });
 }
 
-export async function readPkceCookie(): Promise<{ state: string; verifier: string } | null> {
+export async function readPkceCookie(): Promise<{ state: string; verifier: string; next: string | null } | null> {
   const jar = await cookies();
   const raw = jar.get(PKCE_COOKIE)?.value;
   if (!raw) return null;
   try {
-    const parsed = JSON.parse(Buffer.from(raw, "base64url").toString()) as { state?: string; verifier?: string };
+    const parsed = JSON.parse(Buffer.from(raw, "base64url").toString()) as { state?: string; verifier?: string; next?: unknown };
     if (!parsed.state || !parsed.verifier) return null;
-    return { state: parsed.state, verifier: parsed.verifier };
+    return { state: parsed.state, verifier: parsed.verifier, next: typeof parsed.next === "string" ? parsed.next : null };
   } catch {
     return null;
   }
