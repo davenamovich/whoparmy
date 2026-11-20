@@ -17,7 +17,108 @@ import {
   verifyUserRotatorCode,
   verifyAgentRotatorCode,
   type PickableLink,
+  enforcementEffects, forfeitedAgentIds, summarizeHopDay,
+  type EnforcementLike, type EnforcementEffects, type HopDaySummary,
 } from "@/lib/rotator-v2-core";
+
+export type AdminResult = { ok: true; detail: string } | { ok: false; error: string };
+
+export async function listActiveEnforcements() {
+  return db.rotatorEnforcement.findMany({
+    where: { liftedAt: null },
+    orderBy: { createdAt: "desc" },
+  });
+}
+export async function applyEnforcement(
+  input: { scope: unknown; scopeId: unknown; level: unknown; reason: unknown },
+  createdBy: string,
+): Promise<AdminResult> {
+  if (input.scope !== "AGENT" && input.scope !== "USER") {
+    return { ok: false, error: "Scope must be AGENT or USER." };
+  }
+  if (!["WARN", "THROTTLE", "FORFEIT", "REMOVED"].includes(String(input.level))) {
+    return { ok: false, error: "Invalid enforcement level." };
+  }
+  if (typeof input.scopeId !== "string" || !input.scopeId.trim()) {
+    return { ok: false, error: "Scope id is required." };
+  }
+  if (typeof input.reason !== "string" || !input.reason.trim()) {
+    return { ok: false, error: "Reason is required." };
+  }
+  await db.rotatorEnforcement.create({
+    data: {
+      scope: input.scope,
+      scopeId: input.scopeId,
+      level: input.level as string,
+      reason: input.reason,
+      createdBy,
+    },
+  });
+  return {
+    ok: true,
+    detail: `Applied ${input.level} to ${input.scope} ${input.scopeId}: ${input.reason}`,
+  };
+}
+export async function liftEnforcement(id: unknown): Promise<AdminResult> {
+  if (typeof id !== "string" || !id.trim()) {
+    return { ok: false, error: "Enforcement id is required." };
+  }
+  const row = await db.rotatorEnforcement.findUnique({ where: { id } });
+  if (!row || row.liftedAt) {
+    return { ok: false, error: "Enforcement not found or already lifted." };
+  }
+  await db.rotatorEnforcement.update({
+    where: { id },
+    data: { liftedAt: new Date() },
+  });
+  return { ok: true, detail: `Lifted enforcement ${id}.` };
+}
+async function activeEnforcementsFor(ctx: { agentId?: string | null; userId?: string | null }): Promise<EnforcementLike[] | null> {
+  if (!ctx.agentId && !ctx.userId) {
+    return [];
+  }
+  try {
+    return await db.rotatorEnforcement.findMany({
+      where: {
+        liftedAt: null,
+        OR: [
+          ...(ctx.agentId ? [{ scope: "AGENT", scopeId: ctx.agentId }] : []),
+          ...(ctx.userId ? [{ scope: "USER", scopeId: ctx.userId }] : []),
+        ],
+      },
+      select: { scope: true, scopeId: true, level: true },
+    });
+  } catch (err) {
+    console.error("[rotator-v2] enforcement lookup failed:", err);
+    return null;
+  }
+}
+async function enforcementEffectsFor(ctx: { agentId?: string | null; userId?: string | null }): Promise<EnforcementEffects> {
+  const rows = await activeEnforcementsFor(ctx);
+  return rows
+    ? enforcementEffects(rows, ctx)
+    : { serveBlocked: false, slotsForfeited: false, userRateScale: 1, agentRateScale: 1 };
+}
+export async function getForfeitedAgentIds(
+  placements: Array<{ userId: string }>,
+): Promise<Set<string>> {
+  try {
+    const rows = await listActiveEnforcements();
+    const users = [...new Set(placements.map((p) => p.userId))];
+    const agents = await db.hiredAgent.findMany({
+      where: { userId: { in: users } },
+      select: { id: true, userId: true },
+    });
+    const map = new Map<string, string[]>();
+    for (const agent of agents) {
+      map.set(agent.userId, [...(map.get(agent.userId) ?? []), agent.id]);
+    }
+    return forfeitedAgentIds(rows, map);
+  } catch (err) {
+    console.error("[rotator-v2] forfeiture lookup failed:", err);
+    return new Set();
+  }
+}
 
 /**
  * ─── USER ROTATOR V2 — database operations ─────────────────────────
@@ -190,6 +291,9 @@ export async function recordRotatorHop(input: RotatorHopInput): Promise<void> {
   try {
     const now = new Date();
     const history = await gatherHopHistory(ipHash, input.linkId, input.userId, input.agentId, now);
+    const effects = (input.agentId || input.userId)
+      ? await enforcementEffectsFor({ agentId: input.agentId, userId: input.userId })
+      : { userRateScale: 1, agentRateScale: 1 };
     verdict = scoreHop({
       ua: input.meta.ua,
       hasIp: ipHash !== null,
@@ -197,6 +301,7 @@ export async function recordRotatorHop(input: RotatorHopInput): Promise<void> {
       hasUser: input.userId !== null,
       hasAgent: input.agentId !== null,
       history,
+      rateScales: { user: effects.userRateScale, agent: effects.agentRateScale },
     });
   } catch (err) {
     console.error("[rotator-v2] hop scoring failed:", err);
@@ -318,6 +423,9 @@ export async function serveAgentRotator(
   if (!agent || !isAgentWorking(agent.status, agent.expiresAt, new Date())) {
     return null;
   }
+  if ((await enforcementEffectsFor({ agentId: rotator.agentId, userId: rotator.userId })).serveBlocked) {
+    return null;
+  }
 
   const today = etDateString();
   const window = { gte: dayStart(today), lt: dayEnd(today) };
@@ -381,6 +489,10 @@ export async function resolveAgentRotatorDestination(agentId: string) {
   if (!agent || !isAgentWorking(agent.status, agent.expiresAt, new Date())) {
     return null;
   }
+  const destinationEffects = await enforcementEffectsFor({ agentId: rotator.agentId, userId: rotator.userId });
+  if (destinationEffects.serveBlocked || destinationEffects.slotsForfeited) {
+    return null;
+  }
 
   const today = etDateString();
   const window = { gte: dayStart(today), lt: dayEnd(today) };
@@ -439,6 +551,59 @@ const dayEnd = (date: string) =>
   );
 
 const secret = () => resolveSigningSecret(process.env);
+
+export async function getRotatorHopDayReport(
+  date: string,
+): Promise<HopDaySummary & { date: string }> {
+  const rows = await db.rotatorHop.findMany({
+    where: { ts: { gte: dayStart(date), lt: dayEnd(date) } },
+    select: { counted: true, filterReason: true, agentId: true, userId: true },
+  });
+  return {
+    date,
+    ...summarizeHopDay(rows),
+  };
+}
+
+/** Slot usage remains sourced from AgentTrafficDay; hopClicks is the additional v2 hop-based view. */
+export async function getWeeklyTrafficReport(userId: string, endDate = etDateString()) {
+  const [year, month, day] = endDate.split("-").map(Number);
+  // Use UTC calendar parts so daylight saving changes cannot skip a date.
+  const dates = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date(Date.UTC(year, month - 1, day - (6 - i)));
+    const utcYear = date.getUTCFullYear();
+    const utcMonth = String(date.getUTCMonth() + 1).padStart(2, "0");
+    const utcDay = String(date.getUTCDate()).padStart(2, "0");
+    return `${utcYear}-${utcMonth}-${utcDay}`;
+  });
+  const days = await Promise.all(dates.map(async (date) => {
+    const [slots, hops] = await Promise.all([
+      db.agentTrafficDay.findMany({ where: { userId, date }, select: { agentId: true, slotsUsed: true } }),
+      db.rotatorHop.findMany({
+        where: { userId, ts: { gte: dayStart(date), lt: dayEnd(date) } },
+        select: { counted: true, filterReason: true, agentId: true, userId: true },
+      }),
+    ]);
+    const perAgent: Record<string, number> = {};
+    let totalUsed = 0;
+    for (const row of slots) {
+      perAgent[row.agentId] = row.slotsUsed;
+      totalUsed += row.slotsUsed;
+    }
+    const summary = summarizeHopDay(hops);
+    return {
+      date,
+      slots: { totalUsed, perAgent },
+      hopClicks: { counted: summary.countedTotal, filtered: summary.filteredTotal },
+    };
+  }));
+  return {
+    userId,
+    from: dates[0],
+    to: dates[6],
+    days,
+  };
+}
 
 export async function getMyRotator(userId: string) {
   const rotator = await db.userRotator.upsert({
@@ -562,6 +727,9 @@ export async function serveUserRotator(
     include: { user: { select: { id: true } } },
   });
   if (!rotator?.enabled) {
+    return null;
+  }
+  if ((await enforcementEffectsFor({ userId: rotator.userId })).serveBlocked) {
     return null;
   }
 

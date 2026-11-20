@@ -590,6 +590,23 @@ model RotatorHop {
   @@index([userId, ts])
 }
 
+// ─── Rotator enforcement ladder (Dave, 2026-11-20) ──────────────────
+// Enforcement follows the agent first: operators can warn, throttle,
+// forfeit slots, or remove an agent or member without rewriting hops.
+model RotatorEnforcement {
+  id        String    @id @default(cuid())
+  scope     String   // AGENT | USER
+  scopeId   String   // HiredAgent.id when scope is AGENT; User.id when scope is USER
+  level     String   // WARN | THROTTLE | FORFEIT | REMOVED
+  reason    String
+  createdBy String   // operator User.id who applied it
+  createdAt DateTime  @default(now())
+  liftedAt  DateTime?
+
+  @@index([scope, scopeId])
+  @@index([liftedAt])
+}
+
 // ─── Link clicks (Dave, 2026-11-19) ─────────────────────────────────
 // One row per REAL click the app itself served: a member tapping
 // "Sign up" on their Your Links page (source "signup", credited to

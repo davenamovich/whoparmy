@@ -200,6 +200,128 @@ export interface HopVerdict {
   counted: boolean;
 }
 
+export type EnforcementScope = "AGENT" | "USER";
+export type EnforcementLevel = "WARN" | "THROTTLE" | "FORFEIT" | "REMOVED";
+export interface EnforcementLike {
+  scope: string;
+  scopeId: string;
+  level: string;
+}
+export interface EnforcementEffects {
+  serveBlocked: boolean;
+  slotsForfeited: boolean;
+  userRateScale: number;
+  agentRateScale: number;
+}
+
+/** Active rows only: the DB filters liftedAt=null before these effects are applied. */
+export function enforcementEffects(
+  enforcements: EnforcementLike[],
+  ctx: { agentId?: string | null; userId?: string | null },
+): EnforcementEffects {
+  const effects: EnforcementEffects = {
+    serveBlocked: false,
+    slotsForfeited: false,
+    userRateScale: 1,
+    agentRateScale: 1,
+  };
+  for (const row of enforcements) {
+    const agentMatch = row.scope === "AGENT" && !!ctx.agentId && row.scopeId === ctx.agentId;
+    const userMatch = row.scope === "USER" && !!ctx.userId && row.scopeId === ctx.userId;
+    if (!agentMatch && !userMatch) {
+      continue;
+    }
+    if (row.level === "REMOVED") {
+      effects.serveBlocked = true;
+    }
+    if (row.level === "FORFEIT") {
+      effects.slotsForfeited = true;
+    }
+    if (row.level === "THROTTLE") {
+      if (agentMatch) {
+        effects.agentRateScale = 0.5;
+      }
+      if (userMatch) {
+        effects.userRateScale = 0.5;
+        effects.agentRateScale = 0.5;
+      }
+    }
+  }
+  return effects;
+}
+
+export function forfeitedAgentIds(enforcements: EnforcementLike[], agentIdsByUser: Map<string, string[]>): Set<string> {
+  const ids = new Set<string>();
+  for (const row of enforcements) {
+    if (row.level !== "FORFEIT") {
+      continue;
+    }
+    if (row.scope === "AGENT") {
+      ids.add(row.scopeId);
+    }
+    if (row.scope === "USER") {
+      for (const id of agentIdsByUser.get(row.scopeId) ?? []) {
+        ids.add(id);
+      }
+    }
+  }
+  return ids;
+}
+
+export interface HopSummaryRow {
+  counted: boolean;
+  filterReason: string | null;
+  agentId: string | null;
+  userId: string | null;
+}
+export interface HopDaySummary {
+  total: number;
+  countedTotal: number;
+  filteredTotal: number;
+  filteredByReason: Record<string, number>;
+  perAgent: Array<{ agentId: string; counted: number; filtered: number }>;
+  perUser: Array<{ userId: string; counted: number; filtered: number }>;
+}
+export function summarizeHopDay(rows: HopSummaryRow[]): HopDaySummary {
+  let countedTotal = 0;
+  let filteredTotal = 0;
+  const filteredByReason: Record<string, number> = {};
+  const agents = new Map<string, { counted: number; filtered: number }>();
+  const users = new Map<string, { counted: number; filtered: number }>();
+  for (const row of rows) {
+    const key = row.counted ? "counted" : "filtered";
+    if (row.counted) {
+      countedTotal++;
+    } else {
+      filteredTotal++;
+      const reason = row.filterReason ?? "UNKNOWN";
+      filteredByReason[reason] = (filteredByReason[reason] ?? 0) + 1;
+    }
+    if (row.agentId) {
+      const item = agents.get(row.agentId) ?? { counted: 0, filtered: 0 };
+      item[key]++;
+      agents.set(row.agentId, item);
+    }
+    if (row.userId) {
+      const item = users.get(row.userId) ?? { counted: 0, filtered: 0 };
+      item[key]++;
+      users.set(row.userId, item);
+    }
+  }
+  return {
+    total: rows.length,
+    countedTotal,
+    filteredTotal,
+    filteredByReason,
+    perAgent: [...agents]
+      .map(([agentId, counts]) => ({ agentId, ...counts }))
+      .sort((a, b) => b.counted - a.counted || a.agentId.localeCompare(b.agentId)),
+    perUser: [...users]
+      .map(([userId, counts]) => ({ userId, ...counts }))
+      .sort((a, b) => b.counted - a.counted || a.userId.localeCompare(b.userId)),
+  };
+}
+
 export function scoreHop(input: {
   ua: string | null;
   hasIp: boolean;
@@ -207,6 +329,7 @@ export function scoreHop(input: {
   hasUser: boolean;
   hasAgent: boolean;
   history: HopHistory;
+  rateScales?: { user?: number; agent?: number };
 }): HopVerdict {
   let reason: HopFilterReason | null = null;
   if (uaFamily(input.ua) === "Bot" || !input.ua?.trim()) {
@@ -236,12 +359,12 @@ export function scoreHop(input: {
         c.ipDay >= HOP_FILTER_POLICY.RATE_LIMIT_IP_PER_DAY);
     const userRateLimited =
       input.hasUser &&
-      (c.userMinute >= HOP_FILTER_POLICY.RATE_LIMIT_USER_PER_MINUTE ||
-        c.userDay >= HOP_FILTER_POLICY.RATE_LIMIT_USER_PER_DAY);
+      (c.userMinute >= Math.floor(HOP_FILTER_POLICY.RATE_LIMIT_USER_PER_MINUTE * (input.rateScales?.user ?? 1)) ||
+        c.userDay >= Math.floor(HOP_FILTER_POLICY.RATE_LIMIT_USER_PER_DAY * (input.rateScales?.user ?? 1)));
     const agentRateLimited =
       input.hasAgent &&
-      (c.agentMinute >= HOP_FILTER_POLICY.RATE_LIMIT_AGENT_PER_MINUTE ||
-        c.agentDay >= HOP_FILTER_POLICY.RATE_LIMIT_AGENT_PER_DAY);
+      (c.agentMinute >= Math.floor(HOP_FILTER_POLICY.RATE_LIMIT_AGENT_PER_MINUTE * (input.rateScales?.agent ?? 1)) ||
+        c.agentDay >= Math.floor(HOP_FILTER_POLICY.RATE_LIMIT_AGENT_PER_DAY * (input.rateScales?.agent ?? 1)));
     const poolRateLimited =
       c.poolMinute >= HOP_FILTER_POLICY.RATE_LIMIT_POOL_PER_MINUTE ||
       c.poolDay >= HOP_FILTER_POLICY.RATE_LIMIT_POOL_PER_DAY;

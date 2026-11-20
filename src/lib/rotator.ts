@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { BRIDGE_PARTNERS } from "@/lib/bridge";
 import { filterPlacementsByTrafficPool, getPlacementAgentAttribution } from "@/lib/traffic-pool";
 import { pickGroupedDestination, rotatorV2Enabled } from "@/lib/rotator-v2-core";
-import { resolveAgentRotatorDestination } from "@/lib/rotator-v2";
+import { getForfeitedAgentIds, resolveAgentRotatorDestination } from "@/lib/rotator-v2";
 
 /**
  * ─── THE DAILY ROTATOR — auctioned, admin controlled ───────────────
@@ -127,6 +127,13 @@ export async function getRotatorPool(date = etDateString()): Promise<RotatorPool
   // above is never filtered. Fail-open inside the filter.
   const placements = await filterPlacementsByTrafficPool(earned, date);
   const attribution = v2 ? await getPlacementAgentAttribution(placements, date) : new Map<string, string>();
+  if (v2) {
+    const forfeited = await getForfeitedAgentIds(placements);
+    for (let i = placements.length - 1; i >= 0; i--) {
+      const agentId = attribution.get(placements[i].id);
+      if (agentId && forfeited.has(agentId)) placements.splice(i, 1);
+    }
+  }
   for (const pl of placements) {
     const link = await db.engineLink.findUnique({
       where: { userId_partner: { userId: pl.userId, partner: pl.partner } },
