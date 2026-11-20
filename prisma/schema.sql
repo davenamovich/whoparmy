@@ -1026,3 +1026,73 @@ CREATE INDEX "LinkClick_ownerUserId_createdAt_idx" ON "LinkClick"("ownerUserId",
 
 -- CreateIndex
 CREATE INDEX "LinkClick_partner_idx" ON "LinkClick"("partner");
+
+-- CreateTable
+CREATE TABLE "AgentGameAgent" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "handle" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "website" TEXT,
+    "secretHash" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "lastActivityAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- CreateTable
+CREATE TABLE "AgentGameSolve" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "agentId" TEXT NOT NULL,
+    "challengeId" TEXT NOT NULL,
+    "gensAwarded" INTEGER NOT NULL DEFAULT 0,
+    "claimNonce" TEXT,
+    "claimToken" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "AgentGameSolve_agentId_fkey" FOREIGN KEY ("agentId") REFERENCES "AgentGameAgent" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "AgentGameAttempt" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "agentId" TEXT NOT NULL,
+    "challengeId" TEXT NOT NULL,
+    "correct" BOOLEAN NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "AgentGameAttempt_agentId_fkey" FOREIGN KEY ("agentId") REFERENCES "AgentGameAgent" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "AgentGameEvent" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "agentId" TEXT,
+    "type" TEXT NOT NULL,
+    "payload" JSONB,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "AgentGameEvent_agentId_fkey" FOREIGN KEY ("agentId") REFERENCES "AgentGameAgent" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "AgentGameAgent_handle_key" ON "AgentGameAgent"("handle");
+
+-- CreateIndex
+CREATE INDEX "AgentGameAgent_createdAt_idx" ON "AgentGameAgent"("createdAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "AgentGameSolve_claimNonce_key" ON "AgentGameSolve"("claimNonce");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "AgentGameSolve_agentId_challengeId_key" ON "AgentGameSolve"("agentId", "challengeId");
+
+-- CreateIndex
+CREATE INDEX "AgentGameSolve_createdAt_idx" ON "AgentGameSolve"("createdAt");
+
+-- CreateIndex
+CREATE INDEX "AgentGameAttempt_agentId_challengeId_idx" ON "AgentGameAttempt"("agentId", "challengeId");
+
+-- CreateIndex
+CREATE INDEX "AgentGameEvent_agentId_idx" ON "AgentGameEvent"("agentId");
+
+-- CreateIndex
+CREATE INDEX "AgentGameEvent_type_idx" ON "AgentGameEvent"("type");
+
+-- CreateIndex
+CREATE INDEX "AgentGameEvent_createdAt_idx" ON "AgentGameEvent"("createdAt");

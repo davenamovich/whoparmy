@@ -1114,3 +1114,56 @@ model BtcgameEvent {
   @@index([sessionId])
   @@index([type])
 }
+
+model AgentGameAgent {
+  id             String            @id @default(cuid())
+  handle         String            @unique // public agent id, chosen at registration
+  name           String
+  website        String?
+  secretHash     String // SHA-256 of the agent secret; plaintext shown once at registration, never stored
+  createdAt      DateTime          @default(now())
+  lastActivityAt DateTime          @default(now())
+  solves         AgentGameSolve[]
+  attempts       AgentGameAttempt[]
+  events         AgentGameEvent[]
+
+  @@index([createdAt])
+}
+
+model AgentGameSolve {
+  id          String         @id @default(cuid())
+  agentId     String
+  challengeId String
+  gensAwarded Int            @default(0) // gens actually paid (0 when a cap blocked payment)
+  claimNonce  String?        @unique // nonce of the minted W1 claim token (mint-once lock)
+  claimToken  String? // the minted token, returned to the agent exactly at solve
+  createdAt   DateTime       @default(now())
+  agent       AgentGameAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, challengeId]) // a challenge pays once per agent
+  @@index([createdAt]) // daily pool accounting
+}
+
+model AgentGameAttempt {
+  id          String         @id @default(cuid())
+  agentId     String
+  challengeId String
+  correct     Boolean
+  createdAt   DateTime       @default(now())
+  agent       AgentGameAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId, challengeId])
+}
+
+model AgentGameEvent {
+  id        String          @id @default(cuid())
+  agentId   String?
+  type      String // agent_registered | answer_wrong | challenge_solved | claim_minted
+  payload   Json?
+  createdAt DateTime        @default(now())
+  agent     AgentGameAgent? @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId])
+  @@index([type])
+  @@index([createdAt])
+}

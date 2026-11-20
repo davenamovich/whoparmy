@@ -49,6 +49,11 @@ const PUBLIC_API_PREFIXES = [
   // the auth floor must not block anonymous players (routes reject bad sessions themselves).
   "/api/doors/pickaphone",
   "/api/doors/btcgame",
+  // The agent game API is public by design: agents authenticate per-call
+  // with their registration secret, reads are public game state, and all
+  // reward value is controlled server-side by the pool/agent caps and the
+  // claim bridge's single-use nonces (2026-11-19, Slice 1).
+  "/api/agentgame",
 ];
 
 // Same value as SESSION_COOKIE in lib/whop.ts — duplicated because
