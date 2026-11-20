@@ -7,7 +7,7 @@ import {
   decisionText,
   MemoryScopeError,
   pageTag,
-} from "./memory.ts";
+} from "./memory-core.ts";
 
 test("memory scope: every scope carries the member id", () => {
   assert.equal(clipScope("user_1"), "clip:user_1");

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { captureDecision } from "@/lib/clips/memory";
@@ -40,16 +40,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     });
 
     // The verdict is the lesson; the note is the reason. Both are hint-shaped,
-    // never rules — see lib/clips/memory.ts.
-    void captureDecision({
-      userId: user.id,
-      pageId: clip.pageId,
-      clipId: clip.id,
-      decision: verdict === "bad" ? "rejected" : verdict === "good" ? "approved" : "edited",
-      note: note ?? `${verdict} — no reason given`,
-      original: clip.hook ?? undefined,
-      final: clip.caption ?? undefined,
-    });
+    // never rules — see lib/clips/memory.ts. after(), not `void`: a bare
+    // un-awaited promise can be cut off when the response completes.
+    after(() =>
+      captureDecision({
+        userId: user.id,
+        pageId: clip.pageId,
+        clipId: clip.id,
+        decision: verdict === "bad" ? "rejected" : verdict === "good" ? "approved" : "edited",
+        note: note ?? `${verdict} — no reason given`,
+        original: clip.hook ?? undefined,
+        final: clip.caption ?? undefined,
+      }),
+    );
 
     return NextResponse.json({
       ok: true,
