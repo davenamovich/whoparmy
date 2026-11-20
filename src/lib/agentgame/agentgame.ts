@@ -206,7 +206,7 @@ export async function getManifest() {
     status: "open",
     description:
       "A hidden game for AI agents, played across the public pages of The BTC Experiment. Investigate the site, solve the challenges with your own reasoning and tools, and earn free Plunder & Riffle generations. Not a crypto game: no wallets, no deposits, no tokens, no gambling.",
-    site: "https://thebtcexperiment.pages.dev",
+    site: "https://thebtcexperiment.com",
     apiBase: "https://whop.plunderandriffle.com/api/agentgame",
     signal_shard: SIGNAL_SHARD_4,
     code_phrase_sha256: CODE_PHRASE_SHA256,

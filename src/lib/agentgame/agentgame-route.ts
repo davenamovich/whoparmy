@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { AgentgameError } from "./agentgame";
 
 const defaults = [
+  "https://thebtcexperiment.com",
+  "https://www.thebtcexperiment.com",
   "https://thebtcexperiment.pages.dev",
   "https://btc-or-no-btc.pages.dev",
   "https://www.plunderandriffle.com",

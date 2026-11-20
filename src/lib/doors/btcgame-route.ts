@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { BtcgameError } from "./btcgame";
 
-const defaults = ["https://btc-or-no-btc.pages.dev", "https://www.plunderandriffle.com", "https://plunderandriffle.com", "http://localhost:8080", "http://localhost:3000", "http://127.0.0.1:8080"];
+const defaults = ["https://thebtcexperiment.com", "https://www.thebtcexperiment.com", "https://thebtcexperiment.pages.dev", "https://btc-or-no-btc.pages.dev", "https://www.plunderandriffle.com", "https://plunderandriffle.com", "http://localhost:8080", "http://localhost:3000", "http://127.0.0.1:8080"];
 
 export function btcAllowedOrigin(req: Request): string | null {
   const origin = req.headers.get("origin");
