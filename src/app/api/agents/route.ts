@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getWhopUser, UnauthorizedError } from "@/lib/auth";
-import { AGENT_CATALOG, getWalletState, internalBotBudget, templateByKey } from "@/lib/agents";
+import { AGENT_CATALOG, LEGACY_TEMPLATES, getWalletState, internalBotBudget, templateByKey } from "@/lib/agents";
 import { toolsFromJson, toolsToJson } from "@/lib/agent-architect-core";
 import { getPlan } from "@/lib/plans";
 import { countMonthlyUsage } from "@/lib/usage-server";
@@ -58,6 +58,10 @@ export async function GET() {
         memesLimit: plan.monthlyItems,
       },
       catalog: AGENT_CATALOG,
+      // Retired rental bench (2026-11-19): display-only, so existing
+      // hires grandfathered from the old catalog still resolve their
+      // name/role/default job kind in the UI. Never hireable.
+      legacy: LEGACY_TEMPLATES,
       hires,
       jobs,
       research,
@@ -82,7 +86,16 @@ export async function POST(req: NextRequest) {
     };
     const template = body.templateKey ? templateByKey(body.templateKey) : undefined;
     if (!template) {
-      return NextResponse.json({ error: "Pick a bot from the rental catalog." }, { status: 400 });
+      return NextResponse.json({ error: "Pick an agent from the catalog." }, { status: 400 });
+    }
+    // Real agents seeded by a stack (Dave, 2026-11-19) are never
+    // hired directly — they join through their stack launch, gated
+    // on the member saving the offer link (Barry: DH Media).
+    if (template.viaStack) {
+      return NextResponse.json(
+        { error: `${template.name} joins through its stack, not a direct hire — save your offer link and launch the stack from /bridge.` },
+        { status: 400 },
+      );
     }
     // SMB Agent Factory (2026-11-18): a "custom" rental carries the
     // architect's config — role, standing instructions and the tool

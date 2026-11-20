@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { AGENT_CATALOG, internalBotBudget } from "@/lib/agents";
-import { FACTORY_TOOLS, sanitizeToolIds, toolsToJson } from "@/lib/agent-architect-core";
+import { sanitizeToolIds, toolsToJson } from "@/lib/agent-architect-core";
 import { getPlan } from "@/lib/plans";
 import { starimgConfig, getLadder } from "@/lib/llm-policy";
 import { countMonthlyUsage } from "@/lib/usage-server";
@@ -171,8 +171,13 @@ export async function systemContext(user: { id: string; plan: string; whopId: st
 
 // ─── Drafting ──────────────────────────────────────────────────────
 
-const CATALOG_KEYS = new Set(AGENT_CATALOG.map((t) => t.key));
-const TOOL_IDS = new Set(FACTORY_TOOLS.map((t) => t.id));
+// Real-agent model (Dave, 2026-11-19): blueprints design from the
+// platform-side agents that can actually be HIRED on approval — the
+// bridge agents. Stack-seeded agents (Barry) are excluded: they join
+// through their stack launch, never through a blueprint, and the
+// retired rental bench no longer exists here at all.
+const BLUEPRINT_CATALOG = AGENT_CATALOG.filter((t) => !t.viaStack);
+const CATALOG_KEYS = new Set(BLUEPRINT_CATALOG.map((t) => t.key));
 
 /**
  * Panel fix 4 (2026-11-19): a pinned weekly content spec — exact
@@ -266,28 +271,23 @@ function fallbackBlueprint(ctx: SystemContext): Blueprint {
     // means, never the objective, and the frame follows the
     // member's model (no bookings frame on a business that
     // doesn't sell bookings).
-    objective: `Turn ${biz}'s presence into results: a weekly rhythm of content that ends in ${outcomeFor(ctx.promoting)} — trends watched, leads researched — without the owner doing the marketing by hand.`,
+    objective: `Turn ${biz}'s presence into results: a weekly rhythm of content that ends in ${outcomeFor(ctx.promoting)} — built and run by your own agent crew from Day 1, with the Assessor's free /before pack as the front door — without the owner doing the marketing by hand.`,
     opportunities: [
       { title: "Content that ends in a result", why: `Every week of posts points at the outcome that pays — ${outcomeFor(ctx.promoting)} — so the owner can see what the marketing produced.` },
-      { title: "Trend watching in your niche", why: "Riding what is already working in your niche beats inventing angles from zero — the Trend Scout watches it daily." },
+      { title: "Your own crew, stood up on Day 1", why: "The Day-1 setup prompt builds your workforce in your own Muse — trend watching, content making, QA — fitted to your stack and your approval rules, instead of rented templates." },
       { title: "A free /before pack as the front door", why: "The Assessor turns your research into a spoken pitch + memes a prospect can say yes to." },
     ],
-    // Priority order (panel fixes 1+5): angles → making → leads →
-    // production support → QA → the bridge offer. withSeats()
-    // seats them in this order, so the floor is the promise.
+    // Real-agent model (Dave, 2026-11-19): the platform workforce is
+    // the bridge agents only — the member's own crew (built Day-1 in
+    // their Muse) does the production work the retired rental bench
+    // used to promise. The Assessor is always on the floor; its pack
+    // sharpens once the member's website is on file.
     workforce: [
-      { templateKey: "scout", name: "Trend Scout", role: "Watches trends and drafts angles for your niche, every day.", mission: `Find the day's rideable angles for ${biz} and queue the strongest.`, schedule: "Daily", approval: "Drafts only — you approve anything that ships", metric: "Angles queued per week" },
-      { templateKey: "meme-smith", name: "Meme Smith", role: "Turns briefs into meme packs and captions on order.", mission: `Turn approved angles into meme packs in ${biz}'s voice.`, schedule: "On demand", approval: "Every pack waits for your approve tap", metric: "Packs delivered per week" },
-      { templateKey: "lead-researcher", name: "Lead Researcher", role: "Finds and qualifies businesses that fit your offer.", mission: `Build ${biz} a weekly list of qualified prospects the content and the /before pack can be aimed at.`, schedule: "Weekly", approval: "Research only — outreach always waits for your approval", metric: "Qualified leads found per week" },
-      { templateKey: "content-creator", name: "Content Creator", role: "Builds content packs from your briefs.", mission: `Build the weekly content rhythm for ${biz} from the scout's angles.`, schedule: "Weekly", approval: "Drafts only — you approve anything that ships", metric: "Pieces ready per week" },
-      { templateKey: "qa-editor", name: "QA Editor", role: "Checks every piece against your brand before it reaches you.", mission: `Check voice, claims, and links on everything the crew drafts, so what reaches you is already clean.`, schedule: "On demand", approval: "Flags problems — never ships or rewrites silently", metric: "Pieces passed per week" },
-      ...(ctx.brandWebsite
-        ? [{ templateKey: "assessor", name: "The Assessor", role: "Bridge agent: your /before pack + assessment offer, on your credits.", mission: `Keep ${biz}'s free /before pack current as the front-door offer.`, schedule: "On demand", approval: "Runs through your Muse on your credits, quote first", metric: "Packs generated" } satisfies BlueprintAgent]
-        : []),
+      { templateKey: "assessor", name: "The Assessor", role: "Bridge agent: your /before pack + assessment offer, on your credits.", mission: `Keep ${biz}'s free /before pack current as the front-door offer.`, schedule: "On demand", approval: "Runs through your Muse on your credits, quote first", metric: "Packs generated" },
     ],
     workflows: [
-      { name: "Morning angles", flow: "Trend Scout drafts angles → you skim → Meme Smith builds the pack → QA Editor checks it → your approve tap posts it." },
-      { name: "Weekly rhythm", flow: "Content Creator assembles the week from approved angles; the Lead Researcher refreshes the prospect list it aims at; everything waits for your approval before it goes out." },
+      { name: "Day-1 build", flow: "The setup prompt hands your Muse this blueprint → it stands up your crew and your team board → every piece the crew drafts waits for your approve tap before it ships." },
+      { name: "Front door", flow: "The Assessor keeps your free /before pack current from your research → prospects get the pack → the bridge carries your saved offer links into every pack it makes." },
     ],
     integrations: ctx.integrations,
     // Panel (Risk): never guarantee "no other costs" — the member's
@@ -312,8 +312,7 @@ export async function draftBlueprint(user: { id: string; plan: string; whopId: s
   if (!cfg) return persist(user.id, await withSeats(user, fallback));
   try {
     const ladder = await getLadder("mid");
-    const catalog = AGENT_CATALOG.map((t) => `${t.key} — ${t.name}: ${t.role}`).join("\n");
-    const tools = FACTORY_TOOLS.map((t) => `${t.id} — ${t.label}`).join("\n");
+    const catalog = BLUEPRINT_CATALOG.map((t) => `${t.key} — ${t.name}: ${t.role}`).join("\n");
     const res = await fetch(`${cfg.base}/chat/completions`, {
       method: "POST",
       headers: { Authorization: `Bearer ${cfg.key}`, "Content-Type": "application/json" },
@@ -323,8 +322,8 @@ export async function draftBlueprint(user: { id: string; plan: string; whopId: s
           {
             role: "system",
             content:
-              "You are Muse, the P&R onboarding architect. You design a small AI workforce for a small-business owner from a FIXED catalog — never invent agents, tools, integrations, prices, or results. Plain language, no jargon, no earnings promises. Approval rules must keep a human approving anything that publishes, sends, or spends. The OBJECTIVE must name the outcome THIS business actually sells — content is the means, never the objective. Match the frame to the business's model, from the research and what they promote: a local service business books jobs and estimate requests; a creator grows subscribers and sales; an affiliate earns signups and sales through their links; an agency wins inquiries for its clients; a software or platform business gets signups and customers. NEVER impose a bookings/estimates frame on a business that does not sell bookings. Opportunities may only promise capabilities the workforce you design actually staffs — never name an agent, monitor, or service in an opportunity that is not in the workforce. Order the workforce: angle-finding first, content-making second, lead/outcome work third, then production support and QA — the first agents are the floor the member's plan seats, so order is a promise. Metrics measure outcomes (leads, inquiries, bookings) for roles that touch them; output counts only for pure production roles. Include a QA/editor step when the catalog offers one. " +
-              `Reply with ONLY JSON: {"objective":"...","opportunities":[{"title":"...","why":"..."}],"workforce":[{"templateKey":"<catalog key>","name":"...","mission":"...","schedule":"Daily|Weekly|On demand","approval":"...","metric":"..."}],"workflows":[{"name":"...","flow":"..."}]} — exactly 3 opportunities, 3–5 workforce agents, 2–3 workflows. For a "custom" agent also include "tools":[<tool ids>] and "instructions":"...".`,
+              "You are Muse, the P&R onboarding architect. You design a small AI workforce for a small-business owner from a FIXED catalog — never invent agents, tools, integrations, prices, or results. Plain language, no jargon, no earnings promises. Approval rules must keep a human approving anything that publishes, sends, or spends. The OBJECTIVE must name the outcome THIS business actually sells — content is the means, never the objective. Match the frame to the business's model, from the research and what they promote: a local service business books jobs and estimate requests; a creator grows subscribers and sales; an affiliate earns signups and sales through their links; an agency wins inquiries for its clients; a software or platform business gets signups and customers. NEVER impose a bookings/estimates frame on a business that does not sell bookings. The catalog is deliberately small: these are the platform-side bridge agents, the whole platform workforce. The member's own Muse builds the rest of their crew from the Day-1 setup prompt — opportunities may describe what that Day-1 crew will do (trend watching, content making, QA) framed as the member's OWN agents, but never invent a platform agent, monitor, or service that is not in the catalog. Metrics measure outcomes (leads, inquiries, bookings) for roles that touch them; output counts only for pure production roles. " +
+              `Reply with ONLY JSON: {"objective":"...","opportunities":[{"title":"...","why":"..."}],"workforce":[{"templateKey":"<catalog key>","name":"...","mission":"...","schedule":"Daily|Weekly|On demand","approval":"...","metric":"..."}],"workflows":[{"name":"...","flow":"..."}]} — exactly 3 opportunities, 1–3 workforce agents (only catalog keys — a short workforce is correct when the catalog is short), 2–3 workflows.`,
           },
           {
             role: "user",
@@ -332,7 +331,7 @@ export async function draftBlueprint(user: { id: string; plan: string; whopId: s
               `Business: ${ctx.brandName ?? "(unknown)"} ${ctx.brandWebsite ? `(${ctx.brandWebsite})` : ""}\n` +
               `What they promote: ${ctx.promoting ?? "(unknown)"}\n` +
               `Research on file: ${ctx.researchSnippet ?? "(none yet)"}\n` +
-              `Plan: ${ctx.planKey} (${getPlan(ctx.planKey).monthlyItems} generations/month included; agents are unlimited — order the workforce by priority so the most important work is unmistakable)\n\nAgent catalog (templateKey — name: role):\n${catalog}\n\nCustom-agent tools:\n${tools}\n\nDesign the system.`,
+              `Plan: ${ctx.planKey} (${getPlan(ctx.planKey).monthlyItems} generations/month included; agents are unlimited — order the workforce by priority so the most important work is unmistakable)\n\nAgent catalog (templateKey — name: role):\n${catalog}\n\nDesign the system.`,
           },
         ],
       }),
@@ -358,7 +357,7 @@ export async function draftBlueprint(user: { id: string; plan: string; whopId: s
       .map((a): BlueprintAgent | null => {
         const r = (a ?? {}) as Record<string, unknown>;
         const key = clampStr(r.templateKey, 40);
-        const tpl = AGENT_CATALOG.find((t) => t.key === key);
+        const tpl = BLUEPRINT_CATALOG.find((t) => t.key === key);
         if (!tpl || !CATALOG_KEYS.has(key)) return null;
         const agent: BlueprintAgent = {
           templateKey: key,
@@ -369,16 +368,10 @@ export async function draftBlueprint(user: { id: string; plan: string; whopId: s
           approval: clampStr(r.approval, 200) || "Drafts only — you approve anything that ships",
           metric: clampStr(r.metric, 120) || "Jobs completed",
         };
-        if (key === "custom") {
-          const validTools = sanitizeToolIds(Array.isArray(r.tools) ? r.tools.filter((t): t is string => typeof t === "string" && TOOL_IDS.has(t)) : []).map((t) => t.id);
-          if (validTools.length === 0) return null;
-          agent.tools = validTools;
-          agent.instructions = clampStr(r.instructions, 2000) || undefined;
-        }
         return agent;
       })
       .filter((a): a is BlueprintAgent => a !== null)
-      .slice(0, 5);
+      .slice(0, 3);
 
     const workflows = (Array.isArray(p.workflows) ? p.workflows : [])
       .map((w) => {
@@ -388,7 +381,7 @@ export async function draftBlueprint(user: { id: string; plan: string; whopId: s
       .filter((w) => w.name && w.flow)
       .slice(0, 3);
 
-    if (!clampStr(p.objective, 500) || opportunities.length < 2 || workforce.length < 3) {
+    if (!clampStr(p.objective, 500) || opportunities.length < 2 || workforce.length < 1) {
       return persist(user.id, await withSeats(user, fallback));
     }
     const now = new Date().toISOString();
@@ -432,8 +425,11 @@ export async function approveBlueprint(user: { id: string; plan: string; whopId:
       continue;
     }
     const tpl = AGENT_CATALOG.find((t) => t.key === agent.templateKey);
-    if (!tpl) {
-      results[agent.templateKey] = "needs-seat";
+    if (!tpl || tpl.viaStack) {
+      // Retired rental bench (2026-11-19) or a stack-seeded agent:
+      // not hirable from a blueprint. The agent simply doesn't join
+      // the floor — approval still completes for the rest.
+      results[agent.templateKey] = "retired";
       continue;
     }
     const isCustom = agent.templateKey === "custom";

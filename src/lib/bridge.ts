@@ -170,6 +170,21 @@ async function grantFreePlacement(userId: string, partner: string): Promise<bool
   }
 }
 
+/**
+ * The member's saved offer links, named for agent briefs (Dave,
+ * 2026-11-19): links saved on whop.plunderandriffle.com bridge into
+ * P&R with the member — the connect brief and the Day-1 setup
+ * prompt carry them, so the member's agent promotes with the
+ * member's own links from the first connection.
+ */
+export async function getSavedOfferLinks(userId: string): Promise<{ name: string; url: string }[]> {
+  const links = await db.engineLink.findMany({ where: { userId }, select: { partner: true, url: true } });
+  const nameFor = new Map(BRIDGE_PARTNERS.map((p) => [p.key, p.name]));
+  return links
+    .filter((l) => l.url?.trim())
+    .map((l) => ({ name: nameFor.get(l.partner) ?? l.partner, url: l.url }));
+}
+
 export interface AffiliateOfferState extends BridgePartner {
   url: string;
   joined: boolean;

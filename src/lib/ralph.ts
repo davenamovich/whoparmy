@@ -8,6 +8,7 @@ import { HOUSE_PERSON, mnemosCapture, mnemosPersonFor, mnemosRecall, mnemosSnaps
 import { BridgeError, assertBridgeEligible, bridgeOffer, getMemberEngineKey, mintBridgeCode } from "@/lib/muse-bridge";
 import { redactBridgeSecrets } from "@/lib/bridge-redact";
 import { museWeekCommand } from "@/lib/muse-week-command";
+import { getMemberLanguage } from "@/lib/member-language";
 import { draftBlueprint, getBlueprint } from "@/lib/blueprint";
 import { dailyBriefing } from "@/lib/briefing";
 import { craftSetupPrompt } from "@/lib/setup-prompt";
@@ -280,7 +281,8 @@ export async function ralphAction(userId: string, locale: string, actionId: Ralp
           select: { website: true },
         });
         const businessUrl = brand?.website || "https://your-business-website.com";
-        const command = museWeekCommand(minted.code, businessUrl, minted.budgetCredits, "week");
+        const memberLanguage = await getMemberLanguage(user.id).catch(() => null);
+        const command = museWeekCommand(minted.code, businessUrl, minted.budgetCredits, "week", memberLanguage?.language);
         const link = `https://whop.plunderandriffle.com/connect/${minted.code}`;
         return {
           text:

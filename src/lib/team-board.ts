@@ -25,6 +25,7 @@ import type { Blueprint, BlueprintAgent } from "@/lib/blueprint";
  */
 
 const BOARD_NAMES: Record<string, string> = {
+  "btc-barry": "barry",
   scout: "scout",
   "meme-smith": "maker",
   "content-creator": "creator",

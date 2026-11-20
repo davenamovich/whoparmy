@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { MODEL_TIERS } from "@/lib/game";
+import { BARRY_AGENT_NAME, BARRY_ROLE, BARRY_TEMPLATE_KEY } from "@/lib/barry-agent-core";
 
 /**
  * ─── AGENT ECONOMY — hire agents with tokens ────────────────────────
@@ -56,75 +57,56 @@ export interface AgentTemplate {
    *  job kind runs on these. Only set where the template IS its
    *  instructions (custom builds, FAQ). */
   instructions?: string;
+  /** Real-agent seeding (Dave, 2026-11-19): this agent is NOT hired
+   *  through the catalog — it joins through a stack launch (the value
+   *  is the stack key in lib/stacks.ts), gated on the member saving
+   *  the offer link the stack promotes. POST /api/agents refuses
+   *  direct hires of viaStack templates; the launch creates the
+   *  record (lib/barry-agent.ts for Barry). */
+  viaStack?: string;
 }
 
+/**
+ * ─── THE CATALOG IS REAL AGENTS NOW (Dave, 2026-11-19) ─────────────
+ * The rental bench is deleted: no more generic template workers for
+ * rent. The floor seeds with REAL agents, each promoting an offer
+ * with a brand behind it — BTC Barry (DH Media) is the first — plus
+ * the bridge agents that hand runs to the member's own Muse (The
+ * Assessor today; Lead Magnet + Agent Architect join from their
+ * factory branch). Members' own workforces are built by their own
+ * Muse from the Day-1 prompt, not rented here.
+ */
 export const AGENT_CATALOG: AgentTemplate[] = [
+  {
+    key: BARRY_TEMPLATE_KEY,
+    name: BARRY_AGENT_NAME,
+    role: BARRY_ROLE,
+    tierKey: "mid",
+    minBudget: 0,
+    viaStack: "btc-experiment",
+  },
+  { key: "assessor", name: "The Assessor", role: "Bridge agent: hands your own Muse the Assessor command — it makes your free /before pack on your own credits and writes your $999 assessment offer.", tierKey: "mid", minBudget: 25_000, defaultKind: "ASSESS" },
+];
+
+/**
+ * The retired rental bench (deleted 2026-11-19 at Dave's order).
+ * NOT hireable — templateByKey never looks here, so no new hire can
+ * be created from these. The entries survive only so EXISTING hires
+ * (grandfathered — they keep working) render with their real name,
+ * role and default job kind instead of a blank template lookup.
+ */
+export const LEGACY_TEMPLATES: AgentTemplate[] = [
   { key: "scout", name: "Trend Scout", role: "Watches trends and drafts angles for your niche, every day.", tierKey: "volume", minBudget: 10_000, defaultKind: "SCOUT" },
   { key: "meme-smith", name: "Meme Smith", role: "Turns briefs into meme packs and captions on order.", tierKey: "mid", minBudget: 25_000, defaultKind: "MEME" },
-  { key: "assessor", name: "The Assessor", role: "Bridge agent: hands your own Muse the Assessor command — it makes your free /before pack on your own credits and writes your $999 assessment offer.", tierKey: "mid", minBudget: 25_000, defaultKind: "ASSESS" },
   { key: "hook-smith", name: "Hook Smith", role: "Writes the hooks and headlines that ship — flagship tier.", tierKey: "final", minBudget: 50_000, defaultKind: "HOOK" },
   { key: "qa-editor", name: "QA Editor", role: "Claude-grade quality pass on your best pieces. Rare and expensive by design.", tierKey: "quality", minBudget: 100_000, defaultKind: "QA" },
-  // ─── SMB Agent Factory templates (Dave, 2026-11-18) ──────────────
-  // Only templates whose work runs on tools that exist TODAY are
-  // listed. Sales/outreach templates that need prospect discovery +
-  // email (Lead Scout stack, still draft) are deliberately absent —
-  // they ship when that lane does, not before.
-  {
-    key: "custom",
-    name: "Custom AI Employee",
-    role: "Built for you by the Agent Architect from your own description — name, role, instructions and tools picked for the job you described.",
-    tierKey: "mid",
-    minBudget: 25_000,
-    defaultKind: "CUSTOM",
-  },
-  {
-    key: "competitor-monitor",
-    name: "Competitor Monitor",
-    role: "Scout reports on your competitors and your niche: what they're pushing, the angles they're winning with, and the opening for you. Order a report whenever you want one.",
-    tierKey: "volume",
-    minBudget: 10_000,
-    defaultKind: "SCOUT",
-  },
-  {
-    key: "content-creator",
-    name: "Content Creator",
-    role: "Turns a brief into a ready-to-approve campaign pack: announcement post, meme concepts, social posts and CTAs in your brand's voice.",
-    tierKey: "mid",
-    minBudget: 25_000,
-    defaultKind: "CAMPAIGN",
-  },
-  {
-    key: "social-media-agent",
-    name: "Social Media Agent",
-    role: "Drafts your social posts and campaign packs for approval. It creates — you approve and post. Nothing ever publishes on its own.",
-    tierKey: "mid",
-    minBudget: 25_000,
-    defaultKind: "CAMPAIGN",
-  },
-  {
-    key: "video-script-agent",
-    name: "Video Script Agent",
-    role: "Runs the P&R engine's video lane from a topic brief — episodes and pitches that land as previews in your library for your approval.",
-    tierKey: "mid",
-    minBudget: 25_000,
-    defaultKind: "VIDEO",
-  },
-  {
-    key: "local-seo-researcher",
-    name: "Local SEO Researcher",
-    role: "Research reports on how your business shows up locally: your offer, your audience's pains, your competitors, and the content angles that close the gaps it finds.",
-    tierKey: "volume",
-    minBudget: 10_000,
-    defaultKind: "SCOUT",
-  },
-  {
-    key: "lead-researcher",
-    name: "Lead Researcher",
-    role: "Research-only prospect intelligence: from a brief naming a niche and area, it profiles the kinds of businesses worth approaching and the angle that fits each. It does not contact anyone — outreach stays yours.",
-    tierKey: "volume",
-    minBudget: 10_000,
-    defaultKind: "SCOUT",
-  },
+  { key: "custom", name: "Custom AI Employee", role: "Built for you by the Agent Architect from your own description — name, role, instructions and tools picked for the job you described.", tierKey: "mid", minBudget: 25_000, defaultKind: "CUSTOM" },
+  { key: "competitor-monitor", name: "Competitor Monitor", role: "Scout reports on your competitors and your niche: what they're pushing, the angles they're winning with, and the opening for you. Order a report whenever you want one.", tierKey: "volume", minBudget: 10_000, defaultKind: "SCOUT" },
+  { key: "content-creator", name: "Content Creator", role: "Turns a brief into a ready-to-approve campaign pack: announcement post, meme concepts, social posts and CTAs in your brand's voice.", tierKey: "mid", minBudget: 25_000, defaultKind: "CAMPAIGN" },
+  { key: "social-media-agent", name: "Social Media Agent", role: "Drafts your social posts and campaign packs for approval. It creates — you approve and post. Nothing ever publishes on its own.", tierKey: "mid", minBudget: 25_000, defaultKind: "CAMPAIGN" },
+  { key: "video-script-agent", name: "Video Script Agent", role: "Runs the P&R engine's video lane from a topic brief — episodes and pitches that land as previews in your library for your approval.", tierKey: "mid", minBudget: 25_000, defaultKind: "VIDEO" },
+  { key: "local-seo-researcher", name: "Local SEO Researcher", role: "Research reports on how your business shows up locally: your offer, your audience's pains, your competitors, and the content angles that close the gaps it finds.", tierKey: "volume", minBudget: 10_000, defaultKind: "SCOUT" },
+  { key: "lead-researcher", name: "Lead Researcher", role: "Research-only prospect intelligence: from a brief naming a niche and area, it profiles the kinds of businesses worth approaching and the angle that fits each. It does not contact anyone — outreach stays yours.", tierKey: "volume", minBudget: 10_000, defaultKind: "SCOUT" },
   {
     key: "faq-agent",
     name: "FAQ Agent",
@@ -139,6 +121,12 @@ export const AGENT_CATALOG: AgentTemplate[] = [
 
 export function templateByKey(key: string): AgentTemplate | undefined {
   return AGENT_CATALOG.find((t) => t.key === key);
+}
+
+/** Display-only lookup for grandfathered hires: catalog first, then
+ *  the retired bench. Never used to authorize a hire. */
+export function displayTemplateByKey(key: string): AgentTemplate | undefined {
+  return templateByKey(key) ?? LEGACY_TEMPLATES.find((t) => t.key === key);
 }
 
 export function tierCost(tierKey: string): number {

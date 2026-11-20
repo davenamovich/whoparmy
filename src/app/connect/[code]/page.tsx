@@ -1,6 +1,8 @@
 import { db } from "@/lib/db";
 import { findLiveBridgeCode } from "@/lib/muse-bridge";
-import { museWeekCommand, type MuseWeekOfferId } from "@/lib/muse-week-command";
+import { museWeekCommand, savedLinksBrief, type MuseWeekOfferId } from "@/lib/muse-week-command";
+import { getSavedOfferLinks } from "@/lib/bridge";
+import { getMemberLanguage } from "@/lib/member-language";
 
 /**
  * ─── THE AGENT LINK (Dave, 2026-11-18) ──────────────────────────────
@@ -65,6 +67,10 @@ link." Then stop and wait for the fresh link.`}
   const expiresIso = new Date(live.expiresAt).toISOString().replace(".000Z", "Z");
 
   if (live.scope === "clips") {
+    // Saved links ride along here too (Dave, 2026-11-19): a clip
+    // promoting an offer carries the member's own link.
+    const clipsLinks = savedLinksBrief(await getSavedOfferLinks(live.user.id).catch(() => []));
+    const clipsLanguage = await getMemberLanguage(live.user.id).catch(() => null);
     return (
       <Brief
         text={`AGENT BRIEF — Plunder & Riffle Clip Factory
@@ -77,6 +83,7 @@ credit cap that cannot be exceeded.
 CODE:    ${upper}
 EXPIRES: ${expiresIso}
 CAP:     ${live.budgetCredits} credits
+LANGUAGE: ${clipsLanguage ? `${clipsLanguage.label} (${clipsLanguage.language}) — captions and clip text default to this language` : "English (en)"}
 
 STEP 1 — exchange (once). This is the only step that spends the code.
   POST https://whop.plunderandriffle.com/api/bridge/exchange
@@ -103,7 +110,7 @@ RULES
 - You cannot post. The member approves each clip and posts it.
 - You cannot render MP4 through this link.
 - A spent or expired code is dead — ask for a new link, never retry.
-- Hand back the asset links and one line on what each clip says.`}
+- Hand back the asset links and one line on what each clip says.${clipsLinks ? `\n\n${clipsLinks}` : ""}`}
       />
     );
   }
@@ -115,7 +122,13 @@ RULES
   });
   const businessUrl = brand?.website || "https://your-business-website.com";
   const businessName = brand?.name || live.user.name || "the member";
-  const command = museWeekCommand(upper, businessUrl, live.budgetCredits, offerFor(live.budgetCredits));
+  const memberLanguage = await getMemberLanguage(live.user.id).catch(() => null);
+  const command = museWeekCommand(upper, businessUrl, live.budgetCredits, offerFor(live.budgetCredits), memberLanguage?.language);
+  // Saved links bridge over with the member (Dave, 2026-11-19):
+  // their agent promotes with the member's own links from the
+  // first connection. Best-effort — a links read failure must
+  // never take the brief down.
+  const linksBlock = savedLinksBrief(await getSavedOfferLinks(live.user.id).catch(() => []));
 
   return (
     <Brief
@@ -129,6 +142,7 @@ fetch, read, and follow the brief below.
 
 MEMBER: ${businessName}
 BUSINESS: ${businessUrl}
+LANGUAGE: ${memberLanguage ? `${memberLanguage.label} (${memberLanguage.language}) — content defaults to this language` : "English (en)"}
 CONNECTION CAP: ${live.budgetCredits} credits (the bridge refuses
 spend past this; quote before you spend, per the brief)
 EXPIRES: ${expiresIso}
@@ -138,7 +152,7 @@ when you exchange it in step 1.
 ----- BEGIN BRIEF -----
 
 ${command}
-
+${linksBlock ? `\n${linksBlock}\n` : ""}
 ----- END BRIEF -----
 
 Protocol notes:

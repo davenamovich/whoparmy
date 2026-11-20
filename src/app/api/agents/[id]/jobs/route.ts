@@ -7,6 +7,7 @@ import { getPlan } from "@/lib/plans";
 import { countMonthlyUsage, getFreeGenBalance } from "@/lib/usage-server";
 import { isGrantExpired } from "@/lib/bot-grants";
 import { isSupportedLanguage } from "@/lib/languages";
+import { getMemberLanguage } from "@/lib/member-language";
 
 export const runtime = "nodejs";
 
@@ -42,8 +43,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!brief) return NextResponse.json({ error: "Give the agent a brief." }, { status: 400 });
     const pieces = Math.min(10, Math.max(1, Math.floor(Number(body.pieces ?? 1)) || 1));
     // Any language in, selected language out: the brief may be written in
-    // anything; the job's output language is the member's selection.
-    const language = isSupportedLanguage(body.language ?? "") ? (body.language as string) : "en";
+    // anything; the job's output language is the member's selection —
+    // and when the caller selects none, the member's stored language
+    // speaks (Phase 0 plumbing: hand-offs that omit a language now
+    // produce in the member's language, not silently in English).
+    const language = isSupportedLanguage(body.language ?? "")
+      ? (body.language as string)
+      : (await getMemberLanguage(user.id)).language;
 
     const hire = await db.hiredAgent.findFirst({ where: { id, userId: user.id } });
     if (!hire) return NextResponse.json({ error: "Agent not found." }, { status: 404 });
