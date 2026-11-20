@@ -1,0 +1,27 @@
+import { NextRequest, NextResponse } from "next/server";
+import { serveUserRotator } from "@/lib/rotator-v2";
+import { rotatorV2Enabled } from "@/lib/rotator-v2-core";
+
+/**
+ * Serves a member's signed rotator link.
+ * GET — pick an eligible saved EngineLink and redirect to its URL.
+ */
+
+export async function GET(req: NextRequest, context: { params: Promise<{ code: string }> }) {
+  if (!rotatorV2Enabled(process.env)) {
+    return new NextResponse("Not found", { status: 404 });
+  }
+
+  const { code } = await context.params;
+  const ip =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip");
+  const result = await serveUserRotator(code, {
+    ip,
+    ua: req.headers.get("user-agent"),
+    referer: req.headers.get("referer"),
+  });
+
+  return result
+    ? NextResponse.redirect(result.url, 302)
+    : new NextResponse("Not found", { status: 404 });
+}
