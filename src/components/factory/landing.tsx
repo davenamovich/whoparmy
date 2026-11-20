@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { PROMPT_TEXT } from "@/lib/muse-prompt";
 import { stashRefFromUrl } from "@/lib/ref-stash";
 
 const botUrl = "https://t.me/thewhoppbot";
@@ -22,26 +23,6 @@ const application = {
     { "@type": "Offer", name: "Agency", price: 199, priceCurrency: "USD" },
   ],
 };
-
-const PROMPT_TEXT = `You're my Muse. Build me the stack I can run tomorrow morning, not a plan.
-
-ABOUT ME
-Business: <one sentence. what you sell, to whom>
-Customers: <who they are, and where they already find you>
-Offer: <what you sell and the price>
-Already have: <site / Instagram / nothing>
-Time per week: <30 minutes>
-
-WHAT TO DO
-1. If anything above is thin, ask me — one question at a time, nine at most. Don't guess.
-2. Write my brand profile from my site: my voice, words I'd never use, my offers, three things I'd refuse.
-3. Build a standing brief: who I'm talking to, what I post about, what I never post.
-4. Make one week of content with the Plunder & Riffle engine: five memes and three short videos about my actual business, each with a caption.
-5. Show me all of it for approval. Nothing gets published without my tap.
-6. Tell me what to do Monday: what to post, in what order, and what to watch.
-
-RULES
-No invented numbers, no testimonials I don't have, no publishing without my yes. If you don't know something, ask me.`;
 
 export function LandingPage() {
   const [copied, setCopied] = useState(false);
