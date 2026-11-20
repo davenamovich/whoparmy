@@ -2,6 +2,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { getBlueprint, draftBlueprint, type Blueprint } from "@/lib/blueprint";
 import { composeSetupPrompt } from "@/lib/setup-prompt";
+import { getSavedOfferLinks } from "@/lib/bridge";
 
 /**
  * ─── EXPERT PANEL (Dave, 2026-11-19) ──────────────────────────────
@@ -106,6 +107,7 @@ export async function panelQueue(): Promise<QueuedPanel[]> {
         website: brand?.website ?? null,
         blueprint: bp,
         link: null,
+        savedLinks: await getSavedOfferLinks(userId).catch(() => []),
       }),
     });
   }

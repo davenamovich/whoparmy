@@ -9,6 +9,8 @@ import {
   BridgeError,
 } from "@/lib/muse-bridge";
 import { teamBoardSection } from "@/lib/team-board";
+import { getSavedOfferLinks } from "@/lib/bridge";
+import type { SavedOfferLink } from "@/lib/muse-week-command";
 
 /**
  * ─── DAY-1 SETUP PROMPT (Dave, 2026-11-19) ───────────────────────
@@ -40,8 +42,14 @@ export function composeSetupPrompt(args: {
   website: string | null;
   blueprint: Blueprint;
   link: string | null;
+  savedLinks?: SavedOfferLink[];
 }): string {
   const { business, website, blueprint: bp, link } = args;
+  // Saved links bridge over with the member (Dave, 2026-11-19):
+  // their crew promotes with the member's own links from Day 1.
+  const savedLinksBlock = args.savedLinks?.length
+    ? `My saved offer links — when any workflow promotes one of these offers, use MY link exactly as written, never a house link:\n${args.savedLinks.map((l) => `- ${l.name}: ${l.url}`).join("\n")}`
+    : `My saved offer links: none saved yet — if a workflow promotes an offer, ask me to save my link first in Whop Army → Affiliate Manager, so promotions carry my link, not a house link.`;
   const connectBlock = link
     ? `Open this link and follow its brief to connect to my P&R account:\n${link}\nThe link exchanges for a 7-day connection on my own credits, capped at the budget it states. It is CONTENT-ONLY: it generates content; it never publishes, posts, sends, or spends beyond quoted content credits.`
     : `I don't have a live connect link in this prompt. First, tell me the one step to get it: in the Plunder & Riffle app (whop.plunderandriffle.com), Account → "Talk to my Muse" mints my link (Operator and Agency plans). Once I paste it, follow its brief to connect. The connection is 7 days, on my own credits, content-only.`;
@@ -99,6 +107,8 @@ export function composeSetupPrompt(args: {
       : []),
     `Integrations (wire what you can; flag the rest with the ONE step I need to take):`,
     integrations,
+    ``,
+    savedLinksBlock,
     ``,
     `Budget frame: ${bp.budget}`,
     ``,
@@ -162,6 +172,7 @@ export async function craftSetupPrompt(user: Actor): Promise<SetupPromptResult> 
       website: brand?.website ?? null,
       blueprint: bp,
       link,
+      savedLinks: await getSavedOfferLinks(user.id).catch(() => []),
     }),
     blueprintStatus: bp.status,
   };

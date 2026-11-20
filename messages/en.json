@@ -1,10 +1,10 @@
 {
   "agents": {
-    "botRental": "Bot rental",
+    "botRental": "Real agents",
     "memesLeft": "Memes left",
     "memesThisMonth": "Memes this month",
     "meterNote": "On the house lane your memes come out of this monthly meter. Connect your own key (BYOK) and the meter lifts — you pay a cent per call on your key, the bot never stops.",
-    "rentThisBot": "Rent this bot",
+    "rentThisBot": "Add to my team",
     "seatsFull": "All your bot seats are rented — upgrade for more.",
     "tierSuffix": "{tier} tier",
     "yourBots": "Your bots"

@@ -128,6 +128,9 @@ export function AgentsView() {
   const defaultJobLanguage = isSupportedLanguage(uiLocale) ? uiLocale : "en";
   const [planInfo, setPlanInfo] = useState<{ name: string; price: string; botsRented: number; memesUsed: number; memesLimit: number } | null>(null);
   const [catalog, setCatalog] = useState<AgentTemplate[]>([]);
+  // Retired rental bench (2026-11-19): display-only templates for
+  // grandfathered hires — never rendered as hireable cards.
+  const [legacy, setLegacy] = useState<AgentTemplate[]>([]);
   const [hires, setHires] = useState<Hire[]>([]);
   const [trafficPools, setTrafficPools] = useState<Record<string, TrafficPool>>({});
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -154,6 +157,7 @@ export function AgentsView() {
       const d = await a.json();
       setPlanInfo(d.plan);
       setCatalog(d.catalog);
+      setLegacy(d.legacy ?? []);
       setHires(d.hires);
       setJobs(d.jobs);
       setResearch(d.research ?? null);
@@ -429,22 +433,35 @@ export function AgentsView() {
               </div>
               <p className="text-xs text-muted-foreground">{t.role}</p>
               <div className="flex items-center gap-2">
-                <Button
-                  disabled={busy}
-                  onClick={() =>
-                    void act(
-                      () =>
-                        fetch("/api/agents", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ templateKey: t.key }),
-                        }),
-                      `${t.name} rented — it's on your team`,
-                    )
-                  }
-                >
-                  {tA("rentThisBot")}
-                </Button>
+                {t.viaStack ? (
+                  // Real agents (Dave, 2026-11-19) join through their
+                  // stack launch, gated on the saved offer link — the
+                  // launcher lives on /bridge.
+                  hires.some((h) => h.templateKey === t.key) ? (
+                    <Button disabled>On your team ✓</Button>
+                  ) : (
+                    <Button asChild>
+                      <a href="/bridge">Unlock — save your DH Media link</a>
+                    </Button>
+                  )
+                ) : (
+                  <Button
+                    disabled={busy}
+                    onClick={() =>
+                      void act(
+                        () =>
+                          fetch("/api/agents", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ templateKey: t.key }),
+                          }),
+                        `${t.name} added — it's on your team`,
+                      )
+                    }
+                  >
+                    {tA("rentThisBot")}
+                  </Button>
+                )}
               </div>
             </div>
           ))}
@@ -479,7 +496,7 @@ export function AgentsView() {
           </CardHeader>
           <CardContent className="space-y-4">
             {hires.map((h) => {
-              const template = catalog.find((c) => c.key === h.templateKey);
+              const template = catalog.find((c) => c.key === h.templateKey) ?? legacy.find((c) => c.key === h.templateKey);
               const tools = hireTools(h);
               const form = jobForms[h.id] ?? { kind: template?.defaultKind ?? (h.templateKey === "assessor" ? "ASSESS" : "MEME"), brief: "", pieces: "1", language: defaultJobLanguage };
               const kindOptions: string[] =

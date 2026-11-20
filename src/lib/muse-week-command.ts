@@ -14,6 +14,27 @@
 
 export type MuseWeekOfferId = "taste" | "week" | "opener";
 
+export interface SavedOfferLink {
+  name: string;
+  url: string;
+}
+
+/**
+ * The member's saved offer links, rendered for an agent brief
+ * (Dave, 2026-11-19: links saved on whop.plunderandriffle.com
+ * bridge over to P&R with the member). The agent promotes with
+ * THESE links, exactly as written — never a house link. Empty
+ * string when the member has saved none, so briefs stay lean.
+ */
+export function savedLinksBrief(links: SavedOfferLink[]): string {
+  const rows = links.filter((l) => l.url.trim());
+  if (!rows.length) return "";
+  return [
+    "MY SAVED OFFER LINKS — when you promote any of these offers, use MY link exactly as written, never the house link or a guessed one:",
+    ...rows.map((l) => `- ${l.name}: ${l.url}`),
+  ].join("\n");
+}
+
 export function museWeekCommand(code: string, businessUrl: string, budget: number, offer: MuseWeekOfferId): string {
   const intro = `You are my content agent, connected to my Plunder & Riffle account through my bridge at whop.plunderandriffle.com. My credits are mine — never ask me for an API key; it stays on the engine side and I will never paste it anywhere.
 

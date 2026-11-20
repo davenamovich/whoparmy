@@ -61,7 +61,9 @@ export async function launchReport(user: Actor): Promise<LaunchReport | null> {
             ? "Already on your floor"
             : bp.hireResults?.[a.templateKey] === "needs-seat"
               ? "Planned — not hired yet"
-              : "Planned",
+              : bp.hireResults?.[a.templateKey] === "retired"
+                ? "Retired — no longer offered"
+                : "Planned",
     })),
     integrations: bp.integrations.map((g) => ({ label: g.label, connected: g.connected, note: g.note })),
     workflows: bp.workflows,

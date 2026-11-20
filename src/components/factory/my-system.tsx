@@ -424,6 +424,8 @@ export function MySystemView() {
                       <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold">Already on your floor</span>
                     ) : blueprint.hireResults?.[a.templateKey] === "needs-seat" ? (
                       <span className="rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 px-2 py-0.5 text-[11px] font-semibold">Not hired yet — re-approve to hire</span>
+                    ) : blueprint.hireResults?.[a.templateKey] === "retired" ? (
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold">Retired — no longer offered</span>
                     ) : a.seated === false ? (
                       <span className="rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 px-2 py-0.5 text-[11px] font-semibold">Joins on approval</span>
                     ) : a.seated === true ? (
