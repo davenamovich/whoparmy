@@ -85,8 +85,10 @@ export default function ClaimPage() {
                   Your balance is now {claimed.newBalance} free generations. They spend automatically when
                   your plan&apos;s monthly memes run out — or bid them in the rotator.
                 </p>
-                <a href="/" className="inline-block mt-3 text-sm text-primary underline underline-offset-2">
-                  Back to the factory
+                {/* /bridge, not "/": home is closed while the site gate
+                    is up, and the bridge is the next hand-off step. */}
+                <a href="/bridge" className="inline-block mt-3 text-sm text-primary underline underline-offset-2">
+                  Next: get your agent
                 </a>
               </div>
             </div>
