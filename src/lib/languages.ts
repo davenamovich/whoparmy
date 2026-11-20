@@ -45,3 +45,23 @@ export function languageLabel(code: string): string {
 export function isSupportedLanguage(code: string): boolean {
   return Boolean(LANGUAGE_MAP[code]);
 }
+
+/**
+ * Normalize a raw locale tag (Telegram language_code, a browser or
+ * Whop locale, "es-ES", "pt-br", "EN_us"…) to one of the 23 catalog
+ * codes, or null when nothing matches. Bare "pt" means pt-BR and
+ * bare "zh" means zh-CN in this catalog.
+ */
+export function normalizeLanguageCode(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const tag = raw.trim().replace("_", "-");
+  if (LANGUAGE_MAP[tag]) return tag;
+  const lower = tag.toLowerCase();
+  const exact = LANGUAGES.find((l) => l.code.toLowerCase() === lower);
+  if (exact) return exact.code;
+  const base = lower.split("-")[0];
+  if (base === "pt") return "pt-BR";
+  if (base === "zh") return "zh-CN";
+  const byBase = LANGUAGES.find((l) => l.code.toLowerCase() === base);
+  return byBase ? byBase.code : null;
+}

@@ -12,6 +12,8 @@
  * in-app approve tap. The command text says so to the member's Muse.
  */
 
+import { languageLabel } from "@/lib/languages";
+
 export type MuseWeekOfferId = "taste" | "week" | "opener";
 
 export interface SavedOfferLink {
@@ -35,11 +37,19 @@ export function savedLinksBrief(links: SavedOfferLink[]): string {
   ].join("\n");
 }
 
-export function museWeekCommand(code: string, businessUrl: string, budget: number, offer: MuseWeekOfferId): string {
+export function museWeekCommand(code: string, businessUrl: string, budget: number, offer: MuseWeekOfferId, languageCode?: string): string {
+  // Member language (Phase 0, Dave 2026-11-19): when the member's
+  // language is not English, the command tells their agent to make
+  // content in it by default. English members see the exact text
+  // they always have.
+  const languageLine =
+    languageCode && languageCode !== "en"
+      ? `\n\nContent language: make my content in ${languageLabel(languageCode)} by default — captions, meme text, scripts and audio briefs — unless I ask for another language for a specific piece. Talk to me in ${languageLabel(languageCode)} too.`
+      : "";
   const intro = `You are my content agent, connected to my Plunder & Riffle account through my bridge at whop.plunderandriffle.com. My credits are mine — never ask me for an API key; it stays on the engine side and I will never paste it anywhere.
 
 1. My bridge code is ${code} (one-time, expires in 15 minutes). Exchange it: POST https://whop.plunderandriffle.com/api/bridge/exchange with {"code": "${code}"}. You get a bridge token (7 days) and the MCP URL. Use the token as the Bearer credential for every MCP call. Never print the token back to me, and never store it past this week.
-2. My business is ${businessUrl}. Research it first through the bridge MCP (research_brand, then create_campaign_from_research) — both are free. Work only from what the research actually found about my business; invent nothing.`;
+2. My business is ${businessUrl}. Research it first through the bridge MCP (research_brand, then create_campaign_from_research) — both are free. Work only from what the research actually found about my business; invent nothing.${languageLine}`;
 
   if (offer === "taste") {
     return `Make my day of content

@@ -53,6 +53,7 @@ export default function MuseWeekPage() {
   const [account, setAccount] = useState<BridgeAccount | null>(null);
   const [code, setCode] = useState<string | null>(null);
   const [offerId, setOfferId] = useState<OfferId>("week");
+  const [memberLanguage, setMemberLanguage] = useState<string | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -61,6 +62,16 @@ export default function MuseWeekPage() {
     if (res.ok) {
       const json = (await res.json()) as { account: BridgeAccount };
       setAccount(json.account);
+    }
+    // Member language (Phase 0): the pasted command speaks it too.
+    try {
+      const langRes = await fetch("/api/language");
+      if (langRes.ok) {
+        const langJson = (await langRes.json()) as { language?: { language?: string } };
+        if (langJson.language?.language) setMemberLanguage(langJson.language.language);
+      }
+    } catch {
+      // the command simply stays in its default language
     }
   }, []);
 
@@ -276,12 +287,12 @@ export default function MuseWeekPage() {
                 </p>
               </div>
               <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-4 text-xs leading-relaxed">
-                {museWeekCommand(code, businessUrl, budget, offerId)}
+                {museWeekCommand(code, businessUrl, budget, offerId, memberLanguage)}
               </pre>
               <div className="flex flex-wrap gap-2">
                 <Button
                   onClick={async () => {
-                    await navigator.clipboard.writeText(museWeekCommand(code, businessUrl, budget, offerId));
+                    await navigator.clipboard.writeText(museWeekCommand(code, businessUrl, budget, offerId, memberLanguage));
                     setCopied(true);
                   }}
                 >

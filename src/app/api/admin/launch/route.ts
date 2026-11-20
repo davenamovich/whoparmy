@@ -4,6 +4,7 @@ import { stackById } from "@/lib/stacks";
 import { BRIDGE_PARTNERS } from "@/lib/bridge";
 import { getSavedDhMediaLink } from "@/lib/btc-addresses";
 import { ensureBarryAgent } from "@/lib/barry-agent";
+import { getMemberLanguage } from "@/lib/member-language";
 import {
   BridgeError,
   MAX_BUDGET_CREDITS,
@@ -103,6 +104,13 @@ export async function POST(req: NextRequest) {
         BRIDGE_PARTNERS.find((p) => p.key === "dh-media")?.example ??
         "https://dh.media/?affid=Vesselprotocol";
       prompt = prompt.replaceAll("{DH_MEDIA_LINK}", dhMediaLink ?? fallback);
+    }
+    if (prompt.includes("{LANGUAGE}")) {
+      // Phase 0 plumbing (Dave, 2026-11-19): the launching member's
+      // stored language fills the slot — Barry works in it from the
+      // first message.
+      const memberLanguage = await getMemberLanguage(operator.id).catch(() => null);
+      prompt = prompt.replaceAll("{LANGUAGE}", memberLanguage?.label ?? "English");
     }
     return NextResponse.json(
       {

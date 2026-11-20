@@ -10,6 +10,7 @@ import {
 } from "@/lib/muse-bridge";
 import { teamBoardSection } from "@/lib/team-board";
 import { getSavedOfferLinks } from "@/lib/bridge";
+import { getMemberLanguage } from "@/lib/member-language";
 import type { SavedOfferLink } from "@/lib/muse-week-command";
 
 /**
@@ -43,6 +44,7 @@ export function composeSetupPrompt(args: {
   blueprint: Blueprint;
   link: string | null;
   savedLinks?: SavedOfferLink[];
+  languageLabel?: string;
 }): string {
   const { business, website, blueprint: bp, link } = args;
   // Saved links bridge over with the member (Dave, 2026-11-19):
@@ -86,6 +88,7 @@ export function composeSetupPrompt(args: {
     ``,
     `## 2. My business`,
     `Business: ${business}${website ? `\nWebsite: ${website}` : ""}`,
+    `My language: ${args.languageLabel ?? "English"} — build my system, the management UI and my content defaults in my language.`,
     `System objective: ${bp.objective}`,
     `Brand voice: ${bp.voiceSpec ?? "Mirror the voice on my website — my own phrases, my register, no hype."}`,
     `Top opportunities: ${bp.opportunities.map((o) => `${o.title} — ${o.why}`).join(" · ")}`,
@@ -173,6 +176,7 @@ export async function craftSetupPrompt(user: Actor): Promise<SetupPromptResult> 
       blueprint: bp,
       link,
       savedLinks: await getSavedOfferLinks(user.id).catch(() => []),
+      languageLabel: (await getMemberLanguage(user.id).catch(() => null))?.label,
     }),
     blueprintStatus: bp.status,
   };
