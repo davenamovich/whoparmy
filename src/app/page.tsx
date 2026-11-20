@@ -1,417 +1,141 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  Sparkles,
-  LayoutGrid,
-  Library,
-  Swords,
-  UserRound,
-  Bot,
-  MessagesSquare,
-  ShieldCheck,
-  Network,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
-import { ResultsWorkspace } from "@/components/factory/results-workspace";
-import { MemeArmy } from "@/components/factory/meme-army";
-import { WarRoom } from "@/components/factory/war-room";
-import { AgentsView } from "@/components/factory/agents";
-import { RalphChat, type RalphNavIntent } from "@/components/factory/ralph-chat";
-import { TrendingView } from "@/components/factory/trending";
-import { AgentStart } from "@/components/factory/agent-start";
-import { AdTeardownCard } from "@/components/factory/ad-teardown";
-import { MySystemView } from "@/components/factory/my-system";
-import { CampaignsView } from "@/components/factory/campaigns";
-import { LibraryView } from "@/components/factory/library";
-import { BrandsView } from "@/components/factory/brands";
-import { AccountView } from "@/components/factory/account";
-import { PublishingView } from "@/components/factory/publishing";
-import { WhopAccountBadge, useWhopSession } from "@/components/factory/whop-auth";
-import { LandingPage } from "@/components/factory/landing";
-import { useTranslations } from "next-intl";
-import { LocaleSwitcher } from "@/components/factory/locale-switcher";
-import { QuizCard } from "@/components/factory/quiz-card";
+import { ArrowRight, ExternalLink, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { stashRefFromUrl } from "@/lib/ref-stash";
 
-type View =
-  | "create"
-  | "ralph"
-  | "results"
-  | "campaigns"
-  | "library"
-  | "army"
-  | "agents"
-  | "system"
-  | "account";
+/**
+ * ─── / — the one-time door (Dave, 2026-11-20) ───────────────────────
+ *
+ * "Users are not going to log in repeatedly." The nine-room dashboard
+ * that lived here (Create, Ralph, Campaigns, Library, Meme Army, Agents,
+ * My AI System, Account) is gone: members live in their own agent, and
+ * the agent does that work through the bridge. This page only points:
+ *
+ *   - new here   → The BTC Experiment (the front door), or /bridge if
+ *                  they already played
+ *   - signed in  → your agent lives in your agent app; /bridge for a
+ *                  fresh code; Whop for plans and billing
+ *   - operator   → /admin
+ *
+ * The rooms' components stay in components/factory for now and their
+ * API routes are untouched (agents and the operator still use them);
+ * only the doors closed. While the site gate is up this page is still
+ * operator-only (app/layout.tsx); the public hand-off is /bridge.
+ */
 
-type NavKey = "create" | "ralph" | "campaigns" | "library" | "army" | "agents" | "system" | "account" | "admin";
+const GAME_URL = "https://thebtcexperiment.com/";
+const MUSE_URL = "https://www.plunderandriffle.com/muse-invite";
+const AGENT37_URL = "https://agent37.com/?via=riffle";
+// TODO(Dave): deep link to Whop's membership settings once confirmed.
+const WHOP_URL = "https://whop.com/";
 
-// Consolidated menu (Dave, 2026-11-17): fewer doors, same rooms.
-// The War Room folded into Meme Army. The "warroom" view key no
-// longer exists — the component renders inside its parent view.
-//
-// Agent-creation reframe (Dave, 2026-11-19): the manual tools are
-// GONE — no Meme Studio, no Video Studio, no campaign wizard. The
-// member's agents create; the Create room holds the agent-led
-// start, Brand Profiles (agents work from them) and Trending
-// (headlines hand off to the member's Meme Smith as jobs). The
-// Telegram bot offer (Meme Army) stays.
-//
-// Nav diet, phase 1 (Dave, 2026-11-18, UI audit): Brands, Trending
-// and Publishing lose their doors too — Brands and Trending are
-// inputs to Create (a brand feeds the wizard; a trend loads Create
-// a Meme) and Publishing is a property of Campaigns, so all three
-// render inside those views now. Permanent nav badges (PRO / NEW /
-// LIVE / OPS) are gone: badges are for state that clears, not
-// decoration (ui-ux-pro-max tab-badge rule).
-const NAV: { key: View; labelKey: NavKey; icon: React.ComponentType<{ className?: string }> }[] = [
-  { key: "create", labelKey: "create", icon: Sparkles },
-  // Ralph chat (Dave, 2026-11-18): the one-click dispatcher door.
-  { key: "ralph", labelKey: "ralph", icon: MessagesSquare },
-  { key: "campaigns", labelKey: "campaigns", icon: LayoutGrid },
-  { key: "library", labelKey: "library", icon: Library },
-  { key: "army", labelKey: "army", icon: Swords },
-  { key: "agents", labelKey: "agents", icon: Bot },
-  // My AI System (Dave, 2026-11-19): the blueprint + system state.
-  { key: "system", labelKey: "system", icon: Network },
-  { key: "account", labelKey: "account", icon: UserRound },
-];
+type Session = { connected: boolean; admin: boolean; user: { name: string | null; whopUsername: string | null } | null };
 
-// Mobile bottom bar: max 5 (ui-ux-pro-max bottom-nav-limit), the
-// same primary destinations as the sidebar minus Library.
-const MOBILE_NAV: View[] = ["create", "campaigns", "army", "agents", "account"];
+const label = "font-mono text-[11px] font-semibold tracking-[0.18em] text-primary uppercase";
 
 export default function Home() {
-  const [view, setView] = useState<View>("create");
-  const [resultsCampaignId, setResultsCampaignId] = useState<string | null>(null);
-  // Front-door quiz (Dave, 2026-11-18): shown until the member's
-  // answers (or a skip) are on file — see lib/quiz.ts.
-  const [quizNeeded, setQuizNeeded] = useState(false);
-  const { session, loading: sessionLoading, reload: reloadSession } = useWhopSession();
-  const { toast } = useToast();
-  const tNav = useTranslations("nav");
+  const [session, setSession] = useState<Session | null>(null);
 
-  // OAuth return handling: ?welcome=whop | ?auth_error=...
-  // Toasts are deferred to a post-commit timer: the Toaster (sibling rendered
-  // after {children}) subscribes in a later effect of the same commit, so a
-  // toast dispatched synchronously during this effect would be missed.
   useEffect(() => {
+    stashRefFromUrl();
+    // OAuth return: drop ?welcome / ?auth_error from the address bar.
     const params = new URLSearchParams(window.location.search);
-    const welcome = params.get("welcome");
-    const authError = params.get("auth_error");
-    // Referral program: stash the inviter's code; attribution happens
-    // once a session exists (see the effect below).
-    const ref = params.get("ref");
-    if (ref) {
-      try {
-        window.localStorage.setItem("pr_ref", ref);
-      } catch {
-        // storage unavailable — attribution is a bonus, never a blocker
-      }
-    }
-    if (welcome || authError || ref) {
-      window.setTimeout(() => {
-        if (welcome === "whop") {
-          toast({
-            title: "Signed in with Whop",
-            description: "Your identity was verified via Whop OAuth — entitlements sync from your membership.",
-          });
-        }
-        if (authError) {
-          toast({ title: "Whop sign-in failed", description: authError, variant: "destructive" });
-        }
-      }, 50);
+    if (params.has("welcome") || params.has("auth_error")) {
       window.history.replaceState({}, "", window.location.pathname);
-      void reloadSession();
     }
+    void fetch("/api/auth/session", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((s: Session) => setSession(s))
+      .catch(() => setSession({ connected: false, admin: false, user: null }));
   }, []);
 
-  // One-shot referral attribution: if this browser arrived via a
-  // member's link and the visitor is signed in, credit the inviter.
-  useEffect(() => {
-    if (sessionLoading || !session) return;
-    let code: string | null = null;
-    try {
-      code = window.localStorage.getItem("pr_ref");
-    } catch {
-      code = null;
-    }
-    if (!code) return;
-    try {
-      window.localStorage.removeItem("pr_ref");
-    } catch {
-      // ignore
-    }
-    void fetch("/api/referrals", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code }),
-    }).catch(() => {});
-  }, [session, sessionLoading]);
-
-  // Quiz state: fetch once a connected session exists. A saved
-  // record (answers or a skip) keeps the card away for good.
-  useEffect(() => {
-    if (sessionLoading || !session?.connected) return;
-    let cancelled = false;
-    void fetch("/api/quiz")
-      .then((r) => r.json())
-      .then((data) => {
-        if (!cancelled && !data.quiz) setQuizNeeded(true);
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [session, sessionLoading]);
-
-  function openResults(campaignId: string) {
-    setResultsCampaignId(campaignId);
-    setView("results");
-  }
-
-  // Ralph chat navigation intents: Ralph routes, the page moves.
-  // (Topic taps no longer navigate — Ralph hands them to the
-  // member's Meme Smith directly, see ralph-chat.tsx.)
-  function onRalphNavigate(intent: RalphNavIntent) {
-    setView(intent.view);
-  }
-
-  const activeLabel =
-    view === "results" ? tNav("results") : tNav(NAV.find((n) => n.key === view)?.labelKey ?? "create");
-
-  // The Whop-connection gate (Dave, 2026-11-17): anonymous visitors
-  // get the landing page — the front door borrowed from the Global
-  // Content Factory page. The app's working parts unlock only after
-  // Connect with Whop (any membership, Trial included). A failed
-  // session fetch (session === null) falls through to the app rather
-  // than locking anyone out on a network hiccup.
-  if (!sessionLoading && session && !session.connected) {
-    return <LandingPage />;
-  }
-
-  // While the session probe is in flight, render a neutral splash —
-  // never the app shell. The shell's components fire member fetches on
-  // mount; for an anonymous visitor those now correctly 401 (the
-  // operator fallback is closed), and their error toasts would
-  // otherwise bleed onto the landing page.
-  if (sessionLoading) {
-    return (
-      <div className="min-h-screen grid place-items-center bg-background">
-        <p className="text-xs font-bold tracking-[0.25em] uppercase text-muted-foreground animate-pulse">
-          Plunder &amp; Riffle
-        </p>
-      </div>
-    );
-  }
+  const name = session?.user?.name ?? session?.user?.whopUsername ?? null;
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* top header — mobile brand row + plan context */}
-      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/85 backdrop-blur-md">
-        <div className="mx-auto max-w-7xl px-4 h-14 flex items-center justify-between gap-3">
-          <button className="flex items-center gap-2.5 min-w-0" onClick={() => setView("create")} aria-label={tNav("create")}>
-            <span className="w-8 h-8 rounded-lg bg-primary grid place-items-center text-primary-foreground font-black text-sm tracking-tighter shrink-0">
-              P&amp;R
-            </span>
-            <span className="hidden min-[420px]:block text-left leading-tight">
-              <span className="block text-sm font-bold tracking-tight">Global Content Factory</span>
-              <span className="block text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Powered by P&amp;R MCP</span>
-            </span>
-          </button>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground truncate max-w-28 sm:max-w-none">{activeLabel}</span>
-            <LocaleSwitcher />
-            <WhopAccountBadge session={session} loading={sessionLoading} onSessionChanged={() => void reloadSession()} />
-          </div>
-        </div>
-      </header>
+    <main className="min-h-screen bg-background text-foreground">
+      <div className="mx-auto max-w-2xl px-5 py-14 sm:py-20 space-y-10">
+        <header>
+          <p translate="no" className="text-xs font-black tracking-[0.14em]">
+            PLUNDER <span className="text-primary">&amp;</span> RIFFLE
+          </p>
+        </header>
 
-      <div className="flex-1 flex w-full mx-auto max-w-7xl">
-        {/* sidebar — desktop */}
-        <aside className="hidden lg:flex flex-col w-60 shrink-0 border-r border-border/60 px-3 py-5 gap-1 sticky top-14 self-start h-[calc(100vh-3.5rem)]">
-          {NAV.map((item) => (
-            <button
-              key={item.key}
-              onClick={() => {
-                setView(item.key);
-              }}
-              className={cn(
-                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors text-left",
-                view === item.key || (view === "results" && item.key === "create")
-                  ? "bg-primary/12 text-primary"
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50",
-              )}
-            >
-              <item.icon className="h-4.5 w-4.5 shrink-0" />
-              <span className="truncate">{tNav(item.labelKey)}</span>
-            </button>
-          ))}
+        {session === null ? (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground" aria-label="Loading">
+            <Loader2 className="h-4 w-4 animate-spin" />
+          </p>
+        ) : session.connected ? (
+          <section className="space-y-5">
+            <p className={label}>{name ? `Signed in as ${name}` : "Signed in"}</p>
+            <h1 className="text-4xl sm:text-5xl font-black leading-[1.02] tracking-tight">
+              Your agent lives in your agent app.
+            </h1>
+            <p className="text-muted-foreground leading-relaxed">
+              There&apos;s nothing to run here. Your agent makes your content on the Plunder &amp; Riffle engine and
+              asks you before anything publishes or spends. Open it to keep going.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Button asChild>
+                <a href={MUSE_URL} target="_blank" rel="noreferrer">
+                  Open Muse <ExternalLink className="h-4 w-4 ml-1.5" />
+                </a>
+              </Button>
+              <Button asChild variant="outline">
+                <a href={AGENT37_URL} target="_blank" rel="noreferrer">
+                  Open Agent37 <ExternalLink className="h-4 w-4 ml-1.5" />
+                </a>
+              </Button>
+            </div>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li>
+                Code expired, or setting up a new agent?{" "}
+                <a className="text-primary underline underline-offset-2" href="/bridge">
+                  Get a fresh code
+                </a>
+              </li>
+              <li>
+                Plans and billing are on{" "}
+                <a className="text-primary underline underline-offset-2" href={WHOP_URL} target="_blank" rel="noreferrer">
+                  Whop
+                </a>
+                .
+              </li>
+              {session.admin ? (
+                <li>
+                  <a className="text-primary underline underline-offset-2" href="/admin">
+                    Admin
+                  </a>
+                </li>
+              ) : null}
+            </ul>
+          </section>
+        ) : (
+          <section className="space-y-5">
+            <h1 className="text-4xl sm:text-5xl font-black leading-[1.02] tracking-tight">Start with the experiment.</h1>
+            <p className="text-muted-foreground leading-relaxed">
+              Play The BTC Experiment, pick an agent, and come back here once to give it its bridge code. After that,
+              your agent does the work.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Button asChild>
+                <a href={GAME_URL}>
+                  Play The BTC Experiment <ArrowRight className="h-4 w-4 ml-1.5" />
+                </a>
+              </Button>
+              <Button asChild variant="outline">
+                <a href="/bridge">Already played? Get your agent&apos;s code</a>
+              </Button>
+            </div>
+          </section>
+        )}
 
-          {/* /admin door (Dave, 2026-11-18): shown only when an
-              admin/operator is logged in (same session.admin flag
-              that gates LLM Control). /admin is a real route that
-              404s for everyone else, so the link is safe to show. */}
-          {session?.admin ? (
-            <a
-              href="/admin"
-              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors text-left text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-            >
-              <ShieldCheck className="h-4.5 w-4.5 shrink-0" />
-              <span className="truncate">{tNav("admin")}</span>
-            </a>
-          ) : null}
-
-          <div className="mt-auto rounded-xl border bg-card p-3.5">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-primary mb-1">{tNav("taglineTitle")}</div>
-            <p className="text-xs text-muted-foreground leading-relaxed">{tNav("taglineBody")}</p>
-          </div>
-        </aside>
-
-        {/* main content */}
-        <main className="flex-1 min-w-0 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pb-24 lg:pb-12">
-          {quizNeeded ? (
-            <div className="mb-8">
-              <QuizCard
-                onDone={(v) => {
-                  setQuizNeeded(false);
-                  if (v) setView(v as View);
-                }}
-              />
-            </div>
-          ) : null}
-          {view === "create" ? (
-            <div className="space-y-12">
-              {/* The agent-led start (Dave, 2026-11-18): one input —
-                  website or CTA — then research + the agent handoff.
-                  Everything in this room feeds the member's agents;
-                  there are no manual creation tools (Dave, 2026-11-19). */}
-              <AgentStart />
-              {/* The teardown card (Dave, 2026-11-19): a working
-                  competitor ad/post in, angles + one agent command
-                  out. Agent-led like the start card — generation
-                  happens in the member's agent. */}
-              <AdTeardownCard />
-              {/* Ralph entry card: the button-first door, one tap
-                  from the room members land in. */}
-              <button
-                onClick={() => setView("ralph")}
-                className="w-full flex items-center gap-3 rounded-2xl border border-primary/30 bg-primary/8 px-4 py-3.5 text-left hover:bg-primary/12 transition-colors"
-              >
-                <span className="w-9 h-9 rounded-xl bg-primary grid place-items-center text-primary-foreground shrink-0">
-                  <MessagesSquare className="h-4.5 w-4.5" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-bold tracking-tight">Ask Ralph — one tap, no typing</span>
-                  <span className="block text-xs text-muted-foreground truncate">Free content · free AI audit · he remembers your business</span>
-                </span>
-              </button>
-              {/* Agent fuel (Dave, 2026-11-19): the manual studios
-                  and the campaign wizard are removed — what remains
-                  in this room is what the member's agents work from:
-                  their brand profiles and today's trends. */}
-              <div className="flex items-center gap-3 pt-2" aria-hidden>
-                <span className="h-px flex-1 bg-border" />
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  What your agents work from
-                </span>
-                <span className="h-px flex-1 bg-border" />
-              </div>
-              {/* Jump chips (Dave, 2026-11-18: "where is reply guy" —
-                  the Create room stacks everything, so the doors get
-                  named shortcuts at the top). The row is a plain block
-                  in the space-y flow: an earlier -mb-6 pulled the
-                  Brand Profiles section up over the chips (Dave:
-                  "fix the overlap"), so no negative margins here. */}
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { id: "create-brands", label: "Brand Profiles" },
-                  { id: "create-trending", label: "🔥 Trending — Reply Guy lives here" },
-                ].map((chip) => (
-                  <button
-                    key={chip.id}
-                    onClick={() => document.getElementById(chip.id)?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                    className="rounded-full border border-border bg-card px-3.5 py-1.5 text-xs font-semibold hover:border-primary/50 transition-colors"
-                  >
-                    {chip.label}
-                  </button>
-                ))}
-              </div>
-              {/* Brands lives here — the profiles the member's
-                  agents work from. Its button jumps to the Agents
-                  floor to brief them. */}
-              <div id="create-brands" className="scroll-mt-24">
-                <BrandsView onBriefAgents={() => setView("agents")} />
-              </div>
-              {/* Trending lives here too — its one action hands the
-                  headline to the member's Meme Smith as a job. */}
-              <div id="create-trending" className="scroll-mt-24">
-                <TrendingView onGoToAgents={() => setView("agents")} />
-              </div>
-            </div>
-          ) : null}
-          {view === "ralph" ? <RalphChat onNavigate={onRalphNavigate} /> : null}
-          {view === "results" && resultsCampaignId ? (
-            <ResultsWorkspace campaignId={resultsCampaignId} onBack={() => setView("campaigns")} />
-          ) : null}
-          {view === "campaigns" ? (
-            <div className="space-y-12">
-              <CampaignsView onOpen={openResults} onNewCampaign={() => setView("create")} />
-              {/* Publishing folded in (nav diet phase 1): posting
-                  state is a property of the campaigns above. */}
-              <PublishingView />
-            </div>
-          ) : null}
-          {view === "library" ? <LibraryView /> : null}
-          {view === "army" ? (
-            <div className="space-y-12">
-              <MemeArmy />
-              <WarRoom />
-            </div>
-          ) : null}
-          {view === "agents" ? <AgentsView /> : null}
-          {view === "system" ? <MySystemView /> : null}
-          {view === "account" ? <AccountView /> : null}
-        </main>
+        <footer className="border-t border-border/60 pt-6 text-xs text-muted-foreground">
+          Nothing publishes, sends or spends without your yes on that item. Affiliate and referral money shown anywhere
+          is simulated until it&apos;s actually paid. Nothing is guaranteed.
+        </footer>
       </div>
-
-      {/* sticky footer — pushes down naturally on overflow; extra bottom
-          padding on mobile keeps text clear of the fixed bottom nav */}
-      <footer className="mt-auto border-t border-border/60 bg-background/80 backdrop-blur">
-        <div className="mx-auto max-w-7xl px-4 pt-4 pb-[max(env(safe-area-inset-bottom),6rem)] lg:pb-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p className="text-xs text-muted-foreground text-center sm:text-left">
-            <span className="text-foreground font-semibold">P&amp;R GLOBAL CONTENT FACTORY</span> — ONE IDEA. 23 LANGUAGES. ENDLESS CONTENT.
-          </p>
-          <p className="text-[11px] text-muted-foreground/70">
-            Powered by Plunder &amp; Riffle MCP · Meme Army by P&amp;R
-          </p>
-        </div>
-      </footer>
-
-      {/* bottom nav — mobile */}
-      <nav
-        className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border/60 bg-background/95 backdrop-blur-md pb-safe"
-        aria-label="Primary"
-      >
-        <div className="grid grid-cols-5">
-          {NAV.filter((n) => MOBILE_NAV.includes(n.key)).map((item) => (
-            <button
-              key={item.key}
-              onClick={() => {
-                setView(item.key);
-              }}
-              className={cn(
-                "flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium relative",
-                view === item.key || (view === "results" && item.key === "create") ? "text-primary" : "text-muted-foreground",
-              )}
-            >
-              <item.icon className="h-5 w-5" />
-              <span className="max-w-full truncate px-0.5">{tNav(item.labelKey)}</span>
-            </button>
-          ))}
-        </div>
-      </nav>
-    </div>
+    </main>
   );
 }
