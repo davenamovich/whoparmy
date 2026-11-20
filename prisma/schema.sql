@@ -1215,3 +1215,11 @@ CREATE INDEX "RotatorEnforcement_scope_scopeId_idx" ON "RotatorEnforcement"("sco
 -- CreateIndex
 CREATE INDEX "RotatorEnforcement_liftedAt_idx" ON "RotatorEnforcement"("liftedAt");
 
+-- CreateTable
+CREATE TABLE "ClaimVoidedNonce" (
+    "nonce" TEXT NOT NULL PRIMARY KEY,
+    "handle" TEXT NOT NULL,
+    "reason" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+

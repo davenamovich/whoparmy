@@ -906,6 +906,18 @@ model ClaimRedemption {
   @@index([userId])
 }
 
+// Voided claim nonces: W1 tokens are stateless, so killing an issued
+// code means remembering its nonce forever. Redemption rejects any
+// token whose nonce sits here (checked in lib/claims.ts). Rows are
+// written by the boot-time agent-game purge (scripts/agentgame-purge.ts)
+// before it deletes a test agent whose codes must die with it.
+model ClaimVoidedNonce {
+  nonce     String   @id // the voided win token's one-time nonce
+  handle    String // whose token it was (e.g. the purged agent handle)
+  reason    String // why it was voided (e.g. qa-test-cleanup)
+  createdAt DateTime @default(now())
+}
+
 // ─── The Clipper ────────────────────────────────────────────────────
 // A clipping page: one niche, one handle, a cadence. The editorial
 // contract is `.agents/skills/clipping-agent/SKILL.md` in the engine

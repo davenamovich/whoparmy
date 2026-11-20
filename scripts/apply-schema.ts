@@ -11,6 +11,7 @@
 // best-effort step.
 import { Database } from "bun:sqlite";
 import { readFileSync } from "node:fs";
+import { agentgamePurgeFromEnv } from "./agentgame-purge";
 
 const url = process.env.DATABASE_URL ?? "file:/data/custom.db";
 const path = url.replace(/^file:/, "").split("?")[0];
@@ -77,6 +78,15 @@ for (const { table, column, ddl } of ADDITIVE_COLUMNS) {
     db.exec(ddl);
     console.log(`[boot] added column ${table}.${column}`);
   }
+}
+
+// Env-gated one-shot purge of agent-game test agents (voids their
+// claim nonces first, then deletes the agents). A no-op unless
+// AGENTGAME_PURGE_HANDLES is set; never allowed to block boot.
+try {
+  agentgamePurgeFromEnv(db);
+} catch (err) {
+  console.error("[boot] agentgame purge failed — continuing:", err);
 }
 
 const tables = db.query("SELECT count(*) AS n FROM sqlite_master WHERE type='table'").get() as { n: number };
