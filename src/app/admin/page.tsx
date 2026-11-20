@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getGateState, getSessionOperator } from "@/lib/site-gate";
 import { getStacks, API_KEY_UNLOCKS } from "@/lib/stacks";
 import { AdminPanel } from "@/components/admin/admin-panel";
+import { RotatorAdmin } from "@/components/bridge/rotator-admin";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const runtime = "nodejs";
@@ -117,6 +118,13 @@ export default async function AdminPage() {
       </Card>
 
       <AdminPanel gate={gate} stacks={stacks} />
+
+      {/* Moved here from /bridge with the one-time-door overhaul
+          (Dave, 2026-11-20). Renders nothing unless the operator-only
+          rotator admin API answers. */}
+      <div className="mt-10">
+        <RotatorAdmin />
+      </div>
     </main>
   );
 }

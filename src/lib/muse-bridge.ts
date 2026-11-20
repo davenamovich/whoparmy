@@ -3,6 +3,8 @@ import { createHash, randomBytes } from "node:crypto";
 import type { User } from "@prisma/client";
 import { db } from "@/lib/db";
 import { isDesignatedOperator } from "@/lib/auth";
+import { getSavedDhMediaLink } from "@/lib/btc-addresses";
+import { EXPERIMENT_GENERATING_COSTS, codeTtlMsForScope } from "@/lib/experiment-scope";
 
 /**
  * ─── Muse bridge connector (Dave, 2026-11-17) ───────────────────────
@@ -127,10 +129,13 @@ export function assertBridgeEligible(user: Pick<User, "plan" | "whopId" | "whopU
 // with its own eligibility and allowlist (below). Scopes never mix:
 // the MCP route enforces the token's own scope on every call.
 
-export type BridgeScope = "week" | "clips";
+// "experiment" is the BTC Experiment's agent connection (Dave,
+// 2026-11-20, lib/experiment-scope.ts): any plan with a saved DH
+// Media link, on the member's own balance, 24-hour code.
+export type BridgeScope = "week" | "clips" | "experiment";
 
 export function normalizeScope(raw: unknown): BridgeScope {
-  return raw === "clips" ? "clips" : "week";
+  return raw === "clips" || raw === "experiment" ? raw : "week";
 }
 
 /**
@@ -140,7 +145,7 @@ export function normalizeScope(raw: unknown): BridgeScope {
  * an invalid code/token and refuse.
  */
 export function scopeFromStored(raw: unknown): BridgeScope | null {
-  return raw === "week" || raw === "clips" ? raw : null;
+  return raw === "week" || raw === "clips" || raw === "experiment" ? raw : null;
 }
 
 export { redactBridgeSecrets } from "./bridge-redact";
@@ -163,6 +168,30 @@ export function assertClipsEligible(user: Pick<User, "whopId">): void {
       403,
       "NOT_LINKED",
       "The Clip Factory works on your own Plunder & Riffle credits, and this account isn't linked to a credit account yet. Sign in with Whop so your account carries its Whop user id, then try again.",
+    );
+  }
+}
+
+// ─── Experiment eligibility — the BTC Experiment's agent ────────────
+// Dave, 2026-11-20: saving the DH Media link at the end of The BTC
+// Experiment is what unlocks the bridge — not the Whop plan. Any plan
+// with a linked credit account (they spend their own balance) and a
+// CURRENTLY saved DH Media link. Re-checked at exchange, so removing
+// the link closes a code that has not been used yet.
+
+export async function assertExperimentEligible(user: Pick<User, "id" | "whopId">): Promise<void> {
+  if (!hasLinkedCreditAccount(user)) {
+    throw new BridgeError(
+      403,
+      "NOT_LINKED",
+      "Your agent works on your own Plunder & Riffle credits, and this account isn't linked to them yet. Sign in with Whop, then try again.",
+    );
+  }
+  if (!(await getSavedDhMediaLink(user.id))) {
+    throw new BridgeError(
+      403,
+      "NEEDS_DH_MEDIA_LINK",
+      "Your agent's connection unlocks when your DH Media link is saved. Save it, then get your code.",
     );
   }
 }
@@ -208,7 +237,9 @@ export const CLIPS_GENERATING_COSTS: Record<string, number> = {
 };
 
 export function generatingCostsForScope(scope: BridgeScope): Record<string, number> {
-  return scope === "clips" ? CLIPS_GENERATING_COSTS : BRIDGE_GENERATING_COSTS;
+  if (scope === "clips") return CLIPS_GENERATING_COSTS;
+  if (scope === "experiment") return EXPERIMENT_GENERATING_COSTS;
+  return BRIDGE_GENERATING_COSTS;
 }
 
 export function bridgeToolAllowedForScope(scope: BridgeScope, name: string): boolean {
@@ -434,12 +465,16 @@ export async function mintBridgeCode(
   // (an empty account gets a zero-budget connection, not the week's
   // 805-credit default smuggled in by a falsy check).
   const truncated = Math.trunc(budgetCredits);
+  // Experiment codes budget like clips: the member's own balance,
+  // where zero is real.
   const budget =
-    scope === "clips"
+    scope === "clips" || scope === "experiment"
       ? Math.max(0, Math.min(MAX_BUDGET_CREDITS, Number.isFinite(truncated) ? truncated : 0))
       : Math.max(1, Math.min(MAX_BUDGET_CREDITS, truncated || WEEK_BUDGET_CREDITS));
   const code = newBridgeCode();
-  const expiresAt = new Date(Date.now() + BRIDGE_CODE_TTL_MS);
+  // 15 minutes, except experiment codes: 24 hours (Dave, 2026-11-20),
+  // so a code survives the member setting up their agent.
+  const expiresAt = new Date(Date.now() + codeTtlMsForScope(scope));
   // A fresh code retires every unused one before it: only one live code
   // per member (across BOTH scopes), so a code left on an old page can
   // never be exchanged. Retire + create run in ONE transaction: two
@@ -459,7 +494,8 @@ export async function exchangeBridgeCode(rawCode: string): Promise<{ token: stri
   const scope = scopeFromStored(row.scope);
   if (!scope) throw new BridgeError(400, "BAD_CODE", "That bridge code isn't valid.");
   if (row.expiresAt.getTime() <= Date.now()) {
-    throw new BridgeError(400, "BAD_CODE", `That bridge code expired. Generate a fresh one ${scope === "clips" ? "in the Clip Factory" : "on /muse-week"}.`);
+    const where = scope === "clips" ? "in the Clip Factory" : scope === "experiment" ? "at whop.plunderandriffle.com/bridge" : "on /muse-week";
+    throw new BridgeError(400, "BAD_CODE", `That bridge code expired. Generate a fresh one ${where}.`);
   }
   // Eligibility is re-checked at exchange, PER SCOPE: a member
   // downgraded after minting holds a week code that no longer opens
@@ -469,6 +505,7 @@ export async function exchangeBridgeCode(rawCode: string): Promise<{ token: stri
   const owner = await db.user.findUnique({ where: { id: row.userId } });
   if (!owner) throw new BridgeError(400, "BAD_CODE", "That bridge code isn't valid.");
   if (scope === "clips") assertClipsEligible(owner);
+  else if (scope === "experiment") await assertExperimentEligible(owner);
   else assertBridgeEligible(owner);
   // Single-use: claim the code AND create the token in one
   // transaction — a crash between the two used to burn the code

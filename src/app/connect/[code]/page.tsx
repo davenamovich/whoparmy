@@ -3,6 +3,8 @@ import { findLiveBridgeCode } from "@/lib/muse-bridge";
 import { museWeekCommand, savedLinksBrief, type MuseWeekOfferId } from "@/lib/muse-week-command";
 import { getSavedOfferLinks } from "@/lib/bridge";
 import { getMemberLanguage } from "@/lib/member-language";
+import { stackById } from "@/lib/stacks";
+import { fillStackPrompt } from "@/lib/stack-prompt";
 
 /**
  * ─── THE AGENT LINK (Dave, 2026-11-18) ──────────────────────────────
@@ -52,19 +54,76 @@ export default async function ConnectPage({ params }: { params: Promise<{ code: 
         text={`AGENT BRIEF — Plunder & Riffle connection link: DEAD
 
 This link's code is expired, already exchanged, or not valid. Codes
-are single use (spent at EXCHANGE) and live 15 minutes from minting.
-Do not retry it. Do not guess a replacement.
+are single use (spent at EXCHANGE) and expire (15 minutes, or 24
+hours for a BTC Experiment code). Do not retry it. Do not guess a
+replacement.
 
 Tell your member, in your own words: "That connection link has
-expired — mint a fresh one (in the Plunder & Riffle app, ask Ralph
-for 'Talk to my Muse', or open
-https://whop.plunderandriffle.com/muse-week) and send me the new
-link." Then stop and wait for the fresh link.`}
+expired — get a fresh one at https://whop.plunderandriffle.com/bridge
+and send me the new link." Then stop and wait for the fresh link.`}
       />
     );
   }
 
   const expiresIso = new Date(live.expiresAt).toISOString().replace(".000Z", "Z");
+
+  if (live.scope === "experiment") {
+    // The BTC Experiment's agent (Dave, 2026-11-20): the same BTC
+    // Barry prompt /bridge hands the member (lib/stack-prompt.ts), plus
+    // the first job — the 24/48-hour Facebook-ads experiment, restated
+    // from Super Muse app/experiment/EXPERIMENT-24-48.md for agents
+    // that are not Muse. Keep the two in step.
+    const stack = stackById("btc-experiment");
+    const prompt = stack ? await fillStackPrompt(stack, live.user, upper) : "";
+    return (
+      <Brief
+        text={`AGENT BRIEF — The BTC Experiment, for a Plunder & Riffle member
+
+You are the agent reading this. A member issued this link so you can
+work for them on their own Plunder & Riffle credits. No API key and no
+account of your own: the code below IS the credential. Viewing this
+page did NOT consume it; it is spent only when you exchange it.
+
+CODE:    ${upper}
+EXPIRES: ${expiresIso}
+CAP:     ${live.budgetCredits} credits (the member's own balance; the
+         bridge refuses spend past it — quote before you spend)
+
+----- BEGIN BRIEF -----
+
+${prompt}
+
+----- END BRIEF -----
+
+FIRST JOB — THE 24/48-HOUR EXPERIMENT
+After onboarding, ask the member whether to run it. The question is
+whether you can make them money in 24 to 48 hours starting from
+Facebook ads. It is an open question, never a promise: nothing is
+guaranteed, and say so.
+1. Research who would want what their DH Media link offers (free tools).
+2. Show three ad angles, one line each; the member picks.
+3. Quote each ad (generate_ad_creative 60, generate_ad_copy 10 list
+   credits; on their own key the engine charges $0.01 a call), wait for
+   their go, then make them. Stop at the cap.
+4. Hand over each ad: image or video, headline, body, audience, and a
+   suggested daily spend for Facebook Ads Manager — their choice.
+5. The engine cannot place or pay for ads. The member runs each ad in
+   their own Ads Manager, or you do it if you have their Facebook
+   access — with their yes on that specific ad. Ad spend is their own
+   money, paid to Meta, separate from the credits above.
+6. Check in at 24 and 48 hours with real numbers only. Affiliate money
+   not yet paid is SIMULATED — label it. Say "not verified" freely.
+No income claims in the ads. Follow Meta's ad policies.
+
+Protocol notes:
+- Exchange: POST https://whop.plunderandriffle.com/api/bridge/exchange {"code": "${upper}"}
+- MCP: https://whop.plunderandriffle.com/api/bridge/mcp (Bearer = the token from exchange)
+- The token lasts 7 days. Publishing and MP4 rendering are refused at
+  the bridge. If the exchange returns an error, report its message to
+  your member verbatim and stop; do not retry a spent code.`}
+      />
+    );
+  }
 
   if (live.scope === "clips") {
     // Saved links ride along here too (Dave, 2026-11-19): a clip

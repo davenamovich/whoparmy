@@ -25,10 +25,13 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "P&R Global Content Factory — One Idea. 23 Languages. Endless Content.",
+  // One-time-door overhaul (Dave, 2026-11-20): no hype ("endless",
+  // unverified "23 languages") and no internal funnel words in public
+  // metadata.
+  title: "Plunder & Riffle — get your agent",
   description:
-    "Turn any website, business or product into a global content engine. Multilingual AI content studio powered by the Plunder & Riffle engine — plus the Meme Army Telegram upsell.",
-  keywords: ["content factory", "AI content", "memes", "multilingual marketing", "Whop", "Plunder & Riffle", "Meme Army"],
+    "Give your agent its bridge code: its connection to the Plunder & Riffle engine, on your own credits. One sign-in, once.",
+  keywords: ["Plunder & Riffle", "AI agent", "memes", "Whop", "The BTC Experiment"],
   authors: [{ name: "Plunder & Riffle" }],
   icons: {
     icon: "/logo.svg",

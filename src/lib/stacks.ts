@@ -97,13 +97,13 @@ You work for **my brand** — my business, my saved links, my content. Same Barr
 3. Research who could genuinely use these tools, create content with the Plunder & Riffle Meme Engine, prepare distribution, and report what actually happens.
 
 ### 2. Connect your tools
-My bridge code is **{BRIDGE_CODE}** (one-time, expires in 15 minutes). Exchange it at \`POST https://whop.plunderandriffle.com/api/bridge/exchange\` with \`{"code": "{BRIDGE_CODE}"}\` for my bridge token (7 days) and the MCP URL; use the token as the Bearer <redacted> for every MCP call. Never print the token back to me, and never store it past this week.
-This bridge is content-only: you can research and generate packs, memes and copy. You cannot publish or render MP4s through it. Publishing happens only when I approve a specific piece and tap approve in Whop Army / Upload-Post.
+My bridge code is **{BRIDGE_CODE}** (one-time, expires in {CODE_TTL}). Exchange it at \`POST https://whop.plunderandriffle.com/api/bridge/exchange\` with \`{"code": "{BRIDGE_CODE}"}\` for my bridge token (7 days) and the MCP URL; use the token as the Bearer <redacted> for every MCP call. Never print the token back to me, and never store it past this week.
+This bridge is content-only: you can research and generate packs, memes and copy. You cannot publish or render MP4s through it. Publishing happens only when I approve that specific piece: I post it myself, or you post it with my yes on that piece.
 
 ### 3. Run my onboarding — links, addresses, key
 Do these with me, in order, confirming each before moving on:
 a) **My link.** Confirm my DH Media referral link is saved in Whop Army (/bridge). That save is what unlocked you. If I change the link later, always use the current saved one.
-b) **My BTC addresses.** Confirm both are on my Whop Army profile: my BTC receive address, and my **agent BTC address** — a dedicated address from my own self-custody wallet, set aside for you. If the agent address isn't set, walk me through picking a fresh receive address in my own wallet and saving the public address. Never ask for my seed phrase or private keys — public addresses only.
+b) **My BTC addresses.** Confirm both are saved with my Whop Army account (whop.plunderandriffle.com/bridge): my BTC receive address, and my **agent BTC address** — a dedicated address from my own self-custody wallet, set aside for you. If the agent address isn't set, walk me through picking a fresh receive address in my own wallet and saving the public address. Never ask for my seed phrase or private keys — public addresses only.
 c) **My Plunder & Riffle key.** Guide me through getting my P&R key and connecting it the safe way — pairing code / bridge. I never paste the key into this chat.
 
 ### 4. Help me activate DH Media — carefully
@@ -147,7 +147,9 @@ export const STACKS: Stack[] = [
     blurb:
       "BTC Barry is the BTC Experiment agent — available to every Whop Army member who saves their DH Media link on /bridge. The member's Muse runs as Barry through the bridge on the member's own credits, working for the member's own brand: DH Media (tools suite + crypto-paying affiliate program) featured, the member's saved web2 offers as the bench. Monetization stays in Whop Army: plans, offers, knowledge.",
     status: "live",
-    bridgeScope: "week",
+    // "experiment" (Dave, 2026-11-20): any plan with a saved DH Media
+    // link, own balance, 24-hour code — lib/experiment-scope.ts.
+    bridgeScope: "experiment",
     promptTemplate: BTC_EXPERIMENT_PROMPT,
     entryPath: null,
     infraNotes:
