@@ -3,12 +3,15 @@ import { db } from "@/lib/db";
 import { etDateString } from "@/lib/rotator";
 import {
   hashIp,
+  HOP_FILTER_POLICY,
+  isAgentWorking,
   appendSubParam,
   mintAgentRotatorCode,
   mintUserRotatorCode,
   pickSequential,
   pickWeighted,
   resolveSigningSecret,
+  scoreHop,
   uaFamily,
   validateLinkSet,
   verifyUserRotatorCode,
@@ -182,6 +185,23 @@ export async function recordRotatorHop(input: RotatorHopInput): Promise<void> {
     /* Bad referrers have no host. */
   }
 
+  const ipHash = hashIp(input.meta.ip);
+  let verdict = { filtered: false, reason: null as string | null, counted: true };
+  try {
+    const now = new Date();
+    const history = await gatherHopHistory(ipHash, input.linkId, input.userId, input.agentId, now);
+    verdict = scoreHop({
+      ua: input.meta.ua,
+      hasIp: ipHash !== null,
+      hasReferer: refererHost !== null,
+      hasUser: input.userId !== null,
+      hasAgent: input.agentId !== null,
+      history,
+    });
+  } catch (err) {
+    console.error("[rotator-v2] hop scoring failed:", err);
+  }
+
   try {
     await db.rotatorHop.create({
       data: {
@@ -191,16 +211,88 @@ export async function recordRotatorHop(input: RotatorHopInput): Promise<void> {
         userId: input.userId,
         linkId: input.linkId,
         code: input.code.slice(0, 128),
-        ipHash: hashIp(input.meta.ip),
+        ipHash,
         uaFamily: uaFamily(input.meta.ua),
         refererHost,
-        filtered: false,
-        counted: true,
+        filtered: verdict.filtered,
+        filterReason: verdict.reason,
+        counted: verdict.counted,
       },
     });
   } catch (err) {
     console.error("[rotator-v2] hop recording failed:", err);
   }
+}
+
+async function gatherHopHistory(ipHash: string | null, linkId: string | null, userId: string | null, agentId: string | null, now: Date) {
+  const minuteStart = new Date(now.getTime() - 60_000);
+  const velocityStart = new Date(now.getTime() - HOP_FILTER_POLICY.IP_VELOCITY_WINDOW_MINUTES * 60_000);
+  const refererlessStart = new Date(now.getTime() - HOP_FILTER_POLICY.REFERERLESS_WINDOW_MINUTES * 60_000);
+  const today = etDateString();
+  const day = { gte: dayStart(today), lt: dayEnd(today) };
+  const empty = { ipMinute: 0, ipDay: 0, userMinute: 0, userDay: 0, agentMinute: 0, agentDay: 0, poolMinute: 0, poolDay: 0 };
+  const ipWhere = ipHash ? { ipHash } : null;
+  // Find the last counted hop for duplicate detection.
+  const lastQuery = ipHash && linkId
+    ? db.rotatorHop.findFirst({ where: { ipHash, linkId, counted: true }, orderBy: { ts: "desc" }, select: { ts: true } })
+    : Promise.resolve(null);
+  // Count recent IP hops for velocity filtering.
+  const velocityQuery = ipWhere
+    ? db.rotatorHop.count({ where: { ...ipWhere, ts: { gte: velocityStart } } })
+    : Promise.resolve(0);
+  // Count recent IP hops without a referer.
+  const refererlessQuery = ipWhere
+    ? db.rotatorHop.count({ where: { ...ipWhere, refererHost: null, ts: { gte: refererlessStart } } })
+    : Promise.resolve(0);
+  // Count IP hops in the minute and day rate-limit windows.
+  const ipMinuteQuery = ipWhere
+    ? db.rotatorHop.count({ where: { ...ipWhere, ts: { gte: minuteStart } } })
+    : Promise.resolve(0);
+  const ipDayQuery = ipWhere
+    ? db.rotatorHop.count({ where: { ...ipWhere, ts: day } })
+    : Promise.resolve(0);
+  // Count user hops in the minute and day rate-limit windows.
+  const userMinuteQuery = userId
+    ? db.rotatorHop.count({ where: { userId, ts: { gte: minuteStart } } })
+    : Promise.resolve(0);
+  const userDayQuery = userId
+    ? db.rotatorHop.count({ where: { userId, ts: day } })
+    : Promise.resolve(0);
+  // Count agent hops in the minute and day rate-limit windows.
+  const agentMinuteQuery = agentId
+    ? db.rotatorHop.count({ where: { agentId, ts: { gte: minuteStart } } })
+    : Promise.resolve(0);
+  const agentDayQuery = agentId
+    ? db.rotatorHop.count({ where: { agentId, ts: day } })
+    : Promise.resolve(0);
+  // Count all pool hops in the minute and day rate-limit windows.
+  const poolMinuteQuery = db.rotatorHop.count({ where: { ts: { gte: minuteStart } } });
+  const poolDayQuery = db.rotatorHop.count({ where: { ts: day } });
+  const [last, velocity, refererless, ipMinute, ipDay, userMinute, userDay, agentMinute, agentDay, poolMinute, poolDay] = await Promise.all([
+    lastQuery,
+    velocityQuery,
+    refererlessQuery,
+    ipMinuteQuery,
+    ipDayQuery,
+    userMinuteQuery,
+    userDayQuery,
+    agentMinuteQuery,
+    agentDayQuery,
+    poolMinuteQuery,
+    poolDayQuery,
+  ]);
+  const minutesSinceLastCountedSameIpLink = last
+    ? (now.getTime() - last.ts.getTime()) / 60_000
+    : null;
+  const rateCounts = ipWhere
+    ? { ipMinute, ipDay, userMinute, userDay, agentMinute, agentDay, poolMinute, poolDay }
+    : { ...empty, userMinute, userDay, agentMinute, agentDay, poolMinute, poolDay };
+  return {
+    minutesSinceLastCountedSameIpLink,
+    ipHopsInVelocityWindow: velocity,
+    ipRefererlessHopsInWindow: refererless,
+    rateCounts,
+  };
 }
 
 /** Serves an agent's signed rotator link and records the selected hop. */
@@ -220,6 +312,10 @@ export async function serveAgentRotator(
 
   const rotator = await db.agentRotator.findUnique({ where: { id: verified.rotatorId } });
   if (!rotator?.enabled) {
+    return null;
+  }
+  const agent = await db.hiredAgent.findUnique({ where: { id: rotator.agentId }, select: { status: true, expiresAt: true } });
+  if (!agent || !isAgentWorking(agent.status, agent.expiresAt, new Date())) {
     return null;
   }
 
@@ -279,6 +375,10 @@ export async function serveAgentRotator(
 export async function resolveAgentRotatorDestination(agentId: string) {
   const rotator = await db.agentRotator.findUnique({ where: { agentId } });
   if (!rotator?.enabled) {
+    return null;
+  }
+  const agent = await db.hiredAgent.findUnique({ where: { id: rotator.agentId }, select: { status: true, expiresAt: true } });
+  if (!agent || !isAgentWorking(agent.status, agent.expiresAt, new Date())) {
     return null;
   }
 
@@ -510,33 +610,15 @@ export async function serveUserRotator(
   }
 
   const selected = rows.find((link) => link.id === pick.linkId)!;
-  let refererHost: string | null = null;
-  try {
-    if (meta.referer) {
-      refererHost = new URL(meta.referer).host;
-    }
-  } catch {
-    // Bad referrers have no host.
-  }
-
-  try {
-    await db.rotatorHop.create({
-      data: {
-        surface: "USER",
-        rotatorId: rotator.id,
-        userId: rotator.userId,
-        linkId: selected.id,
-        code: code.slice(0, 128),
-        ipHash: hashIp(meta.ip),
-        uaFamily: uaFamily(meta.ua),
-        refererHost,
-        filtered: false,
-        counted: true,
-      },
-    });
-  } catch (err) {
-    console.error("[rotator-v2] hop recording failed:", err);
-  }
+  await recordRotatorHop({
+    surface: "USER",
+    rotatorId: rotator.id,
+    agentId: null,
+    userId: rotator.userId,
+    linkId: selected.id,
+    code,
+    meta,
+  });
 
   return { url: selected.engineLink.url };
 }

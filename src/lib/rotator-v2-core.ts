@@ -154,6 +154,109 @@ export function uaFamily(ua: string | null): string {
   return "Other";
 }
 
+/**
+ * Hop filtering changes accounting only. It never changes the visitor's redirect.
+ *
+ * Checks run in this order so the first matching reason is recorded:
+ * bot or empty user-agent, duplicate hop, IP velocity, referer-less burst,
+ * then rate limits. Bot identity is checked first because it is the clearest
+ * signal and must win when several filters match the same hop.
+ */
+export const HOP_FILTER_POLICY = {
+  DEDUP_WINDOW_MINUTES: 30,
+  IP_VELOCITY_WINDOW_MINUTES: 5,
+  IP_VELOCITY_MAX_HOPS: 30,
+  REFERERLESS_WINDOW_MINUTES: 5,
+  REFERERLESS_MAX_HOPS: 20,
+  RATE_LIMIT_IP_PER_MINUTE: 60,
+  RATE_LIMIT_IP_PER_DAY: 2000,
+  RATE_LIMIT_USER_PER_MINUTE: 300,
+  RATE_LIMIT_USER_PER_DAY: 20000,
+  RATE_LIMIT_AGENT_PER_MINUTE: 300,
+  RATE_LIMIT_AGENT_PER_DAY: 20000,
+  RATE_LIMIT_POOL_PER_MINUTE: 2000,
+  RATE_LIMIT_POOL_PER_DAY: 200000,
+} as const;
+
+export type HopFilterReason = "BOT_UA" | "DEDUP" | "IP_VELOCITY" | "REFERERLESS_BURST" | "RATE_LIMITED";
+export interface HopHistory {
+  minutesSinceLastCountedSameIpLink: number | null;
+  ipHopsInVelocityWindow: number;
+  ipRefererlessHopsInWindow: number;
+  rateCounts: {
+    ipMinute: number;
+    ipDay: number;
+    userMinute: number;
+    userDay: number;
+    agentMinute: number;
+    agentDay: number;
+    poolMinute: number;
+    poolDay: number;
+  };
+}
+export interface HopVerdict {
+  filtered: boolean;
+  reason: HopFilterReason | null;
+  counted: boolean;
+}
+
+export function scoreHop(input: {
+  ua: string | null;
+  hasIp: boolean;
+  hasReferer: boolean;
+  hasUser: boolean;
+  hasAgent: boolean;
+  history: HopHistory;
+}): HopVerdict {
+  let reason: HopFilterReason | null = null;
+  if (uaFamily(input.ua) === "Bot" || !input.ua?.trim()) {
+    reason = "BOT_UA";
+  } else if (
+    input.hasIp &&
+    input.history.minutesSinceLastCountedSameIpLink !== null &&
+    input.history.minutesSinceLastCountedSameIpLink < HOP_FILTER_POLICY.DEDUP_WINDOW_MINUTES
+  ) {
+    reason = "DEDUP";
+  } else if (
+    input.hasIp &&
+    input.history.ipHopsInVelocityWindow >= HOP_FILTER_POLICY.IP_VELOCITY_MAX_HOPS
+  ) {
+    reason = "IP_VELOCITY";
+  } else if (
+    input.hasIp &&
+    !input.hasReferer &&
+    input.history.ipRefererlessHopsInWindow >= HOP_FILTER_POLICY.REFERERLESS_MAX_HOPS
+  ) {
+    reason = "REFERERLESS_BURST";
+  } else {
+    const c = input.history.rateCounts;
+    const ipRateLimited =
+      input.hasIp &&
+      (c.ipMinute >= HOP_FILTER_POLICY.RATE_LIMIT_IP_PER_MINUTE ||
+        c.ipDay >= HOP_FILTER_POLICY.RATE_LIMIT_IP_PER_DAY);
+    const userRateLimited =
+      input.hasUser &&
+      (c.userMinute >= HOP_FILTER_POLICY.RATE_LIMIT_USER_PER_MINUTE ||
+        c.userDay >= HOP_FILTER_POLICY.RATE_LIMIT_USER_PER_DAY);
+    const agentRateLimited =
+      input.hasAgent &&
+      (c.agentMinute >= HOP_FILTER_POLICY.RATE_LIMIT_AGENT_PER_MINUTE ||
+        c.agentDay >= HOP_FILTER_POLICY.RATE_LIMIT_AGENT_PER_DAY);
+    const poolRateLimited =
+      c.poolMinute >= HOP_FILTER_POLICY.RATE_LIMIT_POOL_PER_MINUTE ||
+      c.poolDay >= HOP_FILTER_POLICY.RATE_LIMIT_POOL_PER_DAY;
+    if (ipRateLimited || userRateLimited || agentRateLimited || poolRateLimited) {
+      reason = "RATE_LIMITED";
+    }
+  }
+  return reason ? { filtered: true, reason, counted: false } : { filtered: false, reason: null, counted: true };
+}
+
+/** Matches traffic-pool-core's working-agent rule for redirect eligibility. */
+export function isAgentWorking(status: string, expiresAt: Date | null, now: Date): boolean {
+  return status === "ACTIVE" && (expiresAt === null || expiresAt.getTime() > now.getTime());
+}
+
 export function hashIp(ip: string | null): string | null {
   return ip == null ? null : createHash("sha256").update(ip).digest("hex");
 }
