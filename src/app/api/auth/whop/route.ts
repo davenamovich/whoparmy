@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getWhopConfig, buildWhopAuthorizeUrl, whopPublicStatus } from "@/lib/whop";
 import { generatePkcePair, generateState, setPkceCookie, resolveRedirectUri, canonicalOrigin } from "@/lib/session";
+import { safeReturnPath } from "@/lib/gate-paths";
 
 export const runtime = "nodejs";
 
@@ -25,9 +26,13 @@ export async function GET(req: NextRequest) {
   // the container bind address behind Railway's proxy, so the public
   // host is read from the forwarding headers instead.
   const canonical = canonicalOrigin(req.nextUrl.origin);
+  // ?next= — the hand-off page to land on after sign-in (/bridge,
+  // /claim?code=…). Anything else is dropped, never redirected to.
+  const next = safeReturnPath(req.nextUrl.searchParams.get("next"));
   const publicHost = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
   if (publicHost && publicHost !== new URL(canonical).host) {
-    return NextResponse.redirect(`${canonical}/api/auth/whop`, { status: 302 });
+    const again = next ? `?next=${encodeURIComponent(next)}` : "";
+    return NextResponse.redirect(`${canonical}/api/auth/whop${again}`, { status: 302 });
   }
 
   const cfg = getWhopConfig();
@@ -47,7 +52,7 @@ export async function GET(req: NextRequest) {
   const { verifier, challenge } = generatePkcePair();
   const state = generateState();
   const nonce = generateState();
-  await setPkceCookie(state, verifier);
+  await setPkceCookie(state, verifier, next);
 
   const authorizeUrl = buildWhopAuthorizeUrl({
     clientId: cfg.appId,

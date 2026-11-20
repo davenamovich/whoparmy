@@ -119,14 +119,16 @@ export default function ClaimPage() {
                 minute, and your code stays valid while you do.
               </p>
               <Button asChild className="w-full font-semibold">
-                <a href="/api/auth/whop">
+                {/* Sign-in returns here with the code still in the URL
+                    (lib/gate-paths safeReturnPath), so the win is one
+                    tap away when they come back. */}
+                <a href={`/api/auth/whop?next=${encodeURIComponent(code.trim() ? `/claim?code=${encodeURIComponent(code.trim())}` : "/claim")}`}>
                   <LogIn className="h-4 w-4 mr-1.5" /> Sign in with Whop to claim
                 </a>
               </Button>
               {code ? (
                 <p className="text-xs text-muted-foreground">
-                  Keep the link you arrived with — signing in lands you on the home page, so open this
-                  same link again afterwards and your code loads automatically.
+                  Signing in brings you straight back here with your code filled in.
                 </p>
               ) : null}
             </>
