@@ -4,7 +4,7 @@ import { getPlan } from "@/lib/plans";
 import { countMonthlyUsage } from "@/lib/usage-server";
 import { getTrending } from "@/lib/trends";
 import { getLadder, starimgConfig } from "@/lib/llm-policy";
-import { HOUSE_PERSON, mnemosCapture, mnemosPersonFor, mnemosRecall, mnemosSnapshot } from "@/lib/mnemos-bridge";
+import { HOUSE_PERSON, mnemosCapture, mnemosPersonFor, mnemosRecall, mnemosSnapshot, mnemosSnapshotResult } from "@/lib/mnemos-bridge";
 import { BridgeError, assertBridgeEligible, bridgeOffer, getMemberEngineKey, mintBridgeCode } from "@/lib/muse-bridge";
 import { redactBridgeSecrets } from "@/lib/bridge-redact";
 import { museWeekCommand } from "@/lib/muse-week-command";
@@ -151,6 +151,21 @@ const L = {
     ja: (s?: string) => `正直に言うと、まだ何も。私との記憶は今から始まります。あなたのビジネスについて一つ教えてください（何を売っているか、誰が買うか）。あなたのために働く全エージェントが使えるよう保持します。`,
     ru: () => `Честно? Пока ничего — твоя память у меня начинается сейчас. Расскажи одну вещь о своём бизнесе (что продаёшь, кто покупает), и я сохраню это для каждого агента, который на тебя работает.`,
   },
+  // The store couldn't be read. Saying "nothing yet" here would be a lie
+  // about an outage — the member's memory is still there.
+  memoryDown: {
+    en: () => `I can't reach your memory right now — that doesn't mean it's empty, it's just not answering. Give it a few minutes and tap the memory button again.`,
+    es: () => `Ahora mismo no puedo acceder a tu memoria — no significa que esté vacía, solo que no responde. Dale unos minutos y vuelve a tocar el botón de memoria.`,
+    ja: () => `今はあなたの記憶にアクセスできません。空になったわけではなく、応答がないだけです。数分後にもう一度メモリーボタンを押してください。`,
+    ru: () => `Сейчас не могу достучаться до твоей памяти — это не значит, что она пуста, она просто не отвечает. Подожди пару минут и снова нажми кнопку памяти.`,
+  },
+  // The model asked to remember a fact and the write did not land.
+  notSaved: {
+    en: () => `\n\n(Heads up: I couldn't save that to your memory just now — tell me again in a bit and I'll keep it.)`,
+    es: () => `\n\n(Aviso: no pude guardar eso en tu memoria ahora mismo — dímelo otra vez en un rato y lo guardo.)`,
+    ja: () => `\n\n（お知らせ: 今はそれを記憶に保存できませんでした。少し後でもう一度教えてください。保存します。）`,
+    ru: () => `\n\n(Важно: сейчас не получилось сохранить это в твою память — повтори чуть позже, и я запомню.)`,
+  },
 } as const;
 
 function pick<T extends Record<string, (...args: never[]) => string>>(table: T, locale: string) {
@@ -206,9 +221,12 @@ export async function ralphAction(userId: string, locale: string, actionId: Ralp
       };
     }
     case "memory": {
-      const snapshot = await mnemosSnapshot(person, house ? [HOUSE_PERSON] : []);
-      if (snapshot && snapshot.length > 20) {
-        return { text: pick(L.remembered, locale)(snapshot.slice(0, 1800)), actions: ["make_content", "free_audit", "trending"] };
+      const snap = await mnemosSnapshotResult(person, house ? [HOUSE_PERSON] : []);
+      if (snap.status === "ok" && snap.text.length > 20) {
+        return { text: pick(L.remembered, locale)(snap.text.slice(0, 1800)), actions: ["make_content", "free_audit", "trending"] };
+      }
+      if (snap.status === "unavailable") {
+        return { text: pick(L.memoryDown, locale)(), actions: ["make_content", "free_audit", "trending"] };
       }
       return { text: pick(L.noMemory, locale)(), actions: ["make_content", "free_audit", "trending"] };
     }
@@ -431,14 +449,25 @@ export async function ralphFreeText(userId: string, locale: string, text: string
         const reply = (parsed.reply ?? "").trim();
         if (!reply) continue;
         const actions = (parsed.actions ?? []).filter((a): a is RalphActionId => (RALPH_MENU as string[]).includes(a)).slice(0, 3);
+        let saveNote = "";
         if (parsed.remember && parsed.remember.trim().length > 3) {
           // Awaited, not fire-and-forget: an un-awaited promise can be
           // cut when the route response completes, and then Ralph has
           // told the member "I'll remember" about a fact that never
-          // landed. The capture is quick; honesty is worth the second.
-          await mnemosCapture(person, parsed.remember.trim().slice(0, 500), "Fact the member told Ralph in chat");
+          // landed. And the result is CHECKED: awaiting a failed write
+          // and replying "I'll remember" anyway is the same lie.
+          const saved = await mnemosCapture(
+            person,
+            parsed.remember.trim().slice(0, 500),
+            "Fact the member told Ralph in chat",
+            { timeoutMs: 8_000 },
+          );
+          if (!saved) {
+            console.warn("[ralph] remember failed; telling the member");
+            saveNote = pick(L.notSaved, locale)();
+          }
         }
-        return { text: reply, actions: actions.length ? actions : ["make_content", "free_audit", "memory"] };
+        return { text: reply + saveNote, actions: actions.length ? actions : ["make_content", "free_audit", "memory"] };
       } catch {
         return { text: raw.slice(0, 1200), actions: ["make_content", "free_audit", "memory"] };
       }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getWhopUser } from "@/lib/auth";
+import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { HOUSE_PERSON, mnemosExport, mnemosPersonFor } from "@/lib/mnemos-bridge";
+import { HOUSE_PERSON, MemoryUnavailableError, mnemosExport, mnemosPersonFor } from "@/lib/mnemos-bridge";
 import { getSessionOperator } from "@/lib/site-gate";
 import type { ResearchSummary } from "@/lib/types";
 
@@ -17,7 +17,15 @@ export const runtime = "nodejs";
  * Mnemos later.
  */
 export async function GET() {
-  const user = await getWhopUser();
+  let user: Awaited<ReturnType<typeof getWhopUser>>;
+  try {
+    user = await getWhopUser();
+  } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      return NextResponse.json({ error: "Sign in to export your memory." }, { status: 401 });
+    }
+    throw err;
+  }
   const person = mnemosPersonFor(user.id);
   // Designated-operator sessions also export the house scope, as its
   // own labeled section (Dave's order, 2026-11-18: operators see
@@ -27,12 +35,14 @@ export async function GET() {
   // A failed section read must not look like an empty memory: each
   // section reports its own failure and the export carries a visible
   // placeholder, so the member never trusts a partial file as whole.
-  const attempt = async <T,>(p: Promise<T>, fallback: T): Promise<{ ok: boolean; value: T }> => {
+  // mnemosExport throws MemoryUnavailableError on ANY failed recall (it
+  // used to swallow them, so this placeholder could never appear).
+  const attempt = async <T,>(p: Promise<T>, fallback: T): Promise<{ ok: boolean; value: T; err?: unknown }> => {
     try {
       return { ok: true, value: await p };
     } catch (err) {
       console.error("[memory export] section failed", err instanceof Error ? err.message : err);
-      return { ok: false, value: fallback };
+      return { ok: false, value: fallback, err };
     }
   };
   const [factsR, brandsR, houseR] = await Promise.all([
@@ -45,7 +55,10 @@ export async function GET() {
   const facts = factsR.value;
   const brands = brandsR.value;
   const houseFactsRaw = houseR.value;
-  const UNAVAILABLE = "⚠ This section was unavailable during export — it is NOT empty; export again in a few minutes.";
+  const UNAVAILABLE_RETRY = "⚠ This section was unavailable during export — it is NOT empty; export again in a few minutes.";
+  const UNCONFIGURED = "⚠ Memory isn't switched on for this deployment yet, so there was nothing to read — this is not your memory being empty.";
+  const unavailable = (r: { ok: boolean; err?: unknown }) =>
+    r.err instanceof MemoryUnavailableError && r.err.reason === "unconfigured" ? UNCONFIGURED : UNAVAILABLE_RETRY;
   const memberKeys = new Set(facts.map((f) => f.toLowerCase().replace(/\s+/g, " ").slice(0, 140)));
   const houseFacts = houseFactsRaw.filter((f) => !memberKeys.has(f.toLowerCase().replace(/\s+/g, " ").slice(0, 140)));
 
@@ -63,11 +76,11 @@ export async function GET() {
     "agent to bring them up to speed on your business. Exported from your",
     "Plunder & Riffle memory on " + today + ".",
     "",
-    `## What your agents remember (${facts.length})`,
+    `## What your agents remember (${factsR.ok ? facts.length : "?"})`,
     "",
   ];
   if (!factsR.ok) {
-    lines.push(`_${UNAVAILABLE}_`, "");
+    lines.push(`_${unavailable(factsR)}_`, "");
   } else if (facts.length === 0) {
     lines.push("_Nothing yet — tell Ralph about your business and it lands here._", "");
   } else {
@@ -76,9 +89,9 @@ export async function GET() {
   }
 
   if (operator) {
-    lines.push(`## House memory — operator scope (${houseFacts.length})`, "");
+    lines.push(`## House memory — operator scope (${houseR.ok ? houseFacts.length : "?"})`, "");
     if (!houseR.ok) {
-      lines.push(`_${UNAVAILABLE}_`, "");
+      lines.push(`_${unavailable(houseR)}_`, "");
     } else if (houseFacts.length === 0) {
       lines.push("_Nothing recalled from the house scope._", "");
     } else {
@@ -88,7 +101,7 @@ export async function GET() {
   }
 
   if (!brandsR.ok) {
-    lines.push("## Your brands and research", "", `_${UNAVAILABLE}_`, "");
+    lines.push("## Your brands and research", "", `_${UNAVAILABLE_RETRY}_`, "");
   } else if (brands.length > 0) {
     lines.push("## Your brands and research", "");
     for (const b of brands) {

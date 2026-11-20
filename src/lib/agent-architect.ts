@@ -101,11 +101,15 @@ export async function architectAgent(params: {
 
   // The need the owner described is durable business context — it
   // belongs in their memory whether or not they install this agent.
-  void mnemosCapture(
+  // Awaited (short timeout, never throws): fire-and-forget here could be
+  // cut off when the route's response completes, dropping the fact.
+  const captured = await mnemosCapture(
     mnemosPersonFor(params.userId),
     `Owner described an agent need: ${brief.slice(0, 400)} — architect designed "${config.name}" (${config.role.slice(0, 200)})`,
     "SMB Agent Factory — architect session",
-  ).catch(() => {});
+    { timeoutMs: 8_000 },
+  );
+  if (!captured) console.warn("[architect] agent need not captured to memory");
 
   return { config, researched, researchDigest: researchDigest || undefined };
 }

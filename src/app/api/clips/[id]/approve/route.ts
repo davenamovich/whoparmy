@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 // Web Crypto, not node:crypto: the repo has no @types/node, and this
 // route runs on the Node runtime anyway (crypto.subtle is global there).
 import { db } from "@/lib/db";
@@ -90,13 +90,17 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
     // The approval is the lesson — captured once, after the row is written,
     // and never allowed to fail the request (see lib/clips/memory.ts).
-    void captureDecision({
-      userId: user.id,
-      pageId: clip.pageId,
-      clipId: clip.id,
-      decision: "approved",
-      note: clip.hook ? `hook kept: ${clip.hook}` : undefined,
-    });
+    // after(), not `void`: a bare un-awaited promise can be cut off when
+    // the response completes, silently dropping the lesson.
+    after(() =>
+      captureDecision({
+        userId: user.id,
+        pageId: clip.pageId,
+        clipId: clip.id,
+        decision: "approved",
+        note: clip.hook ? `hook kept: ${clip.hook}` : undefined,
+      }),
+    );
 
     return NextResponse.json({
       ok: true,
