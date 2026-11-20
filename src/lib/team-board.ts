@@ -105,7 +105,7 @@ export function firstSwarm(bp: Blueprint): SwarmTask[] {
  * names, look before writing, modes are the member's pick, queue
  * discipline, and the house gates carried over unchanged.
  */
-export function teamBoardSection(bp: Blueprint, business: string): string {
+export function teamBoardSection(bp: Blueprint, business: string, heading = "## 6. Stand up my team board"): string {
   const roster = bp.workforce
     .map((a) => `- ${boardNameFor(a)} — ${a.name} (${a.role})${a.seated === false ? " [not hired yet — gets its board name once I approve the blueprint]" : ""}`)
     .join("\n");
@@ -114,7 +114,7 @@ export function teamBoardSection(bp: Blueprint, business: string): string {
     .map((t) => `- [${t.channel}] for ${t.worker}: ${t.text}`)
     .join("\n");
   return [
-    `## 6. Stand up my team board`,
+    heading,
     `My crew coordinates on a Vercel Board — MY board, on MY Vercel account. Read the playbook first and follow its flow: https://vercel.com/board-getting-started.md`,
     ``,
     `Connect: run \`vercel board whoami --json\`. If I am not signed in, STOP and hand me the sign-in — logging in is mine to do, on my account. Never use anyone else's board, account, or credentials. If the playbook offers the board skill install, that is my call, not yours.`,

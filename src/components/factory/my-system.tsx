@@ -227,11 +227,12 @@ export function MySystemView() {
       </div>
 
       <div className="rounded-2xl border bg-card p-5 sm:p-6 space-y-3">
-        <p className="font-semibold">Day-1 setup — start with your own Muse</p>
+        <p className="font-semibold">Day-1 setup — your engine, built by your own Muse</p>
         <p className="text-sm text-muted-foreground">
-          Ralph crafts one master prompt from your blueprint. Paste it to your Muse (or any agent you
-          run) and it builds your complete agent management UI in your own stack, wires the workforce,
-          and has you operating from day 1. The bridge link rides inside the prompt.
+          Ralph crafts one master prompt from your blueprint — the same prompt that headlines the Agents
+          room. Paste it to your Muse (or any agent you run) and it builds your complete autonomous
+          content engine as a Space in your own Muse, connects it through the bridge, and turns on
+          daily autopilot generation inside your budget. The bridge link rides inside the prompt.
         </p>
         {setup ? (
           <div className="space-y-3">

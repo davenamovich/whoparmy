@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Bot, Wallet, Pause, Play, Store, Briefcase, ListOrdered, Zap, Send, Brain, Download, Sparkles, Activity, FileSearch, Wrench, Settings2, LayoutGrid, Hammer } from "lucide-react";
+import { Bot, Wallet, Pause, Play, Briefcase, ListOrdered, Zap, Send, Brain, Download, Activity, FileSearch, Wrench, Settings2, LayoutGrid, Copy, RefreshCw, Loader2, Rocket } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,17 +39,6 @@ interface FactoryToolView {
   id: string;
   label: string;
   kind: string;
-}
-
-interface ArchitectConfigView {
-  name: string;
-  role: string;
-  instructions: string;
-  tools: FactoryToolView[];
-  toolsJson: string;
-  defaultKind: string;
-  successMetric: string;
-  summary: string;
 }
 
 interface ResearchView {
@@ -140,13 +129,12 @@ export function AgentsView() {
   const [campForm, setCampForm] = useState({ title: "", description: "", bounty: "100" });
   const [claimAgent, setClaimAgent] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
-  // SMB Agent Factory (2026-11-18): research for the control center,
-  // the architect creator, per-agent tabs, and the memory view.
+  // Research for the control center, per-agent tabs, memory view.
   const [research, setResearch] = useState<ResearchView | null>(null);
-  const [archForm, setArchForm] = useState({ brief: "", website: "" });
-  const [archBusy, setArchBusy] = useState(false);
-  const [archConfig, setArchConfig] = useState<ArchitectConfigView | null>(null);
-  const [archResearched, setArchResearched] = useState(false);
+  // THE agent-creation door (consolidated 2026-11-20): Ralph's
+  // engine prompt, crafted from the member's blueprint.
+  const [setup, setSetup] = useState<{ eligible: boolean; link: string | null; prompt: string } | null>(null);
+  const [busySetup, setBusySetup] = useState(false);
   const [hireTabs, setHireTabs] = useState<Record<string, string>>({});
   const [memoryFacts, setMemoryFacts] = useState<string[] | null>(null);
   const [settingsForms, setSettingsForms] = useState<Record<string, { name: string; role: string; instructions: string }>>({});
@@ -197,44 +185,27 @@ export function AgentsView() {
     }
   }
 
-  async function runArchitect() {
-    setArchBusy(true);
+  async function craftSetup() {
+    setBusySetup(true);
     try {
-      const res = await fetch("/api/agents/architect", {
+      const res = await fetch("/api/blueprint", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brief: archForm.brief, website: archForm.website || undefined }),
+        body: JSON.stringify({ action: "setup" }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? "The architect couldn't design that agent");
-      setArchConfig(data.config as ArchitectConfigView);
-      setArchResearched(!!data.researched);
+      const data = (await res.json().catch(() => ({}))) as {
+        eligible?: boolean;
+        link?: string | null;
+        prompt?: string;
+        error?: string;
+      };
+      if (!res.ok || !data.prompt) throw new Error(data.error ?? "Setup failed");
+      setSetup({ eligible: Boolean(data.eligible), link: data.link ?? null, prompt: data.prompt });
     } catch (err) {
       toast({ title: "That didn't work", description: err instanceof Error ? err.message : undefined, variant: "destructive" });
     } finally {
-      setArchBusy(false);
+      setBusySetup(false);
     }
-  }
-
-  async function installArchitectAgent() {
-    if (!archConfig) return;
-    await act(
-      () =>
-        fetch("/api/agents", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            templateKey: "custom",
-            name: archConfig.name,
-            role: archConfig.role,
-            instructions: archConfig.instructions,
-            toolsJson: archConfig.toolsJson,
-          }),
-        }),
-      `${archConfig.name} installed — it's on your team`,
-    );
-    setArchConfig(null);
-    setArchForm({ brief: "", website: "" });
   }
 
   // Memory is per-member and shared by every agent — load it once,
@@ -259,13 +230,71 @@ export function AgentsView() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
-          <Bot className="h-6 w-6 text-primary" /> Rent a Bot
+          <Bot className="h-6 w-6 text-primary" /> Your Agent Engine
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Your own meme bot, rented by the month. Order work, watch it ship, approve what goes out. No dashboards to
-          learn, no AI math — just memes. Owner approves — bots create.
+          One way to build agents here — the prompt below. It builds your complete autonomous content engine as a
+          Space in your own Muse, connects it to your P&amp;R account, and starts it generating on autopilot.
+          Agents you already run stay managed on the floor below.
         </p>
       </div>
+
+      {/* ─── THE creation door (consolidated 2026-11-20): one prompt
+          builds the whole engine in the member's own Muse. ─── */}
+      <Card className="border-primary/50">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Rocket className="h-5 w-5 text-primary" /> Build my autonomous engine
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Ralph crafts one master prompt from your blueprint — your business, your workforce, your budget, your
+            bridge connect link inside. Paste it to your Muse and it builds your content engine as a Space in
+            your own Muse, wires your agents, and turns on daily autopilot generation inside your budget.
+            Everything it makes lands in your approvals inbox — nothing publishes without your tap.
+          </p>
+          {setup ? (
+            <div className="space-y-3">
+              {setup.link ? (
+                <p className="text-sm">
+                  Your fresh connect link: <span className="font-medium break-all">{setup.link}</span>
+                  <span className="text-muted-foreground"> — it&apos;s inside the prompt too. Crafting a new one retires older unused links.</span>
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Connect links mint on Operator and Agency plans — the prompt includes the one step to get yours.
+                  Everything else in it works today.
+                </p>
+              )}
+              <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-xl bg-muted p-4 text-xs leading-relaxed">{setup.prompt}</pre>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={() => {
+                    void navigator.clipboard.writeText(setup.prompt);
+                    toast({ title: "Engine prompt copied — paste it to your Muse." });
+                  }}
+                >
+                  <Copy className="h-4 w-4 mr-1.5" /> Copy the prompt
+                </Button>
+                <Button variant="outline" onClick={() => void craftSetup()} disabled={busySetup}>
+                  {busySetup ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Craft a fresh one
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button onClick={() => void craftSetup()} disabled={busySetup}>
+              {busySetup ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Bot className="h-4 w-4 mr-1.5" />}
+              Craft my engine prompt
+            </Button>
+          )}
+          <p className="text-[11px] text-muted-foreground">
+            BTC Barry joins your team from the bridge —{" "}
+            <a href="/bridge" className="text-primary underline underline-offset-2">save your DH Media link to unlock him</a>.
+            Your blueprint and workforce design live in My AI System; this prompt carries them into your Muse.
+          </p>
+        </CardContent>
+      </Card>
 
       {/* Control-center roll-up (Factory Slice B) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
@@ -281,88 +310,6 @@ export function AgentsView() {
           </div>
         ))}
       </div>
-
-      {/* ─── BUILD YOUR AI EMPLOYEE (Factory Slice A) ─── */}
-      <Card className="border-primary/40">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" /> Build Your AI Employee
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            Describe the job in plain English. The architect researches your business, designs the agent —
-            its role, instructions and tools — and shows you the whole thing before anything is installed.
-            No AI knowledge needed.
-          </p>
-          <textarea
-            className="w-full min-h-20 rounded-md border border-input bg-background px-3 py-2 text-sm"
-            placeholder='e.g. "I own a roofing company. I want an agent that finds commercial roofing opportunities and drafts the outreach for my approval."'
-            value={archForm.brief}
-            onChange={(e) => setArchForm((f) => ({ ...f, brief: e.target.value }))}
-          />
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Input
-              className="flex-1"
-              placeholder="Your business website (optional — the architect researches it)"
-              value={archForm.website}
-              onChange={(e) => setArchForm((f) => ({ ...f, website: e.target.value }))}
-            />
-            <Button disabled={archBusy || archForm.brief.trim().length < 10} onClick={() => void runArchitect()}>
-              <Hammer className="h-4 w-4 mr-1.5" /> {archBusy ? "Designing your agent…" : "Build my agent"}
-            </Button>
-          </div>
-          {archBusy ? (
-            <p className="text-[11px] text-muted-foreground">Researching and designing can take a minute when a website is included.</p>
-          ) : null}
-          {archConfig ? (
-            <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <span className="font-black text-base">Your agent is ready — {archConfig.name}</span>
-                <Badge className="bg-primary/15 text-primary border-0 text-[10px]">ONE-CLICK INSTALL</Badge>
-              </div>
-              <p className="text-sm">{archConfig.summary}</p>
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">What it does</div>
-                <p className="text-sm text-muted-foreground">{archConfig.role}</p>
-              </div>
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Capabilities</div>
-                <ul className="text-sm text-muted-foreground list-disc pl-5">
-                  {archConfig.tools.map((t) => (
-                    <li key={t.id}>{t.label}</li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">How it runs</div>
-                <p className="text-sm text-muted-foreground">
-                  Whoparmy agent runner · Mnemos business memory (shared with your other agents) ·{" "}
-                  {archResearched ? "designed from live research on your business · " : ""}P&R creative engine
-                  where its tools call for it. It fills one of your plan&apos;s bot seats. Everything it makes is
-                  a draft for your approval — it never publishes, sends or spends on its own.
-                </p>
-              </div>
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">You&apos;ll know it&apos;s working when</div>
-                <p className="text-sm text-muted-foreground">{archConfig.successMetric}</p>
-              </div>
-              <details>
-                <summary className="text-xs font-semibold cursor-pointer">Its standing instructions</summary>
-                <pre className="text-xs whitespace-pre-wrap mt-2 max-h-48 overflow-auto rounded-md bg-secondary/40 p-2.5">{archConfig.instructions}</pre>
-              </details>
-              <div className="flex gap-2 flex-wrap">
-                <Button disabled={busy} onClick={() => void installArchitectAgent()}>
-                  Install agent
-                </Button>
-                <Button variant="outline" disabled={busy} onClick={() => setArchConfig(null)}>
-                  Discard
-                </Button>
-              </div>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
 
       <BrandedBotCard />
 
@@ -417,56 +364,6 @@ export function AgentsView() {
           </CardContent>
         </Card>
       ) : null}
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Store className="h-4 w-4 text-primary" /> {tA("botRental")}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2">
-          {catalog.filter((t) => t.key !== "custom").map((t) => (
-            <div key={t.key} className="rounded-lg border border-border/60 p-4 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-bold">{t.name}</span>
-                <Badge className="bg-primary/15 text-primary border-0 text-[10px]">{tA("tierSuffix", { tier: t.tierKey })}</Badge>
-              </div>
-              <p className="text-xs text-muted-foreground">{t.role}</p>
-              <div className="flex items-center gap-2">
-                {t.viaStack ? (
-                  // Real agents (Dave, 2026-11-19) join through their
-                  // stack launch, gated on the saved offer link — the
-                  // launcher lives on /bridge.
-                  hires.some((h) => h.templateKey === t.key) ? (
-                    <Button disabled>On your team ✓</Button>
-                  ) : (
-                    <Button asChild>
-                      <a href="/bridge">Unlock — save your DH Media link</a>
-                    </Button>
-                  )
-                ) : (
-                  <Button
-                    disabled={busy}
-                    onClick={() =>
-                      void act(
-                        () =>
-                          fetch("/api/agents", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ templateKey: t.key }),
-                          }),
-                        `${t.name} added — it's on your team`,
-                      )
-                    }
-                  >
-                    {tA("rentThisBot")}
-                  </Button>
-                )}
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader className="pb-2">
