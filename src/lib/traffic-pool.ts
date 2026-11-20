@@ -5,6 +5,7 @@ import {
   DAILY_TRAFFIC_SLOTS,
   decideTrafficPools,
   type TrafficPoolDecision,
+  placementAgentMap,
 } from "@/lib/traffic-pool-core";
 
 /**
@@ -176,5 +177,16 @@ export async function filterPlacementsByTrafficPool<T extends PlacementRow>(plac
   } catch (err) {
     console.error("[traffic-pool] filter failed, serving unfiltered pool:", err);
     return placements;
+  }
+}
+
+export async function getPlacementAgentAttribution(placements: Array<{ id: string; userId: string }>, date: string): Promise<Map<string, string>> {
+  if (!placements.length) return new Map();
+  try {
+    const { decision } = await computeForUsers(placements.map((placement) => placement.userId), date);
+    return placementAgentMap(decision);
+  } catch (err) {
+    console.error("[traffic-pool] attribution failed, serving legacy entries:", err);
+    return new Map();
   }
 }

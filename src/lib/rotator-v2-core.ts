@@ -22,12 +22,12 @@ function sign(payload: string, secret: string): string {
   return createHmac("sha256", secret).update(payload).digest("base64url");
 }
 
-export function mintUserRotatorCode(rotatorId: string, secret: string): string {
-  const payload = Buffer.from(JSON.stringify({ r: rotatorId })).toString("base64url");
+function mintCode(key: "r" | "a", id: string, secret: string): string {
+  const payload = Buffer.from(JSON.stringify({ [key]: id })).toString("base64url");
   return `v1.${payload}.${sign(payload, secret)}`;
 }
 
-export function verifyUserRotatorCode(code: string, secret: string): { rotatorId: string } | null {
+function verifyCode(key: "r" | "a", code: string, secret: string): string | null {
   const parts = String(code ?? "").split(".");
   if (parts.length !== 3 || parts[0] !== "v1") {
     return null;
@@ -44,10 +44,48 @@ export function verifyUserRotatorCode(code: string, secret: string): { rotatorId
 
   try {
     const value = JSON.parse(Buffer.from(parts[1], "base64url").toString());
-    return value && typeof value.r === "string" && value.r ? { rotatorId: value.r } : null;
+    return value && typeof value[key] === "string" && value[key] ? value[key] : null;
   } catch {
     return null;
   }
+}
+
+export function mintUserRotatorCode(rotatorId: string, secret: string): string {
+  return mintCode("r", rotatorId, secret);
+}
+
+export function verifyUserRotatorCode(code: string, secret: string): { rotatorId: string } | null {
+  const rotatorId = verifyCode("r", code, secret);
+  return rotatorId ? { rotatorId } : null;
+}
+
+export function mintAgentRotatorCode(rotatorId: string, secret: string): string {
+  return mintCode("a", rotatorId, secret);
+}
+
+export function verifyAgentRotatorCode(code: string, secret: string): { rotatorId: string } | null {
+  const rotatorId = verifyCode("a", code, secret);
+  return rotatorId ? { rotatorId } : null;
+}
+
+export function appendSubParam(url: string, sub: string): string {
+  try {
+    const parsed = new URL(url);
+    if (parsed.searchParams.has("sub")) return url;
+    parsed.searchParams.append("sub", sub);
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
+export function pickGroupedDestination<T>(groups: T[][], hour: number): T | null {
+  const available = groups.filter((group) => group.length > 0);
+  if (!available.length) return null;
+  const groupIndex = ((hour % available.length) + available.length) % available.length;
+  const group = available[groupIndex];
+  const entryIndex = Math.floor(hour / available.length) % group.length;
+  return group[(entryIndex + group.length) % group.length];
 }
 
 export interface PickableLink {

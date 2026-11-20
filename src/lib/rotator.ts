@@ -1,7 +1,9 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { BRIDGE_PARTNERS } from "@/lib/bridge";
-import { filterPlacementsByTrafficPool } from "@/lib/traffic-pool";
+import { filterPlacementsByTrafficPool, getPlacementAgentAttribution } from "@/lib/traffic-pool";
+import { pickGroupedDestination, rotatorV2Enabled } from "@/lib/rotator-v2-core";
+import { resolveAgentRotatorDestination } from "@/lib/rotator-v2";
 
 /**
  * ─── THE DAILY ROTATOR — auctioned, admin controlled ───────────────
@@ -65,6 +67,7 @@ export interface RotatorPoolEntry {
   partnerName: string;
   source: "auction" | "free";
   userId: string | null;
+  agentId?: string | null;
 }
 
 export interface RotatorDestination {
@@ -78,6 +81,9 @@ export interface RotatorDestination {
   pickUserId: string | null;
   poolSize: number;
   pool: RotatorPoolEntry[];
+  agentId?: string | null;
+  agentRotatorId?: string | null;
+  agentRotatorLinkId?: string | null;
 }
 
 function etHour(d = new Date()): number {
@@ -97,6 +103,7 @@ function etHour(d = new Date()): number {
  */
 export async function getRotatorPool(date = etDateString()): Promise<RotatorPoolEntry[]> {
   const pool: RotatorPoolEntry[] = [];
+  const v2 = rotatorV2Enabled(process.env);
   const day = await db.rotatorDay.findUnique({ where: { date } });
   if (day?.status === "CONFIRMED" && day.winnerUrl) {
     const partner = BRIDGE_PARTNERS.find((p) => p.key === day.winnerPartner);
@@ -106,6 +113,7 @@ export async function getRotatorPool(date = etDateString()): Promise<RotatorPool
       partnerName: partner?.name ?? day.winnerPartner ?? "",
       source: "auction",
       userId: day.winnerUserId,
+      ...(v2 ? { agentId: null } : {}),
     });
   }
   const earned = await db.rotatorPlacement.findMany({
@@ -118,6 +126,7 @@ export async function getRotatorPool(date = etDateString()): Promise<RotatorPool
   // no working agent rotate exactly as before, and the auction entry
   // above is never filtered. Fail-open inside the filter.
   const placements = await filterPlacementsByTrafficPool(earned, date);
+  const attribution = v2 ? await getPlacementAgentAttribution(placements, date) : new Map<string, string>();
   for (const pl of placements) {
     const link = await db.engineLink.findUnique({
       where: { userId_partner: { userId: pl.userId, partner: pl.partner } },
@@ -131,6 +140,7 @@ export async function getRotatorPool(date = etDateString()): Promise<RotatorPool
       partnerName: partner?.name ?? pl.partner,
       source: "free",
       userId: pl.userId,
+      ...(v2 ? { agentId: attribution.get(pl.id) ?? null } : {}),
     });
   }
   return pool;
@@ -142,19 +152,40 @@ export async function getRotatorDestination(date = etDateString()): Promise<Rota
     // The rotator ROTATES: today's featured link changes hourly, so
     // every entry in the pool gets its share of the day's 24 hours.
     // (Other dates report the pool head — only today has a "now".)
-    const pick = date === etDateString() ? pool[etHour() % pool.length] : pool[0];
+    const today = date === etDateString();
+    let pick = today ? pool[etHour() % pool.length] : pool[0];
+    if (rotatorV2Enabled(process.env) && today) {
+      const auction = pool.filter((entry) => entry.source === "auction").map((entry) => [entry]);
+      const agentGroups = [...new Set(pool.filter((entry) => entry.source === "free" && entry.agentId).map((entry) => entry.agentId!))]
+        .sort((a, b) => a.localeCompare(b))
+        .map((agentId) => pool.filter((entry) => entry.source === "free" && entry.agentId === agentId));
+      const legacy = pool.filter((entry) => entry.source === "free" && !entry.agentId);
+      pick = pickGroupedDestination([...auction, ...agentGroups, ...(legacy.length ? [legacy] : [])], etHour()) ?? pick;
+    }
+    let served = { url: pick.url, partner: pick.partner, partnerName: pick.partnerName, agentId: null as string | null, agentRotatorId: null as string | null, agentRotatorLinkId: null as string | null };
+    if (rotatorV2Enabled(process.env) && today && pick.source === "free" && pick.agentId) {
+      const resolved = await resolveAgentRotatorDestination(pick.agentId);
+      if (resolved) served = { url: resolved.url, partner: resolved.partner, partnerName: BRIDGE_PARTNERS.find((item) => item.key === resolved.partner)?.name ?? resolved.partner, agentId: pick.agentId, agentRotatorId: resolved.rotatorId, agentRotatorLinkId: resolved.linkId };
+    }
     const hasAuction = pool.some((e) => e.source === "auction");
     const hasFree = pool.some((e) => e.source === "free");
     return {
       date,
-      url: pick.url,
-      partner: pick.partner,
-      partnerName: pick.partnerName,
+      url: served.url,
+      partner: served.partner,
+      partnerName: served.partnerName,
       source: hasAuction && hasFree ? "mixed" : hasAuction ? "auction" : "free",
       winnerUserId: pool.find((e) => e.source === "auction")?.userId ?? null,
       pickUserId: pick.userId,
       poolSize: pool.length,
       pool,
+      ...(rotatorV2Enabled(process.env)
+        ? {
+            agentId: served.agentId,
+            agentRotatorId: served.agentRotatorId,
+            agentRotatorLinkId: served.agentRotatorLinkId,
+          }
+        : {}),
     };
   }
   const pick = HOUSE_POOL[(dayOfYearET(date) - 1) % HOUSE_POOL.length];

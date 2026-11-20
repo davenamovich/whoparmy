@@ -78,6 +78,7 @@ model User {
   clipPages    ClipPage[]
   clipJobs     ClipJob[]
   userRotator UserRotator?
+  agentRotators AgentRotator[]
 }
 
 // ─── Brand profiles (multiple allowed for agencies) ─────────────────
@@ -263,6 +264,7 @@ model HiredAgent {
   user User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   jobs AgentJob[]
   trafficDays AgentTrafficDay[]
+  agentRotator AgentRotator?
 
   @@index([userId])
 }
@@ -498,6 +500,7 @@ model EngineLink {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   rotatorLinks UserRotatorLink[]
+  agentRotatorLinks AgentRotatorLink[]
 
   @@unique([userId, partner])
   @@index([userId])
@@ -528,6 +531,40 @@ model UserRotatorLink {
 
   rotator    UserRotator @relation(fields: [rotatorId], references: [id], onDelete: Cascade)
   engineLink EngineLink  @relation(fields: [engineLinkId], references: [id], onDelete: Cascade)
+
+  @@unique([rotatorId, engineLinkId])
+  @@index([rotatorId])
+}
+
+model AgentRotator {
+  id        String   @id @default(cuid())
+  agentId   String   @unique
+  userId    String
+  mode      String   @default("WEIGHTED")
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agent HiredAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  links AgentRotatorLink[]
+
+  @@index([userId])
+}
+
+model AgentRotatorLink {
+  id           String   @id @default(cuid())
+  rotatorId    String
+  engineLinkId String
+  weight       Int      @default(1)
+  dailyCap     Int?
+  position     Int      @default(0)
+  enabled      Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  rotator    AgentRotator @relation(fields: [rotatorId], references: [id], onDelete: Cascade)
+  engineLink EngineLink   @relation(fields: [engineLinkId], references: [id], onDelete: Cascade)
 
   @@unique([rotatorId, engineLinkId])
   @@index([rotatorId])

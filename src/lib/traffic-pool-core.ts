@@ -60,6 +60,14 @@ export interface TrafficPoolDecision {
   allowedPlacementIds: Set<string>;
 }
 
+export function placementAgentMap(decision: TrafficPoolDecision): Map<string, string> {
+  const result = new Map<string, string>();
+  for (const [agentId, state] of decision.states) {
+    for (const placementId of state.placementIds) result.set(placementId, agentId);
+  }
+  return result;
+}
+
 function byCreatedThenId<T extends { createdAt: Date; id: string }>(a: T, b: T): number {
   const dt = a.createdAt.getTime() - b.createdAt.getTime();
   return dt !== 0 ? dt : a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
