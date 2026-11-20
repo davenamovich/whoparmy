@@ -74,6 +74,8 @@ export interface RotatorDestination {
   partnerName: string;
   source: "auction" | "free" | "mixed" | "house";
   winnerUserId: string | null;
+  /** Owner of the link being served right now (the hourly pick); null for house. */
+  pickUserId: string | null;
   poolSize: number;
   pool: RotatorPoolEntry[];
 }
@@ -150,6 +152,7 @@ export async function getRotatorDestination(date = etDateString()): Promise<Rota
       partnerName: pick.partnerName,
       source: hasAuction && hasFree ? "mixed" : hasAuction ? "auction" : "free",
       winnerUserId: pool.find((e) => e.source === "auction")?.userId ?? null,
+      pickUserId: pick.userId,
       poolSize: pool.length,
       pool,
     };
@@ -162,6 +165,7 @@ export async function getRotatorDestination(date = etDateString()): Promise<Rota
     partnerName: pick.name,
     source: "house",
     winnerUserId: null,
+    pickUserId: null,
     poolSize: 0,
     pool: [],
   };

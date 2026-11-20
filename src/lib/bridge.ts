@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { grantReferralBot } from "@/lib/bot-grants";
+import { resolveSignup, type SignupSource } from "@/lib/bridge-signup";
 
 /**
  * ─── THE BRIDGE — build your own engine, step one ────────────────────
@@ -107,10 +108,27 @@ export const BRIDGE_PARTNERS: BridgePartner[] = [
 
 const PARTNER_KEYS = new Set(BRIDGE_PARTNERS.map((p) => p.key));
 
+export interface BridgePartnerState extends BridgePartner {
+  url: string;
+  /**
+   * The sign-up destination for this offer on this member's page
+   * (Dave, 2026-11-19): the member's REFERRER's saved link for the
+   * offer, populated so a new member signs up under the member who
+   * sent them; the house example only when the referrer has none.
+   * Null when neither side has a real URL (text placeholders).
+   */
+  signupUrl: string | null;
+  signupSource: SignupSource | null;
+  /** Whose link signupUrl is, when the source is the referrer. */
+  signupOwnerId: string | null;
+}
+
 export interface BridgeState {
-  partners: Array<BridgePartner & { url: string }>;
+  partners: BridgePartnerState[];
   linksSavedAt: string | null;
   hasReferrer: boolean;
+  /** Display label for the member who sent this member, if any. */
+  referrerLabel: string | null;
   freeGensPerLinkSave: number;
 }
 
@@ -119,11 +137,38 @@ export async function getBridgeState(userId: string): Promise<BridgeState> {
     db.user.findUnique({ where: { id: userId }, select: { linksSavedAt: true, referredById: true } }),
     db.engineLink.findMany({ where: { userId }, select: { partner: true, url: true } }),
   ]);
+  // The referrer's own saved links populate the sign-up buttons.
+  let referrerLabel: string | null = null;
+  const referrerByPartner = new Map<string, string>();
+  if (user?.referredById) {
+    const [referrer, referrerLinks] = await Promise.all([
+      db.user.findUnique({
+        where: { id: user.referredById },
+        select: { whopUsername: true, name: true },
+      }),
+      db.engineLink.findMany({
+        where: { userId: user.referredById },
+        select: { partner: true, url: true },
+      }),
+    ]);
+    referrerLabel = referrer?.whopUsername ?? referrer?.name ?? "your referrer";
+    for (const l of referrerLinks) referrerByPartner.set(l.partner, l.url);
+  }
   const byPartner = new Map(links.map((l) => [l.partner, l.url]));
   return {
-    partners: BRIDGE_PARTNERS.map((p) => ({ ...p, url: byPartner.get(p.key) ?? "" })),
+    partners: BRIDGE_PARTNERS.map((p) => {
+      const signup = resolveSignup(p.example, referrerByPartner.get(p.key));
+      return {
+        ...p,
+        url: byPartner.get(p.key) ?? "",
+        signupUrl: signup.signupUrl,
+        signupSource: signup.signupSource,
+        signupOwnerId: signup.signupSource === "referrer" ? (user?.referredById ?? null) : null,
+      };
+    }),
     linksSavedAt: user?.linksSavedAt?.toISOString() ?? null,
     hasReferrer: Boolean(user?.referredById),
+    referrerLabel,
     freeGensPerLinkSave: LINK_SAVE_FREE_GENS,
   };
 }

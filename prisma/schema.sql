@@ -1009,3 +1009,20 @@ CREATE UNIQUE INDEX "AgentTrafficDay_agentId_date_key" ON "AgentTrafficDay"("age
 
 -- CreateIndex
 CREATE INDEX "AgentTrafficDay_userId_date_idx" ON "AgentTrafficDay"("userId", "date");
+
+-- CreateTable
+CREATE TABLE "LinkClick" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "ownerUserId" TEXT,
+    "partner" TEXT NOT NULL,
+    "source" TEXT NOT NULL,
+    "visitorUserId" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "LinkClick_ownerUserId_fkey" FOREIGN KEY ("ownerUserId") REFERENCES "User" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE INDEX "LinkClick_ownerUserId_createdAt_idx" ON "LinkClick"("ownerUserId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "LinkClick_partner_idx" ON "LinkClick"("partner");

@@ -35,6 +35,7 @@ model User {
   researchJobs ResearchJob[]
   videoJobs    VideoJob[]
   engineLinks  EngineLink[]
+  linkClicksOwned LinkClick[] @relation("LinkClickOwner")
   rotatorBids  RotatorBid[]
   rotatorWins  RotatorDay[] @relation("RotatorWins")
   rotatorPlacements RotatorPlacement[]
@@ -498,6 +499,28 @@ model EngineLink {
 
   @@unique([userId, partner])
   @@index([userId])
+}
+
+// ─── Link clicks (Dave, 2026-11-19) ─────────────────────────────────
+// One row per REAL click the app itself served: a member tapping
+// "Sign up" on their Your Links page (source "signup", credited to
+// the referrer whose link was served — ownerUserId null when the
+// house link was served) and a no-ref visitor following the rotator
+// (source "rotator", credited to the member whose link the rotator
+// featured at that moment). This is the member dashboard's click
+// count — clicks the app never served are never invented here.
+model LinkClick {
+  id            String   @id @default(cuid())
+  ownerUserId   String? // member whose link was clicked; null = house link
+  partner       String // BRIDGE_PARTNERS key
+  source        String // signup | rotator
+  visitorUserId String? // signed-in clicker when known (signup clicks)
+  createdAt     DateTime @default(now())
+
+  owner User? @relation("LinkClickOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+
+  @@index([ownerUserId, createdAt])
+  @@index([partner])
 }
 
 // ─── Muse bridge connector (Dave, 2026-11-17) ──────────────────────
