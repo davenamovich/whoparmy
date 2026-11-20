@@ -3,17 +3,20 @@
  * public anonymous game can be tested independently of its session machine.
  * Mirrors pickaphone-logic.ts.
  *
- * The game currency is Vault Tokens (Dave locked 2026-11-18). Conversion is
- * 23 tokens = 1 free generation (DOORS_CREDITS_PER_GEN env override, default
- * 23 — same semantics as tokensPerGen in ./pickaphone-logic.ts). Rewards pay
- * out as free generations through the existing claim bridge, never as engine
- * credits and never as Bitcoin.
+ * The game currency is Points (Dave's Option A decision, 2026-11-19 — BTC
+ * game ONLY; Pickaphone and the Token Vault keep Vault Tokens). Conversion
+ * is a constant 100 Points = 1 free generation — deliberately NOT the
+ * DOORS_CREDITS_PER_GEN env (that env is shared with Pickaphone and the BTC
+ * game must not drift with it). Rewards pay out as free generations through
+ * the existing claim bridge, never as engine credits and never as Bitcoin.
+ * Internal field names (vt / bankedTokens / tokensPerGen) predate the rename
+ * and are kept for API/DB compatibility; values are Points.
  *
- * Board: 26 cases = 22 Vault Token tiles (1,444 VT total) + 4 AGENT BOOST
- * tiles (2 Rotator Placement, 2 Meme Campaign; VT value 0, recorded on the
- * session as perks when revealed — fulfillment wiring is a follow-up).
- * The player's own case never pays VT: its reveal is the experiment twist,
- * which lives in the client copy, not in this math.
+ * Board: 26 cases = 22 Point tiles (5,710 Points total) + 4 AGENT BOOST
+ * tiles (2 Rotator Placement, 2 Meme Campaign; point value 0, recorded on
+ * the session as perks when revealed — fulfillment wiring is a follow-up).
+ * The player's own case never pays Points: its reveal is the experiment
+ * twist, which lives in the client copy, not in this math.
  */
 
 export type BtcBoostKind = "rotator" | "meme";
@@ -21,7 +24,7 @@ export type BtcBoostKind = "rotator" | "meme";
 export interface BtcTile {
   id: string;
   type: "vt" | "boost";
-  /** Vault Tokens this tile banks when revealed (0 for boosts). */
+  /** Points this tile banks when revealed (0 for boosts). Field name kept. */
   vt: number;
   kind: BtcBoostKind | null;
 }
@@ -34,19 +37,20 @@ function boostTile(kind: BtcBoostKind, instance: number): BtcTile {
   return { id: `boost-${kind}-${instance}`, type: "boost", vt: 0, kind };
 }
 
-/** The full published board composition: 22 VT tiles + 4 boosts = 26 cases. */
+/** The full published board composition: 22 Point tiles + 4 boosts = 26 cases. */
 export const BOARD_TILES: readonly BtcTile[] = [
-  vtTile(1, 1), vtTile(1, 2), vtTile(1, 3), vtTile(1, 4),
-  vtTile(5, 1), vtTile(5, 2), vtTile(5, 3), vtTile(5, 4),
   vtTile(10, 1), vtTile(10, 2),
-  vtTile(25, 1), vtTile(25, 2),
+  vtTile(20, 1), vtTile(20, 2),
   vtTile(50, 1), vtTile(50, 2),
-  vtTile(75, 1), vtTile(75, 2),
   vtTile(100, 1), vtTile(100, 2),
-  vtTile(150, 1),
-  vtTile(200, 1),
-  vtTile(250, 1),
-  vtTile(300, 1),
+  vtTile(150, 1), vtTile(150, 2),
+  vtTile(200, 1), vtTile(200, 2),
+  vtTile(250, 1), vtTile(250, 2),
+  vtTile(300, 1), vtTile(300, 2),
+  vtTile(400, 1), vtTile(400, 2),
+  vtTile(500, 1), vtTile(500, 2),
+  vtTile(750, 1),
+  vtTile(1000, 1),
   boostTile("rotator", 1), boostTile("rotator", 2),
   boostTile("meme", 1), boostTile("meme", 2),
 ];
@@ -80,9 +84,11 @@ export const OFFER_MILESTONES: readonly BtcOfferMilestone[] = [
   { afterOpens: 12, gens: 9, perks: [] },
 ];
 
+/** Option A conversion: 100 Points = 1 free generation. Constant by design. */
+export const POINTS_PER_GEN = 100;
+
 export function tokensPerGen(): number {
-  const value = Number(process.env.DOORS_CREDITS_PER_GEN);
-  return Number.isFinite(value) && value > 0 ? Math.floor(value) : 23;
+  return POINTS_PER_GEN;
 }
 
 export const gensForTokens = (tokens: number): number => Math.max(0, Math.floor(tokens / tokensPerGen()));

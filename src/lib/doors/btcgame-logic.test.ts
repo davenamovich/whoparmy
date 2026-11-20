@@ -13,6 +13,7 @@ import {
   offerAt,
   payoutTokens,
   tileById,
+  tokensPerGen,
 } from "./btcgame-logic.ts";
 
 function mulberry32(seed: number): () => number {
@@ -32,7 +33,7 @@ const seededRand = (seed: number) => {
 };
 
 describe("BTC or No BTC board", () => {
-  it("has 26 tiles: 22 VT tiles worth 1,444 VT plus 4 AGENT BOOST tiles", () => {
+  it("has 26 tiles: 22 Point tiles worth 5,710 Points plus 4 AGENT BOOST tiles", () => {
     assert.equal(BOARD_TILES.length, BTCGAME_CASE_COUNT);
     assert.equal(BTCGAME_CASE_COUNT, 26);
     assert.equal(new Set(BOARD_TILES.map((tile) => tile.id)).size, BOARD_TILES.length);
@@ -43,13 +44,13 @@ describe("BTC or No BTC board", () => {
     assert.equal(boosts.filter((tile) => tile.kind === "rotator").length, 2);
     assert.equal(boosts.filter((tile) => tile.kind === "meme").length, 2);
     assert.ok(boosts.every((tile) => tile.vt === 0));
-    assert.equal(BOARD_TOTAL_TOKENS, 1444);
-    assert.equal(vtTiles.reduce((sum, tile) => sum + tile.vt, 0), 1444);
+    assert.equal(BOARD_TOTAL_TOKENS, 5710);
+    assert.equal(vtTiles.reduce((sum, tile) => sum + tile.vt, 0), 5710);
     const denominations = vtTiles.map((tile) => tile.vt).sort((a, b) => a - b);
-    assert.deepEqual(denominations, [1, 1, 1, 1, 5, 5, 5, 5, 10, 10, 25, 25, 50, 50, 75, 75, 100, 100, 150, 200, 250, 300]);
+    assert.deepEqual(denominations, [10, 10, 20, 20, 50, 50, 100, 100, 150, 150, 200, 200, 250, 250, 300, 300, 400, 400, 500, 500, 750, 1000]);
   });
 
-  it("draws distinct full boards that always total 1,444 VT", () => {
+  it("draws distinct full boards that always total 5,710 Points", () => {
     const boardOne = drawBoard(seededRand(1));
     const boardTwo = drawBoard(seededRand(2));
     assert.equal(boardOne.length, 26);
@@ -57,7 +58,7 @@ describe("BTC or No BTC board", () => {
     assert.notDeepEqual(boardOne, boardTwo);
     for (const board of [boardOne, boardTwo]) {
       assert.ok(board.every((id) => tileById(id)));
-      assert.equal(boardTokens(board), 1444);
+      assert.equal(boardTokens(board), 5710);
       assert.equal(board.filter((id) => tileById(id)?.type === "boost").length, 4);
     }
   });
@@ -65,7 +66,7 @@ describe("BTC or No BTC board", () => {
   it("exposes a display board with no slot information", () => {
     const display = boardDisplay();
     assert.equal(display.length, 26);
-    assert.equal(display.reduce((sum, tile) => sum + tile.vt, 0), 1444);
+    assert.equal(display.reduce((sum, tile) => sum + tile.vt, 0), 5710);
     assert.ok(display.every((tile) => !("id" in tile)));
   });
 });
@@ -84,19 +85,31 @@ describe("BTC or No BTC offers and payouts", () => {
     assert.equal(offerAt(26), null);
   });
 
-  it("pays the better of banked tokens and accepted offers", () => {
+  it("pays the better of banked Points and accepted offers", () => {
     assert.equal(payoutTokens(100, null), 100);
-    assert.equal(payoutTokens(100, 5), 115);
-    assert.equal(payoutTokens(300, 5), 300);
-    assert.equal(payoutTokens(0, 2), 46);
-    assert.equal(payoutTokens(0, 9), 207);
+    assert.equal(payoutTokens(100, 5), 500);
+    assert.equal(payoutTokens(600, 5), 600);
+    assert.equal(payoutTokens(0, 2), 200);
+    assert.equal(payoutTokens(0, 9), 900);
   });
 
-  it("converts tokens to generations at the default rate", () => {
-    assert.equal(gensForTokens(1444), 62);
-    assert.equal(gensForTokens(25), 1);
-    assert.equal(gensForTokens(22), 0);
+  it("converts Points to generations at 100 Points = 1 generation", () => {
+    assert.equal(gensForTokens(5710), 57);
+    assert.equal(gensForTokens(100), 1);
+    assert.equal(gensForTokens(99), 0);
+    assert.equal(gensForTokens(250), 2);
     assert.equal(gensForTokens(0), 0);
+  });
+
+  it("keeps the BTC game conversion at 100 even if the shared doors env is set", () => {
+    const previous = process.env.DOORS_CREDITS_PER_GEN;
+    process.env.DOORS_CREDITS_PER_GEN = "23";
+    try {
+      assert.equal(tokensPerGen(), 100);
+    } finally {
+      if (previous === undefined) delete process.env.DOORS_CREDITS_PER_GEN;
+      else process.env.DOORS_CREDITS_PER_GEN = previous;
+    }
   });
 });
 
