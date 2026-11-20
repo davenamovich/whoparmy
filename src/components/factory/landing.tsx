@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
-import Link from "next/link";
+import { useEffect, useState, useRef } from "react";
+import { PROMPT_TEXT } from "@/lib/muse-prompt";
 import { stashRefFromUrl } from "@/lib/ref-stash";
-import { ShowcasePhone } from "./showcase-phone";
 
 const botUrl = "https://t.me/thewhoppbot";
 const connectUrl = "/api/auth/whop";
@@ -25,16 +24,29 @@ const application = {
   ],
 };
 
-const agentSteps = [
-  "A member connects with Whop.",
-  "They mint a bridge code in Ralph (“Talk to my Muse”).",
-  "The agent calls the Plunder & Riffle MCP bridge: budget-capped, publish-blocked, revocable any time.",
-];
-
 export function LandingPage() {
+  const [copied, setCopied] = useState(false);
+  const promptRef = useRef<HTMLPreElement>(null);
+
   useEffect(() => {
     stashRefFromUrl();
   }, []);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(PROMPT_TEXT);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      if (promptRef.current) {
+        const range = document.createRange();
+        range.selectNodeContents(promptRef.current);
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+      }
+    }
+  };
 
   return (
     <div className="min-h-screen flex-1 overflow-x-clip bg-zinc-950 font-sans text-zinc-50 [color-scheme:dark]">
@@ -48,81 +60,82 @@ export function LandingPage() {
           <span translate="no" className="text-xs leading-tight font-black tracking-[0.12em] sm:text-sm">
             PLUNDER <span className="text-primary">&amp;</span> RIFFLE
           </span>
-          <nav aria-label="Main" className="flex shrink-0 items-center gap-3 sm:gap-6">
-            <a href="#agents" className={`inline-flex min-h-11 items-center text-sm text-zinc-300 hover:text-white ${focus}`}>Agents</a>
+          <nav aria-label="Main" className="flex shrink-0 items-center gap-3">
             <a href={connectUrl} className={`${button} min-h-11 border border-white/25 px-4 hover:bg-white/10`}>Connect</a>
           </nav>
         </header>
 
         <main id="main" tabIndex={-1}>
-          <section aria-labelledby="hero-title" className="grid items-center gap-x-10 gap-y-9 pt-14 pb-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] lg:gap-y-6 lg:py-20 xl:gap-x-20">
-            <div className="min-w-0 text-center lg:self-end lg:text-left">
-              <p className={label}>THE CONTENT ENGINE — LIVE</p>
-              <h1 id="hero-title" className="mt-5 text-6xl leading-[0.93] font-black tracking-[-0.072em] text-balance sm:text-7xl xl:text-[5.75rem]">
-                Marketing that makes itself<span className="text-primary">.</span>
-              </h1>
-              <p className="mx-auto mt-6 max-w-md text-base leading-relaxed text-pretty text-zinc-300 sm:text-lg lg:mx-0">
-                Right now, owners are generating inside Telegram — or their agent is doing it for them. This phone is the live feed.
-              </p>
-            </div>
-
-            <div className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">
-              <ShowcasePhone />
-            </div>
-
-            <div className="text-center lg:self-start lg:text-left">
-              <div className="flex flex-wrap justify-center gap-3 lg:justify-start">
-                <a href={botUrl} target="_blank" rel="noopener noreferrer" className={`${button} bg-primary text-zinc-950 hover:bg-primary/90`}>
-                  Generate in the bot <span aria-hidden="true" className="ml-2">↗</span>
-                </a>
-                <a href={connectUrl} className={`${button} border border-white/25 hover:bg-white/10`}>
-                  Run it with your agent <span aria-hidden="true" className="ml-2">→</span>
-                </a>
-              </div>
-              <p className="mx-auto mt-4 max-w-sm text-sm leading-relaxed text-pretty text-zinc-400 lg:mx-0">
-                Free to start: your first Before pack — a pitch and memes about YOUR business — is on us. No card.
-              </p>
+          <section aria-labelledby="hero-title" className="mx-auto max-w-3xl pt-14 pb-16 text-center sm:pt-20 sm:pb-20">
+            <p className={label}>THE STACK YOU RUN TOMORROW</p>
+            <h1 id="hero-title" className="mt-5 text-6xl leading-[0.93] font-black tracking-[-0.072em] text-balance sm:text-7xl xl:text-[5.75rem]">
+              Built by Muse in one session<span className="text-primary">.</span>
+            </h1>
+            <p className="mx-auto mt-6 max-w-lg text-base leading-relaxed text-pretty text-zinc-300 sm:text-lg">
+              Solo founders and small businesses: copy this prompt into Muse. It asks what it needs to know, then builds a stack you can run tomorrow morning.
+            </p>
+            <div className="mt-8 flex flex-wrap justify-center gap-3">
+              <button onClick={handleCopy} className={`${button} bg-primary text-zinc-950 hover:bg-primary/90`}>
+                {copied ? "Copied" : "Copy the prompt"}
+              </button>
+              <span role="status" aria-live="polite" className="sr-only">{copied ? "Prompt copied to the clipboard" : ""}</span>
+              <a href="https://www.plunderandriffle.com/muse-invite" target="_blank" rel="noopener noreferrer" className={`${button} border border-white/25 hover:bg-white/10`}>
+                Open Muse <span aria-hidden="true" className="ml-2">↗</span>
+              </a>
             </div>
           </section>
 
-          <section aria-labelledby="doors-title" className="pb-16 sm:pb-24">
-            <h2 id="doors-title" className="mb-7 text-4xl font-bold tracking-tight sm:text-5xl">Two ways in</h2>
-            <div className="grid gap-7 sm:grid-cols-2 sm:gap-10">
-              <div className="border-t border-white/20 pt-5">
-                <h3 className={label}>IN THE BOT</h3>
-                <p className="mt-3 max-w-md text-lg leading-relaxed text-pretty text-zinc-300">
-                  Open <span translate="no">@thewhoppbot</span>, drop your website, get your Before pack right in the chat. No dashboard, no signup wall.
-                </p>
-                <a href={botUrl} target="_blank" rel="noopener noreferrer" className={textLink}>
-                  Open the bot <span aria-hidden="true">↗</span>
-                </a>
-              </div>
-              <div className="border-t border-white/20 pt-5">
-                <h3 className={label}>WITH YOUR AGENT</h3>
-                <p className="mt-3 max-w-md text-lg leading-relaxed text-pretty text-zinc-300">
-                  Your agent connects once and generates on your key, your budget, your approve tap — publishing stays yours.
-                </p>
-                <a href={connectUrl} className={textLink}>Connect <span aria-hidden="true">→</span></a>
-                <p className="text-sm text-zinc-400">
-                  No agent yet? <a href="https://www.plunderandriffle.com/muse-invite" className={`inline-flex min-h-11 items-center text-zinc-200 underline decoration-white/30 underline-offset-4 hover:decoration-primary ${focus}`}>Start with Muse <span aria-hidden="true" className="ml-1">→</span></a>
-                </p>
-              </div>
+          <section aria-labelledby="prompt-title" className="mx-auto max-w-4xl pb-16 sm:pb-24">
+            <h2 id="prompt-title" className="sr-only">The prompt</h2>
+            <div className="rounded-lg border border-white/15 bg-zinc-900/50 p-6 sm:p-8">
+              <pre
+                ref={promptRef}
+                className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-zinc-200 sm:text-sm"
+                tabIndex={0}
+              >
+                {PROMPT_TEXT}
+              </pre>
+              <button
+                onClick={handleCopy}
+                className={`mt-6 ${button} w-full border border-white/25 hover:bg-white/10 sm:w-auto`}
+              >
+                {copied ? "Copied" : "Copy"}
+              </button>
+            </div>
+            <p className="mx-auto mt-4 max-w-xl text-center text-sm leading-relaxed text-pretty text-zinc-400">
+              Paste this into Muse. It will ask you up to nine questions about your business, then build your brand profile, a standing brief, and a week of content made by the Plunder &amp; Riffle engine. Free to start: your first Before pack — a pitch and memes about your business — no card.
+            </p>
+          </section>
+
+          <section aria-labelledby="builds-title" className="mx-auto max-w-3xl border-t border-white/15 pt-12 pb-16 sm:pt-16 sm:pb-24">
+            <h2 id="builds-title" className="text-4xl font-bold tracking-tight text-balance sm:text-5xl">What it builds</h2>
+            <ul className="mt-8 space-y-5 text-base leading-relaxed text-zinc-300 sm:text-lg">
+              <li className="border-t border-white/10 pt-4">A brand profile written from your site: your voice, your offers, three things you refuse</li>
+              <li className="border-t border-white/10 pt-4">A standing brief: who you talk to, what you post about, what you never post</li>
+              <li className="border-t border-white/10 pt-4">One week of content made by the engine: five memes and three short videos about your business, each with a caption</li>
+              <li className="border-t border-white/10 pt-4">An approval desk where you tap yes before anything goes live</li>
+            </ul>
+          </section>
+
+          <section aria-labelledby="cost-title" className="mx-auto max-w-3xl border-t border-white/15 pt-12 pb-16 sm:pt-16 sm:pb-24">
+            <h2 id="cost-title" className="text-4xl font-bold tracking-tight text-balance sm:text-5xl">Cost and commitment</h2>
+            <div className="mt-6 space-y-4 text-base leading-relaxed text-zinc-300 sm:text-lg">
+              <p>The free tier is an allowance, not a trial you have to remember to cancel. No card to start.</p>
+              <p>Nothing publishes without your yes. A human approves every piece, always — yours.</p>
+              <p>The prompt is yours to keep and change. It is a text box, not a contract.</p>
             </div>
           </section>
 
-          <section id="agents" aria-labelledby="agents-title" className="scroll-mt-6 border-t border-white/15 py-12 sm:py-16">
-            <h2 id="agents-title" className="text-4xl font-bold tracking-tight text-balance sm:text-5xl">Built for agents, too.</h2>
-            <ol className="mt-6 max-w-3xl list-decimal space-y-3 pl-7 font-mono text-sm leading-relaxed text-zinc-300 marker:text-primary sm:text-base">
-              {agentSteps.map((step) => <li key={step} className="pl-1">{step}</li>)}
-            </ol>
-            <Link href="/bridge" className={`${textLink} mt-3`}>
-              The bridge, in detail <span aria-hidden="true">→</span>
-            </Link>
+          <section aria-labelledby="cta-title" className="mx-auto max-w-3xl border-t border-white/15 pt-12 pb-16 text-center sm:pt-16 sm:pb-20">
+            <h2 id="cta-title" className="text-3xl font-bold tracking-tight text-balance sm:text-4xl">Ready to build your stack?</h2>
+            <a href="https://www.plunderandriffle.com/muse-invite" target="_blank" rel="noopener noreferrer" className={`${button} mt-6 bg-primary text-zinc-950 hover:bg-primary/90`}>
+              Open Muse <span aria-hidden="true" className="ml-2">↗</span>
+            </a>
           </section>
         </main>
 
         <footer className="border-t border-white/15 py-6 text-xs leading-relaxed text-zinc-400">
-          Powered by the <span translate="no">Plunder &amp; Riffle MCP</span> · Referral programs have their own terms; commissions aren’t guaranteed.
+          Powered by the <span translate="no">Plunder &amp; Riffle MCP</span> · Referral programs have their own terms; commissions aren't guaranteed.
         </footer>
       </div>
     </div>
