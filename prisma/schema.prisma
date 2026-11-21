@@ -258,6 +258,20 @@ model HiredAgent {
   role         String? // SMB Agent Factory (2026-11-18): the agent's job in plain words
   instructions String? // Factory: the agent's standing instructions (CUSTOM kind runs on these)
   toolsJson    String? // Factory: JSON array of selected tools [{id,label,kind}]
+  // Whop Army 2.0 Slice 2 (2026-11-21): public agent profile. All
+  // nullable/defaulted — a profile exists only when publicProfile is
+  // true AND slug is set; nothing here is exposed until then.
+  slug           String?  @unique // public /agent/{slug} path segment
+  publicProfile  Boolean  @default(false)
+  avatarUrl      String?
+  description    String? // one-line public description
+  category       String? // one of AGENT_CATEGORIES (lib/agent-profile.ts)
+  capabilitiesJson String? // JSON array of capability strings
+  demoUrl        String?
+  appUrl         String?
+  gitUrl         String?
+  buildPrompt    String?
+  spaceUrl       String? // Muse Space URL where applicable
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 

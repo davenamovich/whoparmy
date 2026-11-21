@@ -1,0 +1,163 @@
+import { notFound } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { db } from "@/lib/db";
+import { capabilitiesFromJson, serializePublicProfile } from "@/lib/agent-profile";
+
+export const dynamic = "force-dynamic";
+
+/**
+ * ─── /agent/{slug} — public agent profile (Whop Army 2.0, Slice 2) ──
+ *
+ * Renders ONLY an agent whose owner marked it publicProfile with a
+ * slug, and only through serializePublicProfile (lib/agent-profile.ts)
+ * — no member fields, no stats (none exist yet, and none are
+ * invented). Everything else 404s.
+ */
+
+const label = "font-mono text-[11px] font-semibold tracking-[0.18em] text-primary uppercase";
+
+export default async function AgentProfilePage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const agent = await db.hiredAgent.findFirst({
+    where: { slug, publicProfile: true },
+    include: { user: { select: { name: true, whopUsername: true, refCode: true } } },
+  });
+  if (!agent) notFound();
+
+  const profile = serializePublicProfile(agent, agent.user);
+  const capabilities = capabilitiesFromJson(agent.capabilitiesJson);
+  const tryUrl = profile.demoUrl ?? profile.appUrl ?? "/bridge";
+
+  return (
+    <main className="min-h-screen bg-background text-foreground">
+      <div className="mx-auto flex min-h-screen max-w-2xl flex-col px-5 py-10">
+        <header className="flex items-center justify-between gap-3">
+          <p translate="no" className="text-xs font-black tracking-[0.14em]">
+            PLUNDER <span className="text-primary">&amp;</span> RIFFLE
+          </p>
+          <nav aria-label="Main" className="flex items-center gap-4 text-sm font-semibold">
+            <a className="text-primary underline underline-offset-2" href="/agents">
+              All agents
+            </a>
+            <a className="text-primary underline underline-offset-2" href="/api/auth/whop">
+              Connect
+            </a>
+          </nav>
+        </header>
+
+        <section className="space-y-5 py-12">
+          <div className="flex items-center gap-4">
+            {profile.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={profile.avatarUrl} alt="" className="h-16 w-16 rounded-2xl object-cover" />
+            ) : (
+              <span className="grid h-16 w-16 place-items-center rounded-2xl bg-primary text-2xl font-black text-primary-foreground">
+                {profile.name.slice(0, 1).toUpperCase()}
+              </span>
+            )}
+            <div>
+              <p className={label}>Whop Army agent</p>
+              <h1 className="text-4xl font-black leading-tight tracking-tight sm:text-5xl">{profile.name}</h1>
+              <p className="text-sm text-muted-foreground">
+                by {profile.owner.displayName}
+                {profile.category ? ` · ${profile.category}` : ""} · {profile.status}
+              </p>
+            </div>
+          </div>
+
+          {profile.description ? <p className="leading-relaxed text-muted-foreground">{profile.description}</p> : null}
+
+          <div className="flex flex-wrap gap-3">
+            <Button asChild>
+              <a href={tryUrl}>TRY AGENT</a>
+            </Button>
+            <Button asChild variant="outline">
+              <a href="/bridge">BUILD YOUR OWN</a>
+            </Button>
+            {profile.referralUrl ? (
+              <Button asChild variant="outline">
+                <a href={profile.referralUrl}>REFER</a>
+              </Button>
+            ) : null}
+          </div>
+        </section>
+
+        {capabilities.length > 0 ? (
+          <section className="space-y-4 border-t border-border/60 py-10">
+            <h2 className={label}>What this agent does</h2>
+            <ul className="flex flex-wrap gap-2">
+              {capabilities.map((capability) => (
+                <li key={capability} className="rounded-full border border-border px-3 py-1.5 text-sm font-semibold">
+                  {capability}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        <section className="space-y-3 border-t border-border/60 py-10">
+          <h2 className={label}>Links</h2>
+          <ul className="space-y-2 text-sm">
+            {profile.demoUrl ? (
+              <li>
+                Demo —{" "}
+                <a className="text-primary underline underline-offset-2" href={profile.demoUrl} target="_blank" rel="noreferrer">
+                  {profile.demoUrl}
+                </a>
+              </li>
+            ) : null}
+            {profile.appUrl ? (
+              <li>
+                Open app —{" "}
+                <a className="text-primary underline underline-offset-2" href={profile.appUrl} target="_blank" rel="noreferrer">
+                  {profile.appUrl}
+                </a>
+              </li>
+            ) : null}
+            {profile.gitUrl ? (
+              <li>
+                Source —{" "}
+                <a className="text-primary underline underline-offset-2" href={profile.gitUrl} target="_blank" rel="noreferrer">
+                  {profile.gitUrl}
+                </a>
+              </li>
+            ) : null}
+            {profile.spaceUrl ? (
+              <li>
+                Muse Space —{" "}
+                <a className="text-primary underline underline-offset-2" href={profile.spaceUrl} target="_blank" rel="noreferrer">
+                  {profile.spaceUrl}
+                </a>
+              </li>
+            ) : null}
+            <li>
+              Runs on — {profile.agent37Connected ? "Connected to Agent37" : "Runs on the Plunder & Riffle engine"}
+            </li>
+            {profile.referralUrl ? (
+              <li>
+                Referral link —{" "}
+                <a className="text-primary underline underline-offset-2" href={profile.referralUrl}>
+                  {profile.referralUrl}
+                </a>
+              </li>
+            ) : null}
+          </ul>
+        </section>
+
+        {profile.buildPrompt ? (
+          <section className="space-y-3 border-t border-border/60 py-10">
+            <h2 className={label}>Build prompt</h2>
+            <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-muted/40 p-4 font-mono text-xs leading-relaxed">
+              {profile.buildPrompt}
+            </pre>
+          </section>
+        ) : null}
+
+        <footer className="mt-auto border-t border-border/60 pt-6 text-xs text-muted-foreground">
+          Nothing publishes, sends or spends without your yes on that item. Affiliate and referral money shown anywhere
+          is simulated until it&apos;s actually paid. Nothing is guaranteed.
+        </footer>
+      </div>
+    </main>
+  );
+}

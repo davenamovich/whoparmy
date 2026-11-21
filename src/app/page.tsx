@@ -14,7 +14,8 @@ import { stashRefFromUrl } from "@/lib/ref-stash";
  *   DISCOVER AGENTS · ENTER THE ROTATOR · BUILD AN AGENT
  *
  * Destinations are existing surfaces only:
- *   - DISCOVER AGENTS  -> The BTC Experiment (gamified discovery)
+ *   - DISCOVER AGENTS  -> /agents (the public agent directory,
+ *                          Whop Army 2.0 Slice 2)
  *   - ENTER THE ROTATOR -> the live rotator serve (/api/bridge/rotator/go)
  *   - BUILD AN AGENT    -> /bridge (the hand-off: sign in, save a link,
  *                          get your agent's kit)
@@ -24,7 +25,7 @@ import { stashRefFromUrl } from "@/lib/ref-stash";
  * members live in their own agent, reached via /bridge.
  */
 
-const GAME_URL = "https://thebtcexperiment.com/";
+const DISCOVER_URL = "/agents";
 const ROTATOR_URL = "/api/bridge/rotator/go";
 const BUILD_URL = "/bridge";
 const CONNECT_URL = "/api/auth/whop";
@@ -78,7 +79,7 @@ export default function Home() {
           </p>
           <div className="flex flex-wrap justify-center gap-3 pt-2">
             <Button asChild>
-              <a href={GAME_URL}>DISCOVER AGENTS</a>
+              <a href={DISCOVER_URL}>DISCOVER AGENTS</a>
             </Button>
             <Button asChild variant="outline">
               <a href={ROTATOR_URL}>ENTER THE ROTATOR</a>

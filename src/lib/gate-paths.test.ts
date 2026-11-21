@@ -4,7 +4,7 @@ import { isGateExempt, safeReturnPath } from "./gate-paths.ts";
 
 describe("isGateExempt", () => {
   it("keeps the game hand-off pages open", () => {
-    for (const p of ["/gate", "/connect", "/connect/ABCD-1234", "/bridge", "/claim"]) {
+    for (const p of ["/gate", "/connect", "/connect/ABCD-1234", "/bridge", "/claim", "/agents", "/agent/btc-barry"]) {
       assert.equal(isGateExempt(p), true, p);
     }
   });

@@ -26,8 +26,11 @@
  * is unit-tested directly (gate-paths.test.ts).
  */
 
-/** Pages reachable while the site gate is ON. Exact path or `<path>/…`. */
-export const GATE_EXEMPT_PATHS = ["/gate", "/connect", "/bridge", "/claim"] as const;
+/** Pages reachable while the site gate is ON. Exact path or `<path>/…`.
+ *  /agents + /agent/{slug} are the Whop Army 2.0 public showcase
+ *  (Slice 2): they render only rows the owner marked publicProfile,
+ *  through the lib/agent-profile.ts serializer — no member data. */
+export const GATE_EXEMPT_PATHS = ["/gate", "/connect", "/bridge", "/claim", "/agents", "/agent"] as const;
 
 /** Pages a sign-in may return to (a subset of the exempt ones, plus home). */
 const RETURN_PATHS = new Set(["/", "/bridge", "/claim"]);

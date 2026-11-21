@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getWhopUser, UnauthorizedError } from "@/lib/auth";
+import { getWhopUser, isDesignatedOperator, UnauthorizedError } from "@/lib/auth";
 import { isGrantExpired } from "@/lib/bot-grants";
 import { toolsFromJson, toolsToJson } from "@/lib/agent-architect-core";
+import { capabilitiesToJson, isAgentCategory, isHttpUrl, isValidSlug, slugify } from "@/lib/agent-profile";
 
 export const runtime = "nodejs";
 
@@ -19,14 +20,47 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       role?: string;
       instructions?: string;
       toolsJson?: string;
+      // Whop Army 2.0 Slice 2: public profile fields.
+      slug?: string;
+      publicProfile?: boolean;
+      avatarUrl?: string;
+      description?: string;
+      category?: string;
+      capabilities?: string[];
+      demoUrl?: string;
+      appUrl?: string;
+      gitUrl?: string;
+      buildPrompt?: string;
+      spaceUrl?: string;
     };
-    const hire = await db.hiredAgent.findFirst({ where: { id, userId: user.id } });
+    const hire = await db.hiredAgent.findFirst({ where: { id } });
     if (!hire) return NextResponse.json({ error: "Bot not found." }, { status: 404 });
+    // Owner-only, except designated operators (who manage house
+    // agents like BTC Barry). Everyone else is refused outright.
+    if (hire.userId !== user.id && !isDesignatedOperator(user)) {
+      return NextResponse.json({ error: "This agent belongs to another member." }, { status: 403 });
+    }
 
     // Settings update (no status in the body): name / role /
     // instructions / tools, each clamped and tool-validated.
     if (body.status === undefined) {
-      const data: { name?: string; role?: string; instructions?: string; toolsJson?: string } = {};
+      const data: {
+        name?: string;
+        role?: string;
+        instructions?: string;
+        toolsJson?: string;
+        slug?: string | null;
+        publicProfile?: boolean;
+        avatarUrl?: string | null;
+        description?: string | null;
+        category?: string | null;
+        capabilitiesJson?: string;
+        demoUrl?: string | null;
+        appUrl?: string | null;
+        gitUrl?: string | null;
+        buildPrompt?: string | null;
+        spaceUrl?: string | null;
+      } = {};
       if (typeof body.name === "string" && body.name.trim()) data.name = body.name.trim().slice(0, 60);
       if (typeof body.role === "string") data.role = body.role.trim().slice(0, 300);
       if (typeof body.instructions === "string") data.instructions = body.instructions.trim().slice(0, 4000);
@@ -36,6 +70,70 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           return NextResponse.json({ error: "Pick at least one real tool for this agent." }, { status: 400 });
         }
         data.toolsJson = toolsToJson(tools);
+      }
+      // ─── Public profile (Whop Army 2.0, Slice 2) ────────────────
+      if (body.slug !== undefined) {
+        const slug = typeof body.slug === "string" ? slugify(body.slug) : "";
+        if (!slug) {
+          data.slug = null;
+        } else {
+          if (!isValidSlug(slug)) {
+            return NextResponse.json({ error: "Slug must be 2–60 chars of lowercase letters, numbers and hyphens." }, { status: 400 });
+          }
+          const taken = await db.hiredAgent.findFirst({ where: { slug, id: { not: id } }, select: { id: true } });
+          if (taken) return NextResponse.json({ error: "That slug is already taken by another agent." }, { status: 400 });
+          data.slug = slug;
+        }
+      }
+      if (typeof body.publicProfile === "boolean") {
+        const effectiveSlug = data.slug !== undefined ? data.slug : hire.slug;
+        if (body.publicProfile && !effectiveSlug) {
+          return NextResponse.json({ error: "Set a slug before publishing this profile." }, { status: 400 });
+        }
+        data.publicProfile = body.publicProfile;
+      }
+      const urlField = (value: string | undefined, key: "avatarUrl" | "demoUrl" | "appUrl" | "gitUrl" | "spaceUrl", label: string) => {
+        if (value === undefined) return null;
+        const trimmed = typeof value === "string" ? value.trim() : "";
+        if (!trimmed) {
+          data[key] = null;
+          return null;
+        }
+        if (!isHttpUrl(trimmed)) return NextResponse.json({ error: `${label} must be an http(s) URL.` }, { status: 400 });
+        data[key] = trimmed.slice(0, 500);
+        return null;
+      };
+      for (const [value, key, label] of [
+        [body.avatarUrl, "avatarUrl", "Avatar URL"],
+        [body.demoUrl, "demoUrl", "Demo URL"],
+        [body.appUrl, "appUrl", "App URL"],
+        [body.gitUrl, "gitUrl", "Git URL"],
+        [body.spaceUrl, "spaceUrl", "Space URL"],
+      ] as const) {
+        const err = urlField(value, key, label);
+        if (err) return err;
+      }
+      if (body.description !== undefined) {
+        data.description = typeof body.description === "string" ? body.description.trim().slice(0, 300) || null : null;
+      }
+      if (body.category !== undefined) {
+        const category = typeof body.category === "string" ? body.category.trim() : "";
+        if (!category) {
+          data.category = null;
+        } else if (!isAgentCategory(category)) {
+          return NextResponse.json({ error: "Unknown category." }, { status: 400 });
+        } else {
+          data.category = category;
+        }
+      }
+      if (body.capabilities !== undefined) {
+        if (!Array.isArray(body.capabilities) || body.capabilities.some((c) => typeof c !== "string")) {
+          return NextResponse.json({ error: "Capabilities must be an array of strings." }, { status: 400 });
+        }
+        data.capabilitiesJson = capabilitiesToJson(body.capabilities);
+      }
+      if (body.buildPrompt !== undefined) {
+        data.buildPrompt = typeof body.buildPrompt === "string" ? body.buildPrompt.trim().slice(0, 8000) || null : null;
       }
       if (Object.keys(data).length === 0) {
         return NextResponse.json({ error: "Nothing to update." }, { status: 400 });

@@ -35,6 +35,12 @@ const PUBLIC_API_PREFIXES = [
   "/api/telegram/webhook/",
   "/api/telegram/pair/verify",
   "/api/showcase",
+  // Whop Army 2.0 public agent profiles (Slice 2, 2026-11-21):
+  // read-only directory/profile JSON. Handlers serve ONLY agents the
+  // owner marked publicProfile, through the lib/agent-profile.ts
+  // serializer — same public class as /api/showcase. The member agent
+  // routes (/api/agents, /api/agents/[id]) stay behind the floor.
+  "/api/agents/public",
   // The trends ingest route carries its own credential (x-trends-key)
   // and rejects bad keys with 401 inside the handler; the middleware
   // floor must not block it first (2026-11-19: the daily X-trends cron

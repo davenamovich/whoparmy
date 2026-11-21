@@ -166,6 +166,17 @@ CREATE TABLE "HiredAgent" (
     "role" TEXT,
     "instructions" TEXT,
     "toolsJson" TEXT,
+    "slug" TEXT,
+    "publicProfile" BOOLEAN NOT NULL DEFAULT false,
+    "avatarUrl" TEXT,
+    "description" TEXT,
+    "category" TEXT,
+    "capabilitiesJson" TEXT,
+    "demoUrl" TEXT,
+    "appUrl" TEXT,
+    "gitUrl" TEXT,
+    "buildPrompt" TEXT,
+    "spaceUrl" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "HiredAgent_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
@@ -568,6 +579,9 @@ CREATE INDEX "XpEvent_userId_kind_idx" ON "XpEvent"("userId", "kind");
 
 -- CreateIndex
 CREATE INDEX "HiredAgent_userId_idx" ON "HiredAgent"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "HiredAgent_slug_key" ON "HiredAgent"("slug");
 
 -- CreateIndex
 CREATE INDEX "AgentJob_userId_idx" ON "AgentJob"("userId");
