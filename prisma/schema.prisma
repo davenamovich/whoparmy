@@ -276,6 +276,18 @@ model HiredAgent {
   gitUrl         String?
   buildPrompt    String?
   spaceUrl       String? // Muse Space URL where applicable
+  // Agent card upgrade (2026-11-21): Bankr token + proceeds preference.
+  // The token address is paste-and-save by the owner AFTER launching on
+  // Bankr in their own session — this app never launches, never holds
+  // keys, never writes to a wallet. The proceeds fields are a RECORDED
+  // owner instruction (shown on the card), not automation: execution
+  // stays in Bankr by the owner's own hand until a write integration
+  // is separately approved.
+  bankrTokenAddress    String?
+  bankrTokenChain      String? // EVM | SOLANA (derived from the address shape at save time)
+  proceedsToCoin       Boolean @default(false)
+  proceedsToCoinPct    Int     @default(0) // 0–100
+  proceedsToCoinTarget String  @default("BTC") // BTC | TOKEN (TOKEN needs a saved bankrTokenAddress)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 

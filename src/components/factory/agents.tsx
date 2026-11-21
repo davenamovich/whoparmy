@@ -12,6 +12,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { LANGUAGES, isSupportedLanguage } from "@/lib/languages";
 import type { AgentTemplate } from "@/lib/agents";
 import { BrandedBotCard } from "@/components/factory/branded-bot-card";
+import { AgentCardExtras } from "@/components/factory/agent-card-extras";
 
 interface Hire {
   id: string;
@@ -450,6 +451,7 @@ export function AgentsView() {
                         : ""}
                     </div>
                   ) : null}
+                  <AgentCardExtras agentId={h.id} />
                   {h.status === "ACTIVE" ? (
                     <div className="flex flex-col sm:flex-row gap-2">
                       <select

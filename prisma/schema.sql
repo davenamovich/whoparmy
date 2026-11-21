@@ -177,6 +177,11 @@ CREATE TABLE "HiredAgent" (
     "gitUrl" TEXT,
     "buildPrompt" TEXT,
     "spaceUrl" TEXT,
+    "bankrTokenAddress" TEXT,
+    "bankrTokenChain" TEXT,
+    "proceedsToCoin" BOOLEAN NOT NULL DEFAULT false,
+    "proceedsToCoinPct" INTEGER NOT NULL DEFAULT 0,
+    "proceedsToCoinTarget" TEXT NOT NULL DEFAULT 'BTC',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "HiredAgent_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
