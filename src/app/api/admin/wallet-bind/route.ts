@@ -9,6 +9,7 @@ import {
   type WalletDb,
 } from "@/lib/wallet-bind";
 import { bindHouseBankr } from "@/lib/wallet-bind-server";
+import { userDisplayName } from "@/lib/bindings-view";
 
 export const runtime = "nodejs";
 
@@ -50,7 +51,49 @@ export async function GET() {
       }),
       db.agentWallet.findMany({ orderBy: { createdAt: "asc" } }),
     ]);
-    return NextResponse.json({ links, wallets });
+    // Enrichment (additive): display names so the admin card can
+    // label whose wallet each binding is — the operator's own, and
+    // each agent wallet's agent + owner — without extra calls.
+    const userIds = [...new Set([...links.map((l) => l.userId), ...wallets.map((w) => w.userId)])];
+    const agentIds = [...new Set(wallets.map((w) => w.agentId))];
+    interface NameRow {
+      id: string;
+      name: string | null;
+      whopUsername: string | null;
+      email: string;
+    }
+    interface AgentRow {
+      id: string;
+      name: string;
+      slug: string | null;
+    }
+    const users: NameRow[] = userIds.length
+      ? await db.user.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, name: true, whopUsername: true, email: true },
+        })
+      : [];
+    const agents: AgentRow[] = agentIds.length
+      ? await db.hiredAgent.findMany({
+          where: { id: { in: agentIds } },
+          select: { id: true, name: true, slug: true },
+        })
+      : [];
+    const userById = new Map<string, NameRow>(users.map((u): [string, NameRow] => [u.id, u]));
+    const agentById = new Map<string, AgentRow>(agents.map((a): [string, AgentRow] => [a.id, a]));
+    return NextResponse.json({
+      links: links.map((l) => ({
+        ...l,
+        userName: userDisplayName(userById.get(l.userId)),
+        isOperator: l.userId === gate.user.id,
+      })),
+      wallets: wallets.map((w) => ({
+        ...w,
+        agentName: agentById.get(w.agentId)?.name ?? "Unknown agent",
+        agentSlug: agentById.get(w.agentId)?.slug ?? null,
+        ownerName: userDisplayName(userById.get(w.userId)),
+      })),
+    });
   } catch (err) {
     return authFailure(err);
   }

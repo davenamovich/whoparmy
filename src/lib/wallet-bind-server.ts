@@ -25,9 +25,30 @@ const idb = db as unknown as IdentityDb;
 
 export interface HouseBindSummary {
   userId: string;
-  identity: Array<{ kind: string; value: string; status: string }>;
-  agent: { agentId: string; wallets: Array<{ chain: string; status: string }> } | null;
+  identity: Array<{ kind: string; value: string; status: string; reason: string | null }>;
+  agent: {
+    agentId: string;
+    agentName: string | null;
+    wallets: Array<{ chain: string; status: string; reason: string | null }>;
+  } | null;
   agentSkipped: string | null;
+}
+
+/** Human reason for a non-bound/existing bind outcome (null when bound/existing). */
+function outcomeReason(status: string, detail?: string): string | null {
+  if (status === "bound" || status === "existing") return null;
+  if (status === "conflict") {
+    if (detail === "identity-bound-to-other-user") return "address is bound to a different user";
+    if (detail === "address-bound-to-other-agent") return "address already serves a different agent";
+    return "already bound to a different user";
+  }
+  if (status === "invalid") {
+    if (detail === "no-agent") return "agent row not found";
+    if (detail === "bad-address") return "address failed validation";
+    if (detail === "bad-chain") return "unknown chain";
+    return "value failed validation";
+  }
+  return detail ?? null;
 }
 
 /**
@@ -53,6 +74,7 @@ export async function bindHouseBankr(operatorUserId: string): Promise<HouseBindS
       kind: chain === "evm" ? "wallet_evm" : "wallet_solana",
       value: HOUSE_BANKR[chain],
       status: res.status,
+      reason: outcomeReason(res.status),
     });
   }
   const refRes = await bindIdentityLink(idb, {
@@ -61,22 +83,31 @@ export async function bindHouseBankr(operatorUserId: string): Promise<HouseBindS
     value: HOUSE_BANKR.refCode,
     verifiedAt: new Date(),
   });
-  identity.push({ kind: "bankr_ref", value: HOUSE_BANKR.refCode, status: refRes.status });
+  identity.push({
+    kind: "bankr_ref",
+    value: HOUSE_BANKR.refCode,
+    status: refRes.status,
+    reason: outcomeReason(refRes.status),
+  });
 
+  // Barry targeting: the OPERATOR's OWN btc-barry row — the same
+  // oldest-row rule ensureBarryAgent / selectBarryRecord use
+  // (per-member rows, templateKey "btc-barry"). Never another
+  // member's Barry.
   const barry = await db.hiredAgent.findFirst({
     where: { userId: operatorUserId, templateKey: BARRY_TEMPLATE_KEY },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-    select: { id: true },
+    select: { id: true, name: true },
   });
   if (!barry) {
     return {
       userId: operatorUserId,
       identity,
       agent: null,
-      agentSkipped: "no BTC Barry agent row for this operator yet — user bindings only",
+      agentSkipped: "no btc-barry agent row for this operator — user bindings only",
     };
   }
-  const wallets: Array<{ chain: string; status: string }> = [];
+  const wallets: Array<{ chain: string; status: string; reason: string | null }> = [];
   for (const chain of ["evm", "solana"] as const) {
     const res = await bindAgentWallet(wdb, {
       agentId: barry.id,
@@ -85,7 +116,16 @@ export async function bindHouseBankr(operatorUserId: string): Promise<HouseBindS
       source: "bankr",
       verifiedAt: new Date(),
     });
-    wallets.push({ chain, status: res.status });
+    wallets.push({
+      chain,
+      status: res.status,
+      reason: outcomeReason(res.status, "reason" in res ? res.reason : undefined),
+    });
   }
-  return { userId: operatorUserId, identity, agent: { agentId: barry.id, wallets }, agentSkipped: null };
+  return {
+    userId: operatorUserId,
+    identity,
+    agent: { agentId: barry.id, agentName: barry.name, wallets },
+    agentSkipped: null,
+  };
 }
