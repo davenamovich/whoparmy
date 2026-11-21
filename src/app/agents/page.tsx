@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { serializePublicProfile } from "@/lib/agent-profile";
-import { AgentsOwnerSection } from "@/components/factory/agents-owner-section";
+import { getPublicAgentBundles, getPublicPoolSummary } from "@/lib/agent-stats";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +10,12 @@ export const dynamic = "force-dynamic";
  * Lists only agents whose owners marked them publicProfile with a
  * slug, serialized through lib/agent-profile.ts. The empty state is
  * honest: when nobody has published a profile yet, the page says so.
+ *
+ * Since 2026-11-21 each card also carries the agent's counted stats
+ * and spot availability (lib/agent-stats.ts — counted hops only,
+ * filtered traffic never counts), the header shows pool-wide open
+ * spots for the current 23:50 ET spot window, and each card links
+ * the agent's own rotator when it is live.
  */
 
 const label = "font-mono text-[11px] font-semibold tracking-[0.18em] text-primary uppercase";
@@ -20,7 +26,15 @@ export default async function AgentsDirectoryPage() {
     orderBy: [{ createdAt: "desc" }],
     include: { user: { select: { name: true, whopUsername: true, refCode: true } } },
   });
-  const profiles = agents.map((agent) => serializePublicProfile(agent, agent.user));
+  const bundles = await getPublicAgentBundles(agents.map((a) => a.id));
+  const pool = await getPublicPoolSummary(bundles);
+  const profiles = agents.map((agent) => {
+    const bundle = bundles.get(agent.id);
+    return {
+      ...serializePublicProfile(agent, agent.user),
+      ...(bundle ? { stats: bundle.stats, access: bundle.access } : {}),
+    };
+  });
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -42,12 +56,13 @@ export default async function AgentsDirectoryPage() {
           <p className="max-w-md leading-relaxed text-muted-foreground">
             Every agent below was published by its owner. Open one to see what it does, try it, or build your own.
           </p>
+          {profiles.length > 0 ? (
+            <p className="text-sm font-semibold text-primary">
+              {pool.totalAvailable} {pool.totalAvailable === 1 ? "spot" : "spots"} open across {pool.activeAgents}{" "}
+              public {pool.activeAgents === 1 ? "agent" : "agents"} this window · spots reset at 11:50 PM ET
+            </p>
+          ) : null}
         </section>
-
-        {/* Owner room (Dave, 2026-11-21): renders only for a signed-in
-            member (the component probes /api/agents and stays empty
-            otherwise) — the public directory below is untouched. */}
-        <AgentsOwnerSection />
 
         {profiles.length === 0 ? (
           <section className="border-t border-border/60 py-10">
@@ -94,6 +109,33 @@ export default async function AgentsDirectoryPage() {
                     </span>
                   ) : null}
                 </a>
+                {profile.stats ? (
+                  <div className="mt-4 space-y-2 border-t border-border/60 pt-3">
+                    <p className="text-xs font-semibold text-muted-foreground">
+                      {profile.stats.visitorsSent} visitors sent · {profile.stats.launches} launches ·{" "}
+                      {profile.stats.placementsRun} placements · {profile.stats.spots.available} spots left
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Counted traffic only — bots and duplicates never count. Spots reset at 11:50 PM ET.
+                    </p>
+                    {profile.access?.rotator.serveUrl ? (
+                      <a
+                        href={profile.access.rotator.serveUrl}
+                        className="inline-block text-xs font-bold text-primary underline underline-offset-2"
+                      >
+                        Ride {profile.name}&rsquo;s rotator →
+                      </a>
+                    ) : (
+                      <p className="text-[11px] text-muted-foreground">
+                        {profile.access?.rotator.state === "disabled"
+                          ? "This agent's rotator is off right now."
+                          : profile.access?.rotator.state === "unavailable"
+                            ? "This agent's rotator is paused right now."
+                            : "This agent hasn't set up its rotator yet."}
+                      </p>
+                    )}
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>

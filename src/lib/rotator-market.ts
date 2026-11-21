@@ -147,6 +147,76 @@ export function etDayEndsAt(dateStr: string): string {
   return etWallTimeToUtc(addDaysToEtDate(dateStr, 1), 0, 0).toISOString();
 }
 
+// ─── Spot windows (Dave, 2026-11-21) ───────────────────────────────
+// Open traffic-pool spots reset at 23:50 ET for the next 24 hours —
+// the same 23:50 moment bidding closes. A spot window runs 23:50 ET
+// → the next 23:50 ET and is keyed by the ET date on which it OPENS.
+// The window math lives here, beside nextBiddingClose, because this
+// module owns the ET conversion utilities and pure cores in this
+// repo cross-import types only, never values (traffic-pool-core.ts
+// holds the allotment policy and the pool decision).
+//
+// A placement dated D (an ET calendar date, like every
+// RotatorPlacement row) rotates almost entirely inside the window
+// that opened the previous evening — 00:00–23:50 of D sits in
+// window D−1, only the last ten minutes of D spill into window D —
+// so placement day D is governed by window key D−1, deterministically,
+// as a pure function of the placement's date. Each placement belongs
+// to exactly one date and each date to exactly one window, so
+// consumption can never double-count across a 23:50 reset and
+// yesterday's consumption can never leak into the new window.
+//
+// The AUCTION day (RotatorDay / RotatorBid) stays an ET CALENDAR
+// day — only pool spots moved to the 23:50 window. The two clocks
+// are deliberately separate: bidding closes at 23:50 ET for the
+// next calendar day's auction while the spot window that opens at
+// the same moment funds the placements that start rotating at
+// midnight.
+
+export const SPOT_WINDOW_OPEN_HOUR = 23;
+export const SPOT_WINDOW_OPEN_MINUTE = 50;
+
+export interface SpotWindow {
+  /** ET yyyy-mm-dd on which the window opens (its 23:50 start date). */
+  key: string;
+  /** UTC instant the window opens (23:50 ET on `key`). */
+  startUtc: string;
+  /** UTC instant the window closes / the next window opens (23:50 ET on key+1). */
+  endUtc: string;
+}
+
+/** The spot window containing `instant`. */
+export function spotWindowFor(instant: Date): SpotWindow {
+  const etToday = etDateStringFrom(instant);
+  const todaysOpen = etWallTimeToUtc(etToday, SPOT_WINDOW_OPEN_HOUR, SPOT_WINDOW_OPEN_MINUTE);
+  if (instant.getTime() >= todaysOpen.getTime()) {
+    const nextKey = addDaysToEtDate(etToday, 1);
+    return {
+      key: etToday,
+      startUtc: todaysOpen.toISOString(),
+      endUtc: etWallTimeToUtc(nextKey, SPOT_WINDOW_OPEN_HOUR, SPOT_WINDOW_OPEN_MINUTE).toISOString(),
+    };
+  }
+  const key = addDaysToEtDate(etToday, -1);
+  return {
+    key,
+    startUtc: etWallTimeToUtc(key, SPOT_WINDOW_OPEN_HOUR, SPOT_WINDOW_OPEN_MINUTE).toISOString(),
+    endUtc: todaysOpen.toISOString(),
+  };
+}
+
+/** The window that governs a placement dated `date` (ET yyyy-mm-dd):
+ *  the window that opened the previous evening, key = date − 1. */
+export function spotWindowKeyForPlacementDate(date: string): string {
+  return addDaysToEtDate(date, -1);
+}
+
+/** The placement date a spot window funds: key + 1. Placements dated
+ *  this ET date are the ones rotating under the window's spots. */
+export function placementDateForSpotWindow(windowKey: string): string {
+  return addDaysToEtDate(windowKey, 1);
+}
+
 /** Operator summary shape (GET /api/admin/rotator-summary). Lives in
  *  the pure core so client components can type against it without
  *  importing the server module. The financials block is explicitly

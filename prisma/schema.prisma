@@ -817,17 +817,20 @@ model RotatorPlacement {
 }
 
 // ─── Traffic pool (Dave, 2026-11-19) ────────────────────────────────
-// Every agent has a daily traffic pool (10 placement-slots per ET
-// day, flat) and a brand behind it. The pool is worked through the
-// rotator's free placements; this row is the recorded outcome for
-// one agent on one ET date (lib/traffic-pool.ts) — the weekly
-// report counts pool usage from here. Slots never roll over: a new
-// date is a new row at 0.
+// Every agent has a daily traffic pool (10 placement-slots per
+// window, flat) and a brand behind it. The pool is worked through
+// the rotator's free placements; this row is the recorded outcome
+// for one agent in one SPOT WINDOW (lib/traffic-pool.ts) — reports
+// count pool usage from here. Slots never roll over: a new window
+// is a new row at 0. Since 2026-11-21 `date` stores the 23:50 ET
+// spot-window KEY (the ET date the window opens on), not the
+// placement's calendar date; pre-window rows were shifted −1 day
+// by a one-time boot remap (scripts/apply-schema.ts).
 model AgentTrafficDay {
   id        String   @id @default(cuid())
   agentId   String
   userId    String
-  date      String // ET yyyy-mm-dd the allotment applies to
+  date      String // spot-window key: ET yyyy-mm-dd the window opens (23:50 ET)
   slotsUsed Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

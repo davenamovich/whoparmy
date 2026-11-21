@@ -1,7 +1,8 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { partnerNameSync } from "@/lib/offer-catalog";
-import { DAILY_TRAFFIC_SLOTS } from "@/lib/traffic-pool-core";
+import { spotAllotmentPerAgent } from "@/lib/traffic-pool-core";
+import { addDaysToEtDate, spotWindowFor } from "@/lib/rotator-market";
 import {
   classifyTokenAddress,
   clickWindows,
@@ -59,9 +60,17 @@ export async function getAgentCardStats(userId: string, agentId: string): Promis
   const now = new Date();
   const w = clickWindows(now);
 
+  // Spots live on the 23:50 ET spot-window clock (2026-11-21):
+  // AgentTrafficDay rows are keyed by window key, so "today" reads
+  // the CURRENT window's row and the 7-day sum reads the last 7
+  // window keys. Clicks below stay ET-calendar — LinkClick rows are
+  // instants, not window records.
+  const window = spotWindowFor(now);
+  const last7WindowKeys = Array.from({ length: 7 }, (_, i) => addDaysToEtDate(window.key, i - 6));
+
   const [trafficRows, clickRows, clicksTotal] = await Promise.all([
     db.agentTrafficDay.findMany({
-      where: { agentId: agent.id, date: { in: w.last7EtDates } },
+      where: { agentId: agent.id, date: { in: last7WindowKeys } },
       select: { date: true, slotsUsed: true },
     }),
     db.linkClick.findMany({
@@ -72,13 +81,15 @@ export async function getAgentCardStats(userId: string, agentId: string): Promis
   ]);
 
   const summary = summarizeClicks(clickRows, now);
-  const todayRow = trafficRows.find((r) => r.date === w.todayEt);
+  const todayRow = trafficRows.find((r) => r.date === window.key);
 
   return {
     agentId: agent.id,
     spots: {
       todayUsed: todayRow?.slotsUsed ?? 0,
-      todayTotal: DAILY_TRAFFIC_SLOTS,
+      // The flat policy value (traffic-pool-core's policy point);
+      // demand inputs are not re-measured on this owner read path.
+      todayTotal: spotAllotmentPerAgent({ activeAgents: 0, countedHops7d: 0 }),
       last7DaysUsed: trafficRows.reduce((sum, r) => sum + r.slotsUsed, 0),
     },
     clicks: {

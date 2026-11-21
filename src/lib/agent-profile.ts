@@ -14,6 +14,8 @@
  * AND a slug. Callers (pages/APIs) enforce that before serializing.
  */
 
+import type { PublicAgentAccess, PublicAgentStats } from "./agent-stats-core.ts";
+
 export const AGENT_CATEGORIES = [
   "Research",
   "Business",
@@ -148,6 +150,12 @@ export interface PublicAgentProfile {
   };
   profileUrl: string;
   referralUrl: string | null;
+  /** Counted stats + rotator access (2026-11-21). Attached by the
+   *  server layer (lib/agent-stats.ts) after serialization — the
+   *  pure serializer never computes them, and older consumers can
+   *  ignore both blocks. */
+  stats?: PublicAgentStats;
+  access?: PublicAgentAccess;
 }
 
 export const PUBLIC_SITE_ORIGIN = "https://whop.plunderandriffle.com";

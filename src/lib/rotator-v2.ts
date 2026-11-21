@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { etDateString } from "@/lib/rotator";
+import { spotWindowKeyForPlacementDate } from "@/lib/rotator-market";
 import {
   hashIp,
   HOP_FILTER_POLICY,
@@ -578,7 +579,13 @@ export async function getWeeklyTrafficReport(userId: string, endDate = etDateStr
   });
   const days = await Promise.all(dates.map(async (date) => {
     const [slots, hops] = await Promise.all([
-      db.agentTrafficDay.findMany({ where: { userId, date }, select: { agentId: true, slotsUsed: true } }),
+      // AgentTrafficDay rows are keyed by SPOT WINDOW key since
+      // 2026-11-21: the slots a placement date consumed live under
+      // the window that governed it (key = placement date − 1).
+      db.agentTrafficDay.findMany({
+        where: { userId, date: spotWindowKeyForPlacementDate(date) },
+        select: { agentId: true, slotsUsed: true },
+      }),
       db.rotatorHop.findMany({
         where: { userId, ts: { gte: dayStart(date), lt: dayEnd(date) } },
         select: { counted: true, filterReason: true, agentId: true, userId: true },

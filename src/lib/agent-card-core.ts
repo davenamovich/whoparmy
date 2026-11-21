@@ -214,10 +214,11 @@ export function summarizeClicks(rows: ClickRow[], now: Date): ClickSummary {
 export interface AgentCardStats {
   agentId: string;
   spots: {
-    /** Traffic-pool slots used today (AgentTrafficDay), ET day. */
+    /** Traffic-pool slots used in the CURRENT spot window
+     *  (AgentTrafficDay, keyed by 23:50 ET window since 2026-11-21). */
     todayUsed: number;
     todayTotal: number;
-    /** Slots used across the last 7 ET days, today included. */
+    /** Slots used across the last 7 spot windows, current included. */
     last7DaysUsed: number;
   };
   clicks: {

@@ -184,6 +184,37 @@ try {
   console.error("[boot] partner-key migration failed — continuing:", err);
 }
 
+// ─── Spot-window key remap for AgentTrafficDay (2026-11-21) ────────
+// Pool spots moved from the ET calendar day to the 23:50 ET spot
+// window (lib/traffic-pool-core.ts): AgentTrafficDay.date now stores
+// the WINDOW KEY, and a placement dated D is governed by window D−1.
+// Rows written before this change carry the PLACEMENT date, so each
+// stored date shifts back one day into the window that governed it.
+// This is a ONE-TIME remap — unlike the partner-key migration above
+// it is NOT idempotent (a second run would shift dates again), so it
+// is guarded by an AppSetting marker and runs exactly once. The
+// two-step prefix dance keeps the (agentId, date) unique index safe:
+// step 1 prefixes every date (all keys stay distinct), step 2
+// un-prefixes with the −1 day shift (distinct inputs stay distinct,
+// and shifted values can never collide with still-prefixed rows).
+try {
+  if (tableExists("AgentTrafficDay") && tableExists("AppSetting")) {
+    const marker = db
+      .query("SELECT count(*) AS n FROM \"AppSetting\" WHERE \"key\" = 'spot-window-migration:v1'")
+      .get() as { n: number };
+    if (marker.n === 0) {
+      db.exec(`UPDATE "AgentTrafficDay" SET "date" = 'win:' || "date"`);
+      db.exec(`UPDATE "AgentTrafficDay" SET "date" = date(substr("date", 5), '-1 day')`);
+      db.exec(
+        `INSERT INTO "AppSetting" ("key", "value", "updatedAt") VALUES ('spot-window-migration:v1', 'AgentTrafficDay dates shifted to 23:50 ET spot-window keys', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`,
+      );
+      console.log("[boot] spot-window remap applied (AgentTrafficDay dates → window keys)");
+    }
+  }
+} catch (err) {
+  console.error("[boot] spot-window remap failed — continuing:", err);
+}
+
 // Env-gated one-shot purge of agent-game test agents (voids their
 // claim nonces first, then deletes the agents). A no-op unless
 // AGENTGAME_PURGE_HANDLES is set; never allowed to block boot.

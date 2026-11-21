@@ -2,7 +2,9 @@ import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/db";
 import { capabilitiesFromJson, serializePublicProfile } from "@/lib/agent-profile";
+import { getPublicAgentBundles } from "@/lib/agent-stats";
 import { publicApplicationInclude, serializePublicApplication } from "@/lib/application";
+import { SpotResetCountdown } from "@/components/spot-reset-countdown";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +13,10 @@ export const dynamic = "force-dynamic";
  *
  * Renders ONLY an agent whose owner marked it publicProfile with a
  * slug, and only through serializePublicProfile (lib/agent-profile.ts)
- * — no member fields, no stats (none exist yet, and none are
- * invented). Everything else 404s.
+ * — no member fields. Since 2026-11-21 the page also shows the
+ * agent's counted stats and rotator access (lib/agent-stats.ts):
+ * counted hops only — filtered traffic never counts, and no number
+ * is shown that the ledgers can't back. Everything else 404s.
  */
 
 const label = "font-mono text-[11px] font-semibold tracking-[0.18em] text-primary uppercase";
@@ -28,6 +32,11 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ s
   const profile = serializePublicProfile(agent, agent.user);
   const capabilities = capabilitiesFromJson(agent.capabilitiesJson);
   const tryUrl = profile.demoUrl ?? profile.appUrl ?? "/bridge";
+
+  // Counted stats + rotator access for this agent (lib/agent-stats.ts).
+  const bundle = (await getPublicAgentBundles([agent.id])).get(agent.id);
+  const stats = bundle?.stats;
+  const access = bundle?.access;
 
   // Applications built by this agent (Slice 3): only the ones the
   // owner marked public, serialized like everywhere else.
@@ -91,6 +100,93 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ s
             ) : null}
           </div>
         </section>
+
+        {stats ? (
+          <section className="space-y-4 border-t border-border/60 py-10">
+            <h2 className={label}>Track record</h2>
+            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <div>
+                <dt className="text-xs text-muted-foreground">Visitors sent</dt>
+                <dd className="text-2xl font-black">{stats.visitorsSent}</dd>
+                <dd className="text-xs text-muted-foreground">{stats.visitorsSent7d} in the last 7 days</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Launches</dt>
+                <dd className="text-2xl font-black">{stats.launches}</dd>
+                <dd className="text-xs text-muted-foreground">{stats.launches7d} in the last 7 days</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Placements run</dt>
+                <dd className="text-2xl font-black">{stats.placementsRun}</dd>
+                <dd className="text-xs text-muted-foreground">{stats.placementsActiveToday} active today</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Spots left this window</dt>
+                <dd className="text-2xl font-black">{stats.spots.available}</dd>
+                <dd className="text-xs text-muted-foreground">
+                  of {stats.spots.allotment} · {stats.spots.used} used
+                </dd>
+              </div>
+            </dl>
+            <p className="text-sm font-semibold text-primary">
+              <SpotResetCountdown resetsAt={stats.spots.resetsAt} />
+            </p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Counted traffic only: the hop ledger filters out bots, duplicates and bursts before anything counts —
+              these numbers are not verified human traffic, and filtered hops are never included. Next window:{" "}
+              {stats.spots.nextWindowAllotment} spots per agent, sized by demand when the window opens.
+            </p>
+          </section>
+        ) : null}
+
+        {access ? (
+          <section className="space-y-4 border-t border-border/60 py-10">
+            <h2 className={label}>Ride the rotator</h2>
+            <ul className="space-y-3">
+              <li className="rounded-2xl border border-border p-5">
+                {access.rotator.serveUrl ? (
+                  <a href={access.rotator.serveUrl} className="block space-y-1">
+                    <span className="block font-black">Ride {profile.name}&rsquo;s rotator →</span>
+                    <span className="block text-sm text-muted-foreground">
+                      One click sends you to one of this agent&apos;s destinations, rotating on every visit.
+                    </span>
+                  </a>
+                ) : (
+                  <span className="block space-y-1">
+                    <span className="block font-black">Ride {profile.name}&rsquo;s rotator</span>
+                    <span className="block text-sm text-muted-foreground">
+                      {access.rotator.state === "disabled"
+                        ? "This agent's rotator is off right now."
+                        : access.rotator.state === "unavailable"
+                          ? "This agent's rotator is paused right now."
+                          : "This agent hasn't set up its rotator yet."}
+                    </span>
+                  </span>
+                )}
+              </li>
+              <li className="rounded-2xl border border-border p-5">
+                <a href={access.dailyRotatorUrl} className="block space-y-1">
+                  <span className="block font-black">Enter the daily rotator →</span>
+                  <span className="block text-sm text-muted-foreground">
+                    Today&apos;s featured destinations from every agent — one auction, won with free generations.
+                  </span>
+                </a>
+              </li>
+              <li className="rounded-2xl border border-border p-5">
+                <a href={access.ownRotatorUrl} className="block space-y-1">
+                  <span className="block font-black">Get your own rotator →</span>
+                  <span className="block text-sm text-muted-foreground">
+                    Connect on the bridge, save your links, and your agent rotates them the same way.
+                  </span>
+                </a>
+              </li>
+            </ul>
+            <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
+              How spots work: spots open at <strong className="text-foreground">11:50 PM ET</strong> for the next 24
+              hours, sized by demand. Members bid free generations for the featured spot in the daily rotator.
+            </p>
+          </section>
+        ) : null}
 
         {capabilities.length > 0 ? (
           <section className="space-y-4 border-t border-border/60 py-10">

@@ -22,12 +22,63 @@
  *   here — the auction and bidding mechanics are untouched.
  *
  * Slots never roll over and are never transferable: the decision is a
- * pure function of ONE day's placements, so a new ET day starts every
- * agent back at 10. The DB layer (lib/traffic-pool.ts) persists the
- * per-day outcome in AgentTrafficDay rows for reporting.
+ * pure function of ONE day's placements, so a new spot window starts
+ * every agent back at the full allotment. The DB layer
+ * (lib/traffic-pool.ts) persists the per-window outcome in
+ * AgentTrafficDay rows for reporting.
+ *
+ * ─── SPOT WINDOWS (Dave, 2026-11-21) ──────────────────────────────
+ * Open spots reset at 23:50 ET for the next 24 hours. The window
+ * math itself (spotWindowFor, the placement-date ↔ window-key
+ * mapping) lives in lib/rotator-market.ts — the module that already
+ * owns the 23:50 ET bidding close and the ET conversion utilities —
+ * because pure cores in this repo cross-import types only, never
+ * values. The rules that matter here:
+ * - A placement dated D is governed by window key D−1 (the window
+ *   that opened the previous evening), a pure function of its date,
+ *   so consumption can never double-count across a 23:50 reset and
+ *   yesterday's consumption never leaks into the new window.
+ * - The AUCTION day stays an ET calendar day; only pool spots moved
+ *   to the 23:50 window.
+ * - AgentTrafficDay.date stores the WINDOW KEY (a one-time boot
+ *   remap in scripts/apply-schema.ts shifted pre-window rows back
+ *   one day into the window that governed them).
  */
 
 export const DAILY_TRAFFIC_SLOTS = 10;
+
+// ─── Allotment policy (the ONE policy point) ───────────────────────
+
+/**
+ * Real demand signals the allotment policy is fed. The server layer
+ * computes these from live tables (working agents right now; counted
+ * agent-attributed hops over the trailing 7 days) — they are inputs,
+ * measured honestly, never estimated.
+ */
+export interface SpotDemandInputs {
+  /** Working agents (ACTIVE and unexpired) across the whole pool. */
+  activeAgents: number;
+  /** Counted serves through agent rotators (AGENT + ALLOCATOR
+   *  surfaces) over the trailing 7 days. */
+  countedHops7d: number;
+}
+
+/**
+ * THE allotment policy: how many spots one agent gets per window.
+ *
+ * Today this returns the flat DAILY_TRAFFIC_SLOTS for every agent —
+ * Dave's standing value (2026-11-19: flat 10, every agent, every
+ * plan; the 2026-11-20 dynamic-slots doctrine names supply/demand as
+ * the sizing principle, but no demand curve has been approved, and
+ * inventing one here would silently change what members' placements
+ * do). The demand inputs are plumbed through and real, so an
+ * approved curve can be applied at exactly this point — and nowhere
+ * else — without touching a single consumer.
+ */
+export function spotAllotmentPerAgent(inputs: SpotDemandInputs): number {
+  void inputs; // demand-ready plumbing; flat until a curve is approved
+  return DAILY_TRAFFIC_SLOTS;
+}
 
 export interface TrafficAgentInput {
   id: string;
