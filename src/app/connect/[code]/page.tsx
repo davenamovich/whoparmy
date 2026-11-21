@@ -217,6 +217,13 @@ ${linksBlock ? `\n${linksBlock}\n` : ""}
 Protocol notes:
 - Exchange endpoint: POST https://whop.plunderandriffle.com/api/bridge/exchange
 - MCP endpoint: https://whop.plunderandriffle.com/api/bridge/mcp (Bearer = the token from exchange)
+- Offer link sync: if you also have the member's own Plunder & Riffle
+  MCP access (their key), call list_my_offers there and POST the
+  result to https://whop.plunderandriffle.com/api/bridge/links/sync
+  (Bearer = the token from exchange; body {"offers": [{"step": "…",
+  "link": "…"}], "pages": [{"saveAs": "…", "views": 0, "visitors": 0,
+  "clicks": 0}]}) so the member's saved links on Whop Army ARE their
+  P&R records, keyed by step.
 - The token lasts 7 days. This connection is content-only by the
   member's platform rules: publishing and MP4 rendering are refused
   at the bridge — deliver pack links and let the member approve.

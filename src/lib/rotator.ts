@@ -1,6 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
-import { BRIDGE_PARTNERS } from "@/lib/bridge";
+import { getActiveCatalog, partnerNameSync } from "@/lib/offer-catalog";
 import { filterPlacementsByTrafficPool, getPlacementAgentAttribution } from "@/lib/traffic-pool";
 import { pickGroupedDestination, rotatorV2Enabled } from "@/lib/rotator-v2-core";
 import { getForfeitedAgentIds, resolveAgentRotatorDestination } from "@/lib/rotator-v2";
@@ -54,12 +54,14 @@ function dayOfYearET(dateStr: string): number {
   return Math.floor((cur - start) / 86400000) + 1;
 }
 
-/** House fallback pool: Dave's own partner links (real URLs only). */
-const HOUSE_POOL = BRIDGE_PARTNERS.filter((p) => p.example.startsWith("http")).map((p) => ({
-  partner: p.key,
-  name: p.name,
-  url: p.example,
-}));
+/** House fallback pool: Dave's own partner links (real URLs only),
+ *  read from the active offer catalog (P&R MCP steps) per call so a
+ *  catalog refresh lands without a restart. */
+function housePool() {
+  return getActiveCatalog()
+    .filter((p) => p.example.startsWith("http"))
+    .map((p) => ({ partner: p.key, name: p.name, url: p.example }));
+}
 
 export interface RotatorPoolEntry {
   url: string;
@@ -106,11 +108,10 @@ export async function getRotatorPool(date = etDateString()): Promise<RotatorPool
   const v2 = rotatorV2Enabled(process.env);
   const day = await db.rotatorDay.findUnique({ where: { date } });
   if (day?.status === "CONFIRMED" && day.winnerUrl) {
-    const partner = BRIDGE_PARTNERS.find((p) => p.key === day.winnerPartner);
     pool.push({
       url: day.winnerUrl,
       partner: day.winnerPartner ?? "",
-      partnerName: partner?.name ?? day.winnerPartner ?? "",
+      partnerName: day.winnerPartner ? partnerNameSync(day.winnerPartner) : "",
       source: "auction",
       userId: day.winnerUserId,
       ...(v2 ? { agentId: null } : {}),
@@ -140,11 +141,10 @@ export async function getRotatorPool(date = etDateString()): Promise<RotatorPool
       select: { url: true },
     });
     if (!link) continue;
-    const partner = BRIDGE_PARTNERS.find((p) => p.key === pl.partner);
     pool.push({
       url: pl.url ?? link.url,
       partner: pl.partner,
-      partnerName: partner?.name ?? pl.partner,
+      partnerName: partnerNameSync(pl.partner),
       source: "free",
       userId: pl.userId,
       ...(v2 ? { agentId: attribution.get(pl.id) ?? null } : {}),
@@ -172,7 +172,7 @@ export async function getRotatorDestination(date = etDateString()): Promise<Rota
     let served = { url: pick.url, partner: pick.partner, partnerName: pick.partnerName, agentId: null as string | null, agentRotatorId: null as string | null, agentRotatorLinkId: null as string | null };
     if (rotatorV2Enabled(process.env) && today && pick.source === "free" && pick.agentId) {
       const resolved = await resolveAgentRotatorDestination(pick.agentId);
-      if (resolved) served = { url: resolved.url, partner: resolved.partner, partnerName: BRIDGE_PARTNERS.find((item) => item.key === resolved.partner)?.name ?? resolved.partner, agentId: pick.agentId, agentRotatorId: resolved.rotatorId, agentRotatorLinkId: resolved.linkId };
+      if (resolved) served = { url: resolved.url, partner: resolved.partner, partnerName: partnerNameSync(resolved.partner), agentId: pick.agentId, agentRotatorId: resolved.rotatorId, agentRotatorLinkId: resolved.linkId };
     }
     const hasAuction = pool.some((e) => e.source === "auction");
     const hasFree = pool.some((e) => e.source === "free");
@@ -195,7 +195,8 @@ export async function getRotatorDestination(date = etDateString()): Promise<Rota
         : {}),
     };
   }
-  const pick = HOUSE_POOL[(dayOfYearET(date) - 1) % HOUSE_POOL.length];
+  const pool0 = housePool();
+  const pick = pool0[(dayOfYearET(date) - 1) % pool0.length];
   return {
     date,
     url: pick.url,
@@ -251,7 +252,7 @@ export async function getRotatorState(userId: string): Promise<RotatorState> {
   ]);
   const dates = [0, 1, 2].map((n) => etDateString(new Date(Date.now() + n * 86400000)));
   const days = await Promise.all(dates.map((d) => dayState(d, userId)));
-  const nameOf = (k: string) => BRIDGE_PARTNERS.find((p) => p.key === k)?.name ?? k;
+  const nameOf = (k: string) => partnerNameSync(k);
   return {
     today,
     myFreeGenBalance: user?.freeGenBalance ?? 0,

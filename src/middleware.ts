@@ -95,6 +95,12 @@ export function middleware(req: NextRequest) {
   // same own-credential class as /api/bridge/mcp. Only that exact
   // method+path is let through; /api/apps/[id] writes stay floored.
   const bridgePublishPost = path === "/api/apps" && req.method === "POST";
+  // POST /api/bridge/links/sync (Offers-from-MCP, 2026-11-21)
+  // authenticates inside the handler with the member's bridge bearer
+  // token — the member's own Muse posting their own list_my_offers
+  // result. Only that exact method+path; the session-based
+  // /api/bridge/links GET/PUT stay behind the floor.
+  const bridgeLinkSyncPost = path === "/api/bridge/links/sync" && req.method === "POST";
   // PATCH /api/agents/<id> (Slice 4 addition) authenticates inside
   // the handler the same way — session OR the owner's bridge bearer
   // token, so a member's Muse can manage its own agent's profile.
@@ -106,6 +112,7 @@ export function middleware(req: NextRequest) {
     path.startsWith("/api/") &&
     process.env.ALLOW_OPERATOR_FALLBACK !== "1" &&
     !bridgePublishPost &&
+    !bridgeLinkSyncPost &&
     !bridgeAgentPatch &&
     !PUBLIC_API_PREFIXES.some((p) => path.startsWith(p)) &&
     !req.cookies.get(SESSION_COOKIE_NAME)?.value

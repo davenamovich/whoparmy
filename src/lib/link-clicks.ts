@@ -1,6 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
-import { BRIDGE_PARTNERS } from "@/lib/bridge";
+import { partnerNameSync } from "@/lib/offer-catalog";
 
 /**
  * ─── LINK CLICKS — the dashboard's click ledger ──────────────────────
@@ -58,7 +58,7 @@ export async function getClickStats(userId: string): Promise<ClickStats> {
       select: { partner: true, source: true, createdAt: true },
     }),
   ]);
-  const nameOf = (k: string) => BRIDGE_PARTNERS.find((p) => p.key === k)?.name ?? k;
+  const nameOf = (k: string) => partnerNameSync(k);
   let signup = 0;
   let rotator = 0;
   const perPartner = new Map<string, number>();

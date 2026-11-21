@@ -206,7 +206,7 @@ function SignedIn() {
     void fetch("/api/bridge/links", { cache: "no-store" })
       .then((r) => r.json())
       .then((data: { bridge?: BridgeState }) => {
-        const url = data.bridge?.partners.find((p) => p.key === "dh-media")?.url?.trim() ?? "";
+        const url = data.bridge?.partners.find((p) => p.key === "salarium")?.url?.trim() ?? "";
         setDhLink(url || null);
       })
       .catch(() => setDhLink(null));
@@ -219,11 +219,11 @@ function SignedIn() {
       const res = await fetch("/api/bridge/links", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ links: { "dh-media": draft.trim() } }),
+        body: JSON.stringify({ links: { salarium: draft.trim() } }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Could not save your link");
-      const url = (data.bridge as BridgeState | undefined)?.partners.find((p) => p.key === "dh-media")?.url ?? draft.trim();
+      const url = (data.bridge as BridgeState | undefined)?.partners.find((p) => p.key === "salarium")?.url ?? draft.trim();
       setDhLink(url || null);
       setEditing(false);
       setKit(null); // a new link means a new kit: the prompt carries the link

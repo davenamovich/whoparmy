@@ -379,6 +379,8 @@ CREATE TABLE "EngineLink" (
     "userId" TEXT NOT NULL,
     "partner" TEXT NOT NULL,
     "url" TEXT NOT NULL,
+    "source" TEXT NOT NULL DEFAULT 'manual',
+    "externalRef" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "EngineLink_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE

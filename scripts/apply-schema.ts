@@ -82,6 +82,8 @@ const ADDITIVE_COLUMNS: Array<{ table: string; column: string; ddl: string }> = 
   { table: "PickaphoneSession", column: "readGuess", ddl: 'ALTER TABLE "PickaphoneSession" ADD COLUMN "readGuess" TEXT' },
   { table: "PickaphoneSession", column: "pendingOfferTokens", ddl: 'ALTER TABLE "PickaphoneSession" ADD COLUMN "pendingOfferTokens" INTEGER' },
   { table: "PickaphoneSession", column: "pendingOfferSweat", ddl: 'ALTER TABLE "PickaphoneSession" ADD COLUMN "pendingOfferSweat" BOOLEAN NOT NULL DEFAULT false' },
+  { table: "EngineLink", column: "source", ddl: 'ALTER TABLE "EngineLink" ADD COLUMN "source" TEXT NOT NULL DEFAULT \'manual\'' },
+  { table: "EngineLink", column: "externalRef", ddl: 'ALTER TABLE "EngineLink" ADD COLUMN "externalRef" TEXT' },
 ];
 for (const { table, column, ddl } of ADDITIVE_COLUMNS) {
   const cols = db.query(`PRAGMA table_info("${table}")`).all() as Array<{ name: string }>;
@@ -89,6 +91,92 @@ for (const { table, column, ddl } of ADDITIVE_COLUMNS) {
     db.exec(ddl);
     console.log(`[boot] added column ${table}.${column}`);
   }
+}
+
+// ─── Offers-from-MCP partner-key migration (2026-11-21) ────────────
+// EngineLink.partner (and every partner-key reference) used to store
+// INVENTED keys from the old hardcoded catalog (fish-audio, dh-media,
+// upload-post…). The canonical key is now the P&R MCP `step`
+// (lib/offer-catalog.ts PARTNER_KEY_MIGRATION). This rewrites legacy
+// rows in place, idempotently, on every boot:
+//   - EngineLink @@unique(userId, partner): when a member somehow has
+//     BOTH the old and the step row, the row with the newest
+//     updatedAt survives (ties keep the step row) and the other is
+//     deleted — the newest link is never lost.
+//   - RotatorPlacement @@unique(userId, partner) is the
+//     once-per-offer-ever grant record: same treatment, keeping the
+//     earliest earned date (then earliest createdAt).
+//   - RotatorBid.partner / RotatorDay.winnerPartner carry no unique
+//     constraint on partner — a plain rename.
+// AppSetting holds no partner-key bookkeeping (checked: traffic-pool
+// and rotator state live in their own tables), so nothing else moves.
+const PARTNER_KEY_MIGRATIONS: Array<[string, string]> = [
+  ["fish-audio", "fishaudio"],
+  ["agent37", "agent37_ref"],
+  ["dh-media", "salarium"],
+  ["upload-post", "uploadpost"],
+  ["whop", "whop_ref"],
+  ["railway", "railway_ref"],
+  ["bankr", "bankr_ref"],
+];
+function tableExists(name: string): boolean {
+  const row = db
+    .query("SELECT count(*) AS n FROM sqlite_master WHERE type='table' AND name = ?")
+    .get(name) as { n: number };
+  return row.n > 0;
+}
+try {
+  if (tableExists("EngineLink")) {
+    for (const [oldKey, newKey] of PARTNER_KEY_MIGRATIONS) {
+      // Old row loses when a step row exists that is at least as new.
+      db.exec(
+        `DELETE FROM "EngineLink" WHERE "partner" = '${oldKey}' AND EXISTS (
+           SELECT 1 FROM "EngineLink" n
+           WHERE n."userId" = "EngineLink"."userId" AND n."partner" = '${newKey}'
+             AND n."updatedAt" >= "EngineLink"."updatedAt")`,
+      );
+      // Step row loses when the old row is strictly newer.
+      db.exec(
+        `DELETE FROM "EngineLink" WHERE "partner" = '${newKey}' AND EXISTS (
+           SELECT 1 FROM "EngineLink" o
+           WHERE o."userId" = "EngineLink"."userId" AND o."partner" = '${oldKey}'
+             AND o."updatedAt" > "EngineLink"."updatedAt")`,
+      );
+      db.exec(`UPDATE "EngineLink" SET "partner" = '${newKey}' WHERE "partner" = '${oldKey}'`);
+    }
+  }
+  if (tableExists("RotatorPlacement")) {
+    for (const [oldKey, newKey] of PARTNER_KEY_MIGRATIONS) {
+      db.exec(
+        `DELETE FROM "RotatorPlacement" WHERE "partner" = '${oldKey}' AND EXISTS (
+           SELECT 1 FROM "RotatorPlacement" n
+           WHERE n."userId" = "RotatorPlacement"."userId" AND n."partner" = '${newKey}'
+             AND (n."date" < "RotatorPlacement"."date"
+               OR (n."date" = "RotatorPlacement"."date" AND n."createdAt" <= "RotatorPlacement"."createdAt")))`,
+      );
+      db.exec(
+        `DELETE FROM "RotatorPlacement" WHERE "partner" = '${newKey}' AND EXISTS (
+           SELECT 1 FROM "RotatorPlacement" o
+           WHERE o."userId" = "RotatorPlacement"."userId" AND o."partner" = '${oldKey}'
+             AND (o."date" < "RotatorPlacement"."date"
+               OR (o."date" = "RotatorPlacement"."date" AND o."createdAt" < "RotatorPlacement"."createdAt")))`,
+      );
+      db.exec(`UPDATE "RotatorPlacement" SET "partner" = '${newKey}' WHERE "partner" = '${oldKey}'`);
+    }
+  }
+  if (tableExists("RotatorBid")) {
+    for (const [oldKey, newKey] of PARTNER_KEY_MIGRATIONS) {
+      db.exec(`UPDATE "RotatorBid" SET "partner" = '${newKey}' WHERE "partner" = '${oldKey}'`);
+    }
+  }
+  if (tableExists("RotatorDay")) {
+    for (const [oldKey, newKey] of PARTNER_KEY_MIGRATIONS) {
+      db.exec(`UPDATE "RotatorDay" SET "winnerPartner" = '${newKey}' WHERE "winnerPartner" = '${oldKey}'`);
+    }
+  }
+  console.log("[boot] partner-key migration applied (legacy keys → MCP steps)");
+} catch (err) {
+  console.error("[boot] partner-key migration failed — continuing:", err);
 }
 
 // Env-gated one-shot purge of agent-game test agents (voids their

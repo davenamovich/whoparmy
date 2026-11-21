@@ -541,8 +541,10 @@ model ResearchJob {
 model EngineLink {
   id        String   @id @default(cuid())
   userId    String
-  partner   String // key from BRIDGE_PARTNERS (lib/bridge.ts)
+  partner   String // canonical key = the P&R MCP step (lib/offer-catalog.ts); legacy keys migrated at boot
   url       String
+  source    String   @default("manual") // "manual" (typed on /bridge) | "pr-mcp" (synced from the member's own list_my_offers via the bridge)
+  externalRef String? // the member's affiliate id extracted from the link (fpr/ref/via/affid/code/… or Temu /k/<id>)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

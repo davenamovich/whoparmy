@@ -1,6 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
-import { BRIDGE_PARTNERS } from "@/lib/bridge";
+import { partnerNameSync } from "@/lib/offer-catalog";
 import {
   DAILY_TRAFFIC_SLOTS,
   decideTrafficPools,
@@ -118,7 +118,7 @@ function toView(
   placementsById: Map<string, PlacementRow>,
 ): AgentTrafficPoolView {
   const state = decision.states.get(agentId);
-  const nameOf = (k: string) => BRIDGE_PARTNERS.find((p) => p.key === k)?.name ?? k;
+  const nameOf = (k: string) => partnerNameSync(k);
   return {
     agentId,
     date,

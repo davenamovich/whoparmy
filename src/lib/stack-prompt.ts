@@ -1,7 +1,7 @@
 import "server-only";
 import type { User } from "@prisma/client";
 import type { Stack } from "@/lib/stacks";
-import { BRIDGE_PARTNERS } from "@/lib/bridge";
+import { catalogEntrySync } from "@/lib/offer-catalog";
 import { getSavedDhMediaLink } from "@/lib/btc-addresses";
 import { getMemberLanguage } from "@/lib/member-language";
 import { codeTtlLabel } from "@/lib/experiment-scope";
@@ -33,7 +33,7 @@ export async function fillStackPrompt(
     // ungated.
     const saved = await getSavedDhMediaLink(user.id).catch(() => null);
     const fallback =
-      BRIDGE_PARTNERS.find((p) => p.key === "dh-media")?.example ?? "https://dh.media/?affid=Vesselprotocol";
+      catalogEntrySync("salarium")?.example ?? "https://dh.media/?affid=Vesselprotocol";
     prompt = prompt.replaceAll("{DH_MEDIA_LINK}", saved ?? fallback);
   }
   if (prompt.includes("{LANGUAGE}")) {

@@ -102,10 +102,18 @@ export async function saveBtcAddresses(
  * access follows the CURRENT saved link.
  */
 export async function getSavedDhMediaLink(userId: string): Promise<string | null> {
-  const link = await db.engineLink.findUnique({
-    where: { userId_partner: { userId, partner: "dh-media" } },
-    select: { url: true },
-  });
+  // DH Media's canonical partner key is the MCP step "salarium"
+  // (Offers-from-MCP, 2026-11-21); the legacy "dh-media" read covers
+  // any row the boot migration has not rewritten yet.
+  const link =
+    (await db.engineLink.findUnique({
+      where: { userId_partner: { userId, partner: "salarium" } },
+      select: { url: true },
+    })) ??
+    (await db.engineLink.findUnique({
+      where: { userId_partner: { userId, partner: "dh-media" } },
+      select: { url: true },
+    }));
   const url = link?.url?.trim();
   return url ? url : null;
 }

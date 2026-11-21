@@ -2,6 +2,14 @@ import "server-only";
 import { db } from "@/lib/db";
 import { grantReferralBot } from "@/lib/bot-grants";
 import { resolveSignup, type SignupSource } from "@/lib/bridge-signup";
+import {
+  SEED_CATALOG,
+  extractAffiliateRef,
+  migratePartnerKey,
+  verifyLinkHost,
+  type CatalogPartner,
+} from "@/lib/offer-catalog";
+import { getOfferCatalog } from "@/lib/offer-catalog-server";
 
 /**
  * ─── THE BRIDGE — build your own engine, step one ────────────────────
@@ -36,77 +44,26 @@ import { resolveSignup, type SignupSource } from "@/lib/bridge-signup";
 export const LINK_SAVE_FREE_GENS = 25;
 
 export interface BridgePartner {
+  /** Canonical key = the P&R MCP `step` ("muse" for the local extra). */
   key: string;
   name: string;
   blurb: string;
   /** Dave's own link, shown as the placeholder example. */
   example: string;
+  /** "mcp" = served from list_my_offers; "local" = Whop Army extra. */
+  source: "mcp" | "local";
+  /** True when the house P&R account has no link saved for the step. */
+  missing: boolean;
+  pageSlug: string | null;
 }
 
-export const BRIDGE_PARTNERS: BridgePartner[] = [
-  {
-    key: "agent37",
-    name: "Agent 37",
-    blurb: "Your AI agent workforce — the team that runs your engine while you sleep.",
-    example: "https://agent37.com/?via=riffle",
-  },
-  {
-    key: "fish-audio",
-    name: "Fish Audio",
-    blurb: "Voice for your content — narration and character voices in minutes.",
-    example: "https://fish.audio/?fpr=oneminute",
-  },
-  {
-    key: "muse",
-    name: "Muse",
-    blurb: "Your own Muse agent — the workhouse that builds and runs it all with you.",
-    example: "https://www.plunderandriffle.com/muse-invite",
-  },
-  {
-    key: "whop",
-    name: "Whop",
-    blurb: "The storefront — sell your own products and memberships here.",
-    example: "https://whop.com/?code=XIGEWN",
-  },
-  {
-    key: "freebuff",
-    name: "Freebuff",
-    blurb: "Free AI coding help — the on-ramp for builders in your audience.",
-    example: "Your Freebuff referral link",
-  },
-  {
-    key: "dh-media",
-    name: "DH Media",
-    blurb: "Media tools and workflow for creators who publish every day.",
-    example: "https://dh.media/?affid=Vesselprotocol",
-  },
-  {
-    key: "upload-post",
-    name: "Upload Post",
-    blurb: "Post everywhere from one place — the distributor for your content.",
-    example: "https://upload-post.com/?ref=VESSEL",
-  },
-  {
-    key: "temu",
-    name: "Temu",
-    blurb: "Products your audience already buys — meme them, link them.",
-    example: "https://temu.to/k/pgxcro0opym",
-  },
-  {
-    key: "bankr",
-    name: "Bankr",
-    blurb: "The agent wallet layer — crypto rails for your engine.",
-    example: "https://bankr.bot/terminal?refCode=7FBFB6T6-BNKR",
-  },
-  {
-    key: "railway",
-    name: "Railway",
-    blurb: "Where apps deploy — host your own stack the way this one runs.",
-    example: "Your Railway referral link",
-  },
-];
-
-const PARTNER_KEYS = new Set(BRIDGE_PARTNERS.map((p) => p.key));
+/**
+ * The catalog is served from the P&R MCP (lib/offer-catalog-server.ts);
+ * BRIDGE_PARTNERS remains only as the synchronous seed view of it for
+ * the rare pure consumer. Everything member-facing goes through
+ * getOfferCatalog() so names/links track the P&R record.
+ */
+export const BRIDGE_PARTNERS: BridgePartner[] = SEED_CATALOG.map((p: CatalogPartner) => ({ ...p }));
 
 export interface BridgePartnerState extends BridgePartner {
   url: string;
@@ -133,9 +90,10 @@ export interface BridgeState {
 }
 
 export async function getBridgeState(userId: string): Promise<BridgeState> {
-  const [user, links] = await Promise.all([
+  const [user, links, catalog] = await Promise.all([
     db.user.findUnique({ where: { id: userId }, select: { linksSavedAt: true, referredById: true } }),
     db.engineLink.findMany({ where: { userId }, select: { partner: true, url: true } }),
+    getOfferCatalog(),
   ]);
   // The referrer's own saved links populate the sign-up buttons.
   let referrerLabel: string | null = null;
@@ -156,7 +114,7 @@ export async function getBridgeState(userId: string): Promise<BridgeState> {
   }
   const byPartner = new Map(links.map((l) => [l.partner, l.url]));
   return {
-    partners: BRIDGE_PARTNERS.map((p) => {
+    partners: catalog.map((p) => {
       const signup = resolveSignup(p.example, referrerByPartner.get(p.key));
       return {
         ...p,
@@ -194,8 +152,10 @@ function etTomorrowString(): string {
   return etDateString(new Date(Date.now() + 24 * 60 * 60 * 1000));
 }
 
-/** Grant the free rotator day for one offer; returns true if new. */
-async function grantFreePlacement(userId: string, partner: string): Promise<boolean> {
+/** Grant the free rotator day for one offer; returns true if new.
+ *  Exported for the bridge links sync (a synced link is a saved link:
+ *  it earns the same free day, idempotently). */
+export async function grantFreePlacement(userId: string, partner: string): Promise<boolean> {
   try {
     // Snapshot the URL being saved right now: the earned day serves
     // THIS link. (The rotator used to resolve the member's current
@@ -223,11 +183,14 @@ async function grantFreePlacement(userId: string, partner: string): Promise<bool
  * member's own links from the first connection.
  */
 export async function getSavedOfferLinks(userId: string): Promise<{ name: string; url: string }[]> {
-  const links = await db.engineLink.findMany({ where: { userId }, select: { partner: true, url: true } });
-  const nameFor = new Map(BRIDGE_PARTNERS.map((p) => [p.key, p.name]));
+  const [links, catalog] = await Promise.all([
+    db.engineLink.findMany({ where: { userId }, select: { partner: true, url: true } }),
+    getOfferCatalog(),
+  ]);
+  const nameFor = new Map(catalog.map((p) => [p.key, p.name]));
   return links
     .filter((l) => l.url?.trim())
-    .map((l) => ({ name: nameFor.get(l.partner) ?? l.partner, url: l.url }));
+    .map((l) => ({ name: nameFor.get(migratePartnerKey(l.partner)) ?? l.partner, url: l.url }));
 }
 
 export interface AffiliateOfferState extends BridgePartner {
@@ -251,7 +214,10 @@ export interface AffiliateState {
  * feature existed, so early members are not shorted their days.
  */
 export async function getAffiliateState(userId: string): Promise<AffiliateState> {
-  const links = await db.engineLink.findMany({ where: { userId }, select: { partner: true, url: true } });
+  const [links, catalog] = await Promise.all([
+    db.engineLink.findMany({ where: { userId }, select: { partner: true, url: true } }),
+    getOfferCatalog(),
+  ]);
   for (const l of links) {
     await grantFreePlacement(userId, l.partner);
   }
@@ -259,7 +225,7 @@ export async function getAffiliateState(userId: string): Promise<AffiliateState>
   const byPartner = new Map(links.map((l) => [l.partner, l.url]));
   const placementByPartner = new Map(placements.map((p) => [p.partner, p]));
   const today = etDateString();
-  const offers = BRIDGE_PARTNERS.map((p) => {
+  const offers = catalog.map((p) => {
     const placement = placementByPartner.get(p.key);
     return {
       ...p,
@@ -293,6 +259,7 @@ export interface AffiliateOverview {
 /** Operator view for the Affiliate Manager: who signed up for what,
  *  and whose free rotator days are coming up. */
 export async function getAffiliateOverview(): Promise<AffiliateOverview> {
+  const catalog = await getOfferCatalog();
   const [grouped, placements, members] = await Promise.all([
     db.engineLink.groupBy({ by: ["partner"], _count: { _all: true } }),
     db.rotatorPlacement.findMany({
@@ -313,7 +280,7 @@ export async function getAffiliateOverview(): Promise<AffiliateOverview> {
       return {
         date: pl.date,
         partner: pl.partner,
-        partnerName: BRIDGE_PARTNERS.find((p) => p.key === pl.partner)?.name ?? pl.partner,
+        partnerName: catalog.find((p) => p.key === migratePartnerKey(pl.partner))?.name ?? pl.partner,
         userId: pl.userId,
         userLabel: pl.user.whopUsername ?? pl.user.name ?? pl.user.email,
         url: link?.url ?? null,
@@ -321,7 +288,7 @@ export async function getAffiliateOverview(): Promise<AffiliateOverview> {
     }),
   );
   return {
-    offerSignups: BRIDGE_PARTNERS.map((p) => ({
+    offerSignups: catalog.map((p) => ({
       partner: p.key,
       name: p.name,
       signups: counts.get(p.key) ?? 0,
@@ -353,9 +320,15 @@ export async function saveBridgeLinks(
   userId: string,
   entries: Record<string, unknown>,
 ): Promise<SaveBridgeResult> {
+  const catalog = await getOfferCatalog();
+  const catalogByKey = new Map(catalog.map((p) => [p.key, p]));
   const clean = new Map<string, string>();
-  for (const [key, raw] of Object.entries(entries)) {
-    if (!PARTNER_KEYS.has(key)) return { ok: false, error: `Unknown partner: ${key}` };
+  for (const [rawKey, raw] of Object.entries(entries)) {
+    // Legacy invented keys (fish-audio, dh-media…) migrate to the MCP
+    // step on the way in, so a stale UI can never write an old key.
+    const key = migratePartnerKey(rawKey);
+    const entry = catalogByKey.get(key);
+    if (!entry) return { ok: false, error: `Unknown partner: ${rawKey}` };
     if (typeof raw !== "string") return { ok: false, error: `Link for ${key} must be text.` };
     const url = raw.trim();
     if (url) {
@@ -369,6 +342,17 @@ export async function saveBridgeLinks(
         return { ok: false, error: "Links must start with https://" };
       }
       if (url.length > 500) return { ok: false, error: "That link is too long." };
+      // Host verification (Offers-from-MCP, 2026-11-21): a saved link
+      // must live on the same host as its P&R record, so the saved
+      // link provably IS a link for that offer. Local extras and
+      // host-less records are exempt (see verifyLinkHost).
+      const verdict = verifyLinkHost(entry, url);
+      if (!verdict.ok) {
+        return {
+          ok: false,
+          error: `This link doesn't look like a ${entry.name} link — it should be on ${verdict.expectedHost}.`,
+        };
+      }
     }
     clean.set(key, url);
   }
@@ -376,10 +360,11 @@ export async function saveBridgeLinks(
   const placementsGranted: string[] = [];
   for (const [partner, url] of clean) {
     if (url) {
+      const externalRef = extractAffiliateRef(partner, url);
       await db.engineLink.upsert({
         where: { userId_partner: { userId, partner } },
-        create: { userId, partner, url },
-        update: { url },
+        create: { userId, partner, url, source: "manual", externalRef },
+        update: { url, source: "manual", externalRef },
       });
       // Signing up for an offer earns its free rotator day.
       if (await grantFreePlacement(userId, partner)) placementsGranted.push(partner);

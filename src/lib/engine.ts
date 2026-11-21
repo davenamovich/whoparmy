@@ -85,6 +85,23 @@ async function callTool(
   return JSON.parse(text) as Record<string, unknown>;
 }
 
+/**
+ * The house account's saved hub offers, straight from the P&R record
+ * (list_my_offers on the bridge house key). Raw payload out —
+ * normalization into the offer catalog lives in lib/offer-catalog.ts.
+ * Throws when the engine is not configured or the call fails, so the
+ * catalog layer can fall back to its snapshot/seed.
+ */
+export async function listEngineOffers(): Promise<Record<string, unknown>> {
+  const cfg = engineConfig();
+  if (!cfg) {
+    throw new Error(
+      "PR_ENGINE_API_KEY is not set in the app environment — the operator sets it at deploy (Railway env) and the engine client picks it up.",
+    );
+  }
+  return callTool(cfg, "list_my_offers", {}, 15_000);
+}
+
 function pageIdFromUrl(pageUrl: string): string {
   const m = /\/m\/([A-Za-z0-9_-]+)/.exec(pageUrl);
   return m?.[1] ?? "";

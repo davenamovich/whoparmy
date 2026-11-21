@@ -1,14 +1,18 @@
 import { NextResponse } from "next/server";
-import { BRIDGE_PARTNERS } from "@/lib/bridge";
+import { getOfferCatalog } from "@/lib/offer-catalog-server";
 
 /**
- * PUBLIC — the bridge partner catalog (names, blurbs, house example
- * links) for the landing page and the not-connected bridge teaser.
- * No member state; the member's own links stay behind the session.
+ * PUBLIC — the partner catalog for the landing page and the
+ * not-connected bridge teaser. Served from the P&R MCP
+ * (list_my_offers, house key) via lib/offer-catalog-server — key =
+ * the MCP `step`, name/blurb/example from the P&R record, plus the
+ * local Muse extra. No member state; the member's own links stay
+ * behind the session.
  */
 export async function GET() {
+  const partners = await getOfferCatalog();
   return NextResponse.json(
-    { partners: BRIDGE_PARTNERS },
-    { headers: { "Cache-Control": "public, max-age=3600" } },
+    { partners },
+    { headers: { "Cache-Control": "public, max-age=900" } },
   );
 }
