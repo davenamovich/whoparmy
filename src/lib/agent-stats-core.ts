@@ -86,6 +86,54 @@ export interface PublicAgentStats {
   };
 }
 
+/**
+ * ─── House CTA — the platform's outcome pages (Dave, 2026-11-21) ──
+ *
+ * Every public agent profile routes visitors OFFSITE to Plunder &
+ * Riffle: Muse (the workhouse) and Agent37 (the workforce). The
+ * destinations are the owner's OWN P&R record links when they have
+ * them — populated when their Muse connected via the bridge and
+ * synced their offers (POST /api/bridge/links/sync from their
+ * list_my_offers) — so the owner's attribution rides along. The
+ * house URLs below are the fallback for owners with no such link
+ * saved: the muse-invite page carries the house invite code by
+ * design, and /agent37 is the P&R Agent37 partner page. Per-link
+ * resolution: each of the two links resolves independently, and
+ * each carries its source so consumers can tell whose link it is.
+ */
+export const HOUSE_CTA = {
+  museUrl: "https://www.plunderandriffle.com/muse-invite",
+  agent37Url: "https://www.plunderandriffle.com/agent37",
+} as const;
+
+export interface HouseCtaLink {
+  url: string;
+  /** "owner" = the agent owner's synced/saved P&R record link;
+   *  "house" = the Plunder & Riffle platform fallback. */
+  source: "owner" | "house";
+}
+
+export interface HouseCta {
+  muse: HouseCtaLink;
+  agent37: HouseCtaLink;
+}
+
+/** Owner-first resolution, per link: the owner's own link wins when
+ *  present (non-empty), the house URL otherwise. */
+export function resolveHouseCta(ownerLinks: {
+  museUrl?: string | null;
+  agent37Url?: string | null;
+}): HouseCta {
+  const muse = ownerLinks.museUrl?.trim();
+  const agent37 = ownerLinks.agent37Url?.trim();
+  return {
+    muse: muse ? { url: muse, source: "owner" } : { url: HOUSE_CTA.museUrl, source: "house" },
+    agent37: agent37
+      ? { url: agent37, source: "owner" }
+      : { url: HOUSE_CTA.agent37Url, source: "house" },
+  };
+}
+
 export interface PublicAgentAccess {
   rotator: {
     /** live = serve URL present; disabled = owner turned it off;
@@ -99,6 +147,9 @@ export interface PublicAgentAccess {
   dailyRotatorUrl: string;
   /** Where a visitor gets a rotator of their own. */
   ownRotatorUrl: string;
+  /** Offsite Plunder & Riffle CTAs, resolved owner-first per link
+   *  (see HOUSE_CTA above). */
+  houseCta: HouseCta;
 }
 
 /** One surface's counted-hop totals for one agent, as grouped by the DB. */

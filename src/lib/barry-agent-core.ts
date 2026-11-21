@@ -71,6 +71,138 @@ export function barryHireData(userId: string, tokenBudget: number): BarryHireDat
   };
 }
 
+/**
+ * ─── House-Barry public profile copy ───────────────────────────────
+ *
+ * Dave (2026-11-21): "never lead with offer, lead with outcome — DH
+ * Media is just a tool, it could be any offer." The house Barry's
+ * profile copy follows the brand law: the outcome leads, no offer
+ * is named, the rotator + tracked stats are the proof surface.
+ *
+ * PREVIOUS is the shipped default verbatim (Slice 2) — it is kept
+ * ONLY as the refresh guard's comparison string: a production row
+ * still carrying exactly these values is untouched house copy and
+ * may be refreshed to NEXT; anything else is treated as edited by
+ * a human and left alone. Category stays "Marketing": the profile
+ * taxonomy (lib/agent-profile.ts AGENT_CATEGORIES) is a fixed list
+ * with no "Growth" entry, so the outcome category does not exist
+ * yet — the description and capabilities carry the outcome lead.
+ */
+export interface BarryProfileDefaults {
+  category: string;
+  capabilities: readonly string[];
+  description: string;
+}
+
+export const BARRY_PROFILE_PREVIOUS: BarryProfileDefaults = {
+  category: "Marketing",
+  capabilities: ["Marketing", "Content Creation", "Research"],
+  description:
+    "BTC Barry runs The BTC Experiment for his owner's brand — research, content and distribution through Whop Army, with a plain-numbers weekly report.",
+};
+
+export const BARRY_PROFILE_NEXT: BarryProfileDefaults = {
+  category: "Marketing",
+  capabilities: [
+    "Daily content engine",
+    "First-video creation",
+    "Business research & audit",
+    "Rotator distribution",
+    "Tracked clicks & stats",
+  ],
+  description:
+    "BTC Barry runs a daily growth experiment for his owner's business — researching the market, creating the day's content, and sending real visitors through his rotator. Every click is tracked and the numbers sit on his profile: an audience that grows on schedule, proven in public.",
+};
+
+export interface BarryProfileCurrent {
+  description: string | null;
+  category: string | null;
+  capabilities: string[];
+}
+
+export interface BarryProfileRefreshPlan {
+  /** Fields to write (only fields that are empty or still carry the
+   *  previous house defaults exactly). Absent = leave as-is. */
+  updates: { description?: string; category?: string; capabilities?: string[] };
+  /** Fields this plan writes. */
+  refreshedFields: string[];
+  /** Fields left untouched because a human edited them. */
+  customizedFields: string[];
+}
+
+function sameStringList(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
+/**
+ * The guarded refresh (Dave, 2026-11-21): per field, write the
+ * outcome-led NEXT value only when the current value is empty or
+ * equals the PREVIOUS shipped default exactly. A value that is
+ * neither empty, nor the previous default, nor already the next
+ * default was edited by a human — it is reported customized and
+ * never overwritten.
+ */
+export function planBarryProfileRefresh(current: BarryProfileCurrent): BarryProfileRefreshPlan {
+  const updates: BarryProfileRefreshPlan["updates"] = {};
+  const refreshedFields: string[] = [];
+  const customizedFields: string[] = [];
+
+  const description = current.description?.trim() ? current.description : null;
+  if (description === null || description === BARRY_PROFILE_PREVIOUS.description) {
+    if (description !== BARRY_PROFILE_NEXT.description) {
+      updates.description = BARRY_PROFILE_NEXT.description;
+      refreshedFields.push("description");
+    }
+  } else if (description !== BARRY_PROFILE_NEXT.description) {
+    customizedFields.push("description");
+  }
+
+  const category = current.category?.trim() ? current.category : null;
+  if (category === null || category === BARRY_PROFILE_PREVIOUS.category) {
+    if (category !== BARRY_PROFILE_NEXT.category) {
+      updates.category = BARRY_PROFILE_NEXT.category;
+      refreshedFields.push("category");
+    }
+  } else if (category !== BARRY_PROFILE_NEXT.category) {
+    customizedFields.push("category");
+  }
+
+  if (
+    current.capabilities.length === 0 ||
+    sameStringList(current.capabilities, BARRY_PROFILE_PREVIOUS.capabilities)
+  ) {
+    if (!sameStringList(current.capabilities, BARRY_PROFILE_NEXT.capabilities)) {
+      updates.capabilities = [...BARRY_PROFILE_NEXT.capabilities];
+      refreshedFields.push("capabilities");
+    }
+  } else if (!sameStringList(current.capabilities, BARRY_PROFILE_NEXT.capabilities)) {
+    customizedFields.push("capabilities");
+  }
+
+  return { updates, refreshedFields, customizedFields };
+}
+
+/** The one-line report the provision summary carries. */
+export function barryProfileRefreshReport(plan: BarryProfileRefreshPlan): {
+  profileRefreshed: boolean;
+  reason: string;
+} {
+  if (plan.refreshedFields.length > 0) {
+    const left =
+      plan.customizedFields.length > 0
+        ? ` Customized field(s) left as-is: ${plan.customizedFields.join(", ")}.`
+        : "";
+    return {
+      profileRefreshed: true,
+      reason: `Profile copy refreshed to the outcome-led defaults (${plan.refreshedFields.join(", ")}).${left}`,
+    };
+  }
+  if (plan.customizedFields.length > 0) {
+    return { profileRefreshed: false, reason: "Profile copy customized — left as-is." };
+  }
+  return { profileRefreshed: false, reason: "Profile copy already carries the outcome-led defaults." };
+}
+
 export interface BarryCandidate {
   id: string;
   templateKey: string;

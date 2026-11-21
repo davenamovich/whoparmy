@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/db";
 import { capabilitiesFromJson, serializePublicProfile } from "@/lib/agent-profile";
+import { HOUSE_CTA } from "@/lib/agent-stats-core";
 import { getPublicAgentBundles } from "@/lib/agent-stats";
 import { publicApplicationInclude, serializePublicApplication } from "@/lib/application";
 import { SpotResetCountdown } from "@/components/spot-reset-countdown";
@@ -37,6 +38,13 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ s
   const bundle = (await getPublicAgentBundles([agent.id])).get(agent.id);
   const stats = bundle?.stats;
   const access = bundle?.access;
+
+  // House CTA (Dave, 2026-11-21): the strip routes offsite to
+  // Plunder & Riffle — resolved owner-first in the access block
+  // (the owner's own synced Muse/Agent37 links win; the house
+  // URLs are the fallback).
+  const ctaMuseUrl = access?.houseCta.muse.url ?? HOUSE_CTA.museUrl;
+  const ctaAgent37Url = access?.houseCta.agent37.url ?? HOUSE_CTA.agent37Url;
 
   // Applications built by this agent (Slice 3): only the ones the
   // owner marked public, serialized like everywhere else.
@@ -138,6 +146,22 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ s
             </p>
           </section>
         ) : null}
+
+        <section className="space-y-4 border-t border-border/60 py-10">
+          <h2 className={label}>Get an agent like this</h2>
+          <p className="max-w-md leading-relaxed text-muted-foreground">
+            An agent like this, working for your business — that&rsquo;s Muse, powered by Plunder &amp; Riffle,
+            running on Agent37.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <Button asChild>
+              <a href={ctaMuseUrl}>GET YOUR OWN MUSE</a>
+            </Button>
+            <Button asChild variant="outline">
+              <a href={ctaAgent37Url}>RUN IT ON AGENT37</a>
+            </Button>
+          </div>
+        </section>
 
         {access ? (
           <section className="space-y-4 border-t border-border/60 py-10">

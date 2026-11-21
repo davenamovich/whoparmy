@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { serializePublicProfile } from "@/lib/agent-profile";
+import { HOUSE_CTA } from "@/lib/agent-stats-core";
 import { getPublicAgentBundles, getPublicPoolSummary } from "@/lib/agent-stats";
 
 export const dynamic = "force-dynamic";
@@ -134,6 +135,14 @@ export default async function AgentsDirectoryPage() {
                             : "This agent hasn't set up its rotator yet."}
                       </p>
                     )}
+                    <p className="text-[11px]">
+                      <a
+                        href={profile.access?.houseCta.muse.url ?? HOUSE_CTA.museUrl}
+                        className="font-bold text-primary underline underline-offset-2"
+                      >
+                        Get your own → Muse
+                      </a>
+                    </p>
                   </div>
                 ) : null}
               </li>

@@ -1,7 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  HOUSE_CTA,
   buildSpotBlock,
+  resolveHouseCta,
   summarizeAgentHops,
   summarizePool,
   type HopSurfaceGroup,
@@ -15,6 +17,37 @@ import { spotWindowFor } from "./rotator-market.ts";
  * Filtered hops never reach these functions — the server queries
  * counted=true rows only — so nothing here can resurrect them.
  */
+
+describe("resolveHouseCta — owner-first, per link (Dave, 2026-11-21)", () => {
+  it("falls back to the house URLs when the owner saved neither link", () => {
+    const cta = resolveHouseCta({});
+    assert.deepEqual(cta.muse, { url: HOUSE_CTA.museUrl, source: "house" });
+    assert.deepEqual(cta.agent37, { url: HOUSE_CTA.agent37Url, source: "house" });
+    assert.equal(cta.muse.url, "https://www.plunderandriffle.com/muse-invite");
+    assert.equal(cta.agent37.url, "https://www.plunderandriffle.com/agent37");
+  });
+
+  it("uses the owner's own links when both are saved", () => {
+    const cta = resolveHouseCta({
+      museUrl: "https://www.plunderandriffle.com/muse-invite?ref=OWNER1",
+      agent37Url: "https://www.agent37.com/?via=owner",
+    });
+    assert.deepEqual(cta.muse, { url: "https://www.plunderandriffle.com/muse-invite?ref=OWNER1", source: "owner" });
+    assert.deepEqual(cta.agent37, { url: "https://www.agent37.com/?via=owner", source: "owner" });
+  });
+
+  it("resolves mixed state per link: owner Muse, house Agent37", () => {
+    const cta = resolveHouseCta({ museUrl: "https://example.com/my-muse" });
+    assert.deepEqual(cta.muse, { url: "https://example.com/my-muse", source: "owner" });
+    assert.deepEqual(cta.agent37, { url: HOUSE_CTA.agent37Url, source: "house" });
+  });
+
+  it("treats blank owner links as absent", () => {
+    const cta = resolveHouseCta({ museUrl: "  ", agent37Url: "" });
+    assert.equal(cta.muse.source, "house");
+    assert.equal(cta.agent37.source, "house");
+  });
+});
 
 describe("summarizeAgentHops", () => {
   it("visitors sent sums all counted surfaces; launches count AGENT serves only", () => {

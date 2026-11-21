@@ -11,6 +11,9 @@ interface ProvisionSummary {
   linksTotal: number;
   state: string;
   detail: string;
+  leadNames?: string[];
+  profileRefreshed?: boolean;
+  profileRefreshReason?: string;
 }
 
 /**
@@ -54,7 +57,10 @@ export function BarryRotatorCard() {
         <p className="text-sm text-muted-foreground">
           Provisions BTC Barry&apos;s agent rotator from your saved links — that is what turns the Ride door on{" "}
           <span className="font-mono">/agent/btc-barry</span> live. Links come only from your saved EngineLinks
-          (never a typed-in URL), existing rotation state is kept, and re-running only adds what is missing.
+          (never a typed-in URL), existing rotation state is kept, and re-running only adds what is missing. Your
+          Muse and Agent37 links lead the rotation at triple weight — offers rotate behind them, never in front.
+          The same tap refreshes Barry&apos;s profile copy to the outcome-led defaults when it still carries the
+          old house copy untouched.
         </p>
       </CardHeader>
       <CardContent>
@@ -72,6 +78,9 @@ export function BarryRotatorCard() {
         </div>
         {error && <p className="mt-3 text-sm text-amber-600 dark:text-amber-400">{error}</p>}
         {summary && <p className="mt-3 text-sm text-muted-foreground">{summary.detail}</p>}
+        {summary?.profileRefreshReason && (
+          <p className="mt-2 text-sm text-muted-foreground">Profile: {summary.profileRefreshReason}</p>
+        )}
       </CardContent>
     </Card>
   );

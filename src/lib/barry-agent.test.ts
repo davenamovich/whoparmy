@@ -2,9 +2,13 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   BARRY_AGENT_NAME,
+  BARRY_PROFILE_NEXT,
+  BARRY_PROFILE_PREVIOUS,
   BARRY_SOURCE,
   BARRY_TEMPLATE_KEY,
   barryHireData,
+  barryProfileRefreshReport,
+  planBarryProfileRefresh,
   selectBarryRecord,
   type BarryCandidate,
 } from "./barry-agent-core.ts";
@@ -65,6 +69,80 @@ describe("selectBarryRecord — one Barry per member, ever", () => {
     const newer = candidate("barry-new", BARRY_TEMPLATE_KEY, new Date(T0.getTime() + 60_000));
     assert.equal(selectBarryRecord([newer, older])?.id, "barry-old");
     assert.equal(selectBarryRecord([older, newer])?.id, "barry-old");
+  });
+});
+
+describe("planBarryProfileRefresh — outcome-led copy, guarded (Dave, 2026-11-21)", () => {
+  const previous = {
+    description: BARRY_PROFILE_PREVIOUS.description,
+    category: BARRY_PROFILE_PREVIOUS.category,
+    capabilities: [...BARRY_PROFILE_PREVIOUS.capabilities],
+  };
+
+  it("the new defaults lead with outcome and name no offer", () => {
+    assert.ok(!/DH Media|dh\.media/i.test(BARRY_PROFILE_NEXT.description));
+    assert.deepEqual(BARRY_PROFILE_NEXT.capabilities, [
+      "Daily content engine",
+      "First-video creation",
+      "Business research & audit",
+      "Rotator distribution",
+      "Tracked clicks & stats",
+    ]);
+    // Category stays in the fixed taxonomy (no "Growth" entry exists).
+    assert.equal(BARRY_PROFILE_NEXT.category, "Marketing");
+  });
+
+  it("refreshes a row still carrying the previous shipped defaults exactly", () => {
+    const plan = planBarryProfileRefresh(previous);
+    assert.equal(plan.updates.description, BARRY_PROFILE_NEXT.description);
+    assert.deepEqual(plan.updates.capabilities, [...BARRY_PROFILE_NEXT.capabilities]);
+    assert.equal(plan.updates.category, undefined, "category is unchanged between defaults");
+    assert.deepEqual(plan.customizedFields, []);
+    const report = barryProfileRefreshReport(plan);
+    assert.equal(report.profileRefreshed, true);
+    assert.match(report.reason, /refreshed to the outcome-led defaults/);
+  });
+
+  it("fills empty fields with the new defaults", () => {
+    const plan = planBarryProfileRefresh({ description: null, category: null, capabilities: [] });
+    assert.equal(plan.updates.description, BARRY_PROFILE_NEXT.description);
+    assert.equal(plan.updates.category, BARRY_PROFILE_NEXT.category);
+    assert.deepEqual(plan.updates.capabilities, [...BARRY_PROFILE_NEXT.capabilities]);
+  });
+
+  it("leaves hand-edited copy untouched and reports it customized", () => {
+    const plan = planBarryProfileRefresh({
+      description: "Dave's own words about Barry.",
+      category: BARRY_PROFILE_PREVIOUS.category,
+      capabilities: [...BARRY_PROFILE_PREVIOUS.capabilities],
+    });
+    assert.equal(plan.updates.description, undefined, "edited description is never overwritten");
+    assert.deepEqual(plan.customizedFields, ["description"]);
+    assert.deepEqual(plan.updates.capabilities, [...BARRY_PROFILE_NEXT.capabilities], "untouched fields still refresh");
+  });
+
+  it("a fully customized profile is left entirely as-is", () => {
+    const plan = planBarryProfileRefresh({
+      description: "Custom description.",
+      category: "Content",
+      capabilities: ["Custom capability"],
+    });
+    assert.deepEqual(plan.updates, {});
+    assert.deepEqual(plan.customizedFields, ["description", "category", "capabilities"]);
+    const report = barryProfileRefreshReport(plan);
+    assert.equal(report.profileRefreshed, false);
+    assert.equal(report.reason, "Profile copy customized — left as-is.");
+  });
+
+  it("is a no-op once the row already carries the new defaults", () => {
+    const plan = planBarryProfileRefresh({
+      description: BARRY_PROFILE_NEXT.description,
+      category: BARRY_PROFILE_NEXT.category,
+      capabilities: [...BARRY_PROFILE_NEXT.capabilities],
+    });
+    assert.deepEqual(plan.updates, {});
+    assert.deepEqual(plan.customizedFields, []);
+    assert.equal(barryProfileRefreshReport(plan).profileRefreshed, false);
   });
 });
 

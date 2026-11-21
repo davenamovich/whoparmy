@@ -2,9 +2,17 @@ import "server-only";
 import { db } from "@/lib/db";
 import { internalBotBudget } from "@/lib/agents";
 import { isDesignatedOperator } from "@/lib/auth";
-import { capabilitiesToJson } from "@/lib/agent-profile";
-import { BARRY_TEMPLATE_KEY, barryHireData, selectBarryRecord } from "@/lib/barry-agent-core";
+import { capabilitiesFromJson, capabilitiesToJson } from "@/lib/agent-profile";
 import {
+  BARRY_PROFILE_NEXT,
+  BARRY_TEMPLATE_KEY,
+  barryHireData,
+  barryProfileRefreshReport,
+  planBarryProfileRefresh,
+  selectBarryRecord,
+} from "@/lib/barry-agent-core";
+import {
+  barryRotatorGate,
   provisionBarryRotator,
   type BarryRotatorDb,
   type EnsureBarryRotatorResult,
@@ -20,12 +28,17 @@ export type { EnsureBarryRotatorResult };
  * agent holding it wins; Barry stays unpublished rather than steal
  * it). A member's own Barry is NEVER auto-published.
  */
+/**
+ * The house-Barry profile defaults are the OUTCOME-LED copy in
+ * lib/barry-agent-core.ts (BARRY_PROFILE_NEXT — Dave, 2026-11-21:
+ * lead with outcome, never with an offer; the previous shipped
+ * strings survive there only as the refresh guard's comparison).
+ */
 const BARRY_PROFILE = {
   slug: "btc-barry",
-  category: "Marketing",
-  capabilities: ["Marketing", "Content Creation", "Research"],
-  description:
-    "BTC Barry runs The BTC Experiment for his owner's brand — research, content and distribution through Whop Army, with a plain-numbers weekly report.",
+  category: BARRY_PROFILE_NEXT.category,
+  capabilities: BARRY_PROFILE_NEXT.capabilities,
+  description: BARRY_PROFILE_NEXT.description,
 } as const;
 
 async function applyBarryProfileDefaults(agentId: string, userId: string) {
@@ -47,12 +60,58 @@ async function applyBarryProfileDefaults(agentId: string, userId: string) {
   }
   const effectiveSlug = agent.slug ?? data.slug;
   if (effectiveSlug && !agent.publicProfile) data.publicProfile = true;
-  if (!agent.category) data.category = BARRY_PROFILE.category;
-  if (!agent.capabilitiesJson) data.capabilitiesJson = capabilitiesToJson(BARRY_PROFILE.capabilities);
-  if (!agent.description) data.description = BARRY_PROFILE.description;
+  // Copy fields go through the guarded refresh plan (barry-agent-
+  // core): empties are filled AND fields still carrying the previous
+  // shipped defaults exactly are refreshed to the outcome-led copy,
+  // in one pass. Hand-edited copy is never overwritten.
+  const plan = planBarryProfileRefresh({
+    description: agent.description,
+    category: agent.category,
+    capabilities: capabilitiesFromJson(agent.capabilitiesJson),
+  });
+  if (plan.updates.description !== undefined) data.description = plan.updates.description;
+  if (plan.updates.category !== undefined) data.category = plan.updates.category;
+  if (plan.updates.capabilities !== undefined) data.capabilitiesJson = capabilitiesToJson(plan.updates.capabilities);
   if (Object.keys(data).length > 0) {
     await db.hiredAgent.update({ where: { id: agentId }, data });
   }
+}
+
+/**
+ * The guarded profile-copy refresh as a reportable action (Dave,
+ * 2026-11-21): for the designated operator's Barry ONLY, bring
+ * description / capabilities / category to the outcome-led defaults
+ * when they are empty or still equal the previous shipped defaults
+ * exactly. Anything a human edited is left untouched and reported
+ * as customized. Called by the provision flow so Dave's one tap in
+ * /admin both provisions the rotator and refreshes the copy; the
+ * launch path heals the same fields silently via
+ * applyBarryProfileDefaults above.
+ */
+export async function refreshBarryProfileCopy(
+  agentId: string,
+  userId: string,
+): Promise<{ profileRefreshed: boolean; reason: string }> {
+  const [agent, owner] = await Promise.all([
+    db.hiredAgent.findUnique({ where: { id: agentId } }),
+    db.user.findUnique({ where: { id: userId }, select: { whopId: true, whopUsername: true } }),
+  ]);
+  if (!agent || !owner || !isDesignatedOperator(owner)) {
+    return { profileRefreshed: false, reason: "Profile copy refresh applies to the operator's Barry only." };
+  }
+  const plan = planBarryProfileRefresh({
+    description: agent.description,
+    category: agent.category,
+    capabilities: capabilitiesFromJson(agent.capabilitiesJson),
+  });
+  const data: { category?: string; capabilitiesJson?: string; description?: string } = {};
+  if (plan.updates.description !== undefined) data.description = plan.updates.description;
+  if (plan.updates.category !== undefined) data.category = plan.updates.category;
+  if (plan.updates.capabilities !== undefined) data.capabilitiesJson = capabilitiesToJson(plan.updates.capabilities);
+  if (Object.keys(data).length > 0) {
+    await db.hiredAgent.update({ where: { id: agentId }, data });
+  }
+  return barryProfileRefreshReport(plan);
 }
 
 /**
@@ -106,14 +165,38 @@ export async function ensureBarryAgent(userId: string, planKey: string) {
  * ONLY for the operator: members' Barrys (and members' agents
  * generally) provision through their own owner API, untouched.
  */
-export async function ensureBarryRotatorForOperator(operatorUserId: string): Promise<EnsureBarryRotatorResult> {
+/** The provision result plus the guarded profile-copy refresh
+ *  outcome (Dave, 2026-11-21) — the /admin card prints both. */
+export interface EnsureBarryRotatorWithProfileResult extends EnsureBarryRotatorResult {
+  profileRefreshed: boolean;
+  profileRefreshReason: string;
+}
+
+export async function ensureBarryRotatorForOperator(
+  operatorUserId: string,
+): Promise<EnsureBarryRotatorWithProfileResult> {
   const candidates = await db.hiredAgent.findMany({
     where: { userId: operatorUserId, templateKey: BARRY_TEMPLATE_KEY },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
   });
   const barry = selectBarryRecord(candidates);
-  return provisionBarryRotator(db as unknown as BarryRotatorDb, {
+  const result = await provisionBarryRotator(db as unknown as BarryRotatorDb, {
     barry: barry ? { id: barry.id, name: barry.name, status: barry.status, expiresAt: barry.expiresAt } : null,
     operatorUserId,
   });
+  // The copy refresh rides the same operator action, but only when
+  // provisioning actually proceeded (a working Barry): a refused
+  // gate changes nothing at all.
+  if (!barry) {
+    return { ...result, profileRefreshed: false, profileRefreshReason: "No Barry record — no profile copy to refresh." };
+  }
+  const gate = barryRotatorGate(
+    { id: barry.id, name: barry.name, status: barry.status, expiresAt: barry.expiresAt },
+    new Date(),
+  );
+  if (!gate.ok) {
+    return { ...result, profileRefreshed: false, profileRefreshReason: "Barry is not working — profile copy left as-is." };
+  }
+  const refresh = await refreshBarryProfileCopy(barry.id, operatorUserId);
+  return { ...result, profileRefreshed: refresh.profileRefreshed, profileRefreshReason: refresh.reason };
 }

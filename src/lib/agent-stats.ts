@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { PUBLIC_SITE_ORIGIN } from "@/lib/agent-profile";
 import {
   buildSpotBlock,
+  resolveHouseCta,
   summarizeAgentHops,
   summarizePool,
   type HopSurfaceGroup,
@@ -113,7 +114,7 @@ export async function getPublicAgentBundles(
 
   // ── Placement attribution (the pool's own decision, per date) ────
   const ownerIds = [...new Set(agents.map((a) => a.userId))];
-  const [ownerAgents, ownerPlacements] = await Promise.all([
+  const [ownerAgents, ownerPlacements, ownerCtaLinks] = await Promise.all([
     ownerIds.length
       ? db.hiredAgent.findMany({
           where: { userId: { in: ownerIds } },
@@ -126,7 +127,26 @@ export async function getPublicAgentBundles(
           select: { id: true, userId: true, partner: true, date: true, createdAt: true },
         })
       : [],
+    // House-CTA owner links (Dave, 2026-11-21): the owner's own
+    // Muse / Agent37 EngineLinks — populated when their Muse
+    // connected via the bridge and synced their P&R offers — win
+    // over the house fallback URLs, per link. Canonical partner
+    // keys win over legacy spellings when both somehow exist.
+    ownerIds.length
+      ? db.engineLink.findMany({
+          where: { userId: { in: ownerIds }, partner: { in: ["muse", "agent37_ref", "agent37"] } },
+          select: { userId: true, partner: true, url: true },
+        })
+      : [],
   ]);
+  const ctaByOwner = new Map<string, { museUrl?: string; agent37Url?: string }>();
+  for (const link of ownerCtaLinks) {
+    const entry = ctaByOwner.get(link.userId) ?? {};
+    if (link.partner === "muse") entry.museUrl = link.url;
+    else if (link.partner === "agent37_ref") entry.agent37Url = link.url;
+    else if (link.partner === "agent37" && !entry.agent37Url) entry.agent37Url = link.url;
+    ctaByOwner.set(link.userId, entry);
+  }
   const agentsByOwner = new Map<string, TrafficAgentInput[]>();
   for (const a of ownerAgents) {
     const list = agentsByOwner.get(a.userId) ?? [];
@@ -197,7 +217,12 @@ export async function getPublicAgentBundles(
 
     out.set(agent.id, {
       stats,
-      access: { rotator: access, dailyRotatorUrl: "/rotator", ownRotatorUrl: "/bridge" },
+      access: {
+        rotator: access,
+        dailyRotatorUrl: "/rotator",
+        ownRotatorUrl: "/bridge",
+        houseCta: resolveHouseCta(ctaByOwner.get(agent.userId) ?? {}),
+      },
     });
   }
   return out;
