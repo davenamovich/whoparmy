@@ -22,7 +22,9 @@
  */
 
 export interface CatalogPartner {
-  /** Canonical key = the MCP `step` (or "muse" for the local extra). */
+  /** Canonical key = the MCP `step`. ("muse" is an MCP step since
+   *  2026-11-21; the local extra below is only the fallback for a
+   *  payload that predates it.) */
   key: string;
   name: string;
   /** The MCP `why` — why a member would promote this offer. */
@@ -41,10 +43,13 @@ export interface CatalogPartner {
 }
 
 /**
- * The local extra: the Muse invite has no MCP step (it is not one of
- * the hub offers on the P&R record — it is the workhouse itself).
- * Kept clearly separated (source "local"); saved links under key
- * "muse" keep working and skip host verification.
+ * The local extra — FALLBACK ONLY since 2026-11-21, when Muse became
+ * a proper step on the P&R record (step "muse", page slug
+ * "muse-invite"). normalizeOffersPayload appends this entry only when
+ * the payload carries no muse step (an older snapshot or the seed
+ * rung), so there is exactly one muse entry ever. Kept clearly
+ * separated (source "local"); saved links under key "muse" keep
+ * working and skip host verification on this entry.
  */
 export const MUSE_LOCAL_PARTNER: CatalogPartner = {
   key: "muse",
@@ -77,14 +82,17 @@ export const SEED_CATALOG: CatalogPartner[] = [
   { key: "whop_ref", name: "Whop", blurb: "People you invite start on Whop through your link. It's where a course, community or software gets sold.", example: "https://whop.com/?code=XIGEWN", source: "mcp", missing: false, pageSlug: null },
   { key: "salarium", name: "DH Media", blurb: "People you invite sign up to DH Media through your link, and its Bitcoin-paid offers earn you commission.", example: "https://dh.media/?affid=Vesselprotocol", source: "mcp", missing: false, pageSlug: null },
   { key: "higgsfield", name: "Higgsfield", blurb: "", example: "", source: "mcp", missing: true, pageSlug: null },
-  MUSE_LOCAL_PARTNER,
+  // Muse as the record now defines it (2026-11-21): a real MCP step with the
+  // muse-invite page (saveAs "muse"). The example is Dave's verified invite
+  // link — the link the house record carries for the step.
+  { key: "muse", name: "Muse", blurb: "People you invite join Muse through your link. When they redeem your invite code in Settings within 48 hours of joining, you each get 1 billion Muse tokens.", example: "https://www.plunderandriffle.com/muse-invite", source: "mcp", missing: false, pageSlug: "muse-invite" },
 ];
 
 /**
  * Legacy invented key → MCP step. Applied by the boot migration to
  * EngineLink / RotatorPlacement / RotatorBid / RotatorDay rows, and
  * at runtime when resolving names or accepting saves from stale UIs.
- * "muse" maps to itself (local extra, unchanged).
+ * "muse" maps to itself (an MCP step since 2026-11-21, unchanged).
  */
 export const PARTNER_KEY_MIGRATION: Record<string, string> = {
   "fish-audio": "fishaudio",
@@ -166,9 +174,11 @@ function cleanOfferName(name: string): string {
 
 /**
  * Normalize a raw list_my_offers result into catalog partners.
- * Offers come first (payload order); `missing` steps follow, flagged;
- * the Muse local extra is appended last, always. Page names/slugs
- * join on pages.saveAs === step.
+ * Offers come first (payload order); `missing` steps follow, flagged.
+ * A payload carrying a real "muse" step wins as-is (source "mcp",
+ * exactly one muse entry); the Muse local extra is appended last
+ * ONLY when the payload has no muse step. Page names/slugs join on
+ * pages.saveAs === step.
  */
 export function normalizeOffersPayload(payload: Record<string, unknown>): CatalogPartner[] {
   const offers = Array.isArray(payload.offers) ? (payload.offers as RawOffer[]) : [];
@@ -203,7 +213,7 @@ export function normalizeOffersPayload(payload: Record<string, unknown>): Catalo
   };
   for (const o of offers) push(o, false);
   for (const m of missing) push(m, true);
-  out.push(MUSE_LOCAL_PARTNER);
+  if (!seen.has("muse")) out.push(MUSE_LOCAL_PARTNER);
   return out;
 }
 

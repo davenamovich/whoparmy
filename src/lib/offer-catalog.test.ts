@@ -59,14 +59,59 @@ test("normalize: junk payload degrades to just the local extra", () => {
   assert.deepEqual(cat.map((p) => p.key), ["muse"]);
 });
 
-test("seed: carries the 11 verified steps + higgsfield missing + muse local", () => {
+test("seed: carries the 11 verified steps + higgsfield missing + muse as an mcp step", () => {
   const keys = SEED_CATALOG.map((p) => p.key);
   for (const step of ["fishaudio", "freebuff", "uploadpost", "railway_ref", "bankr_ref", "polyshares", "amelia", "agent37_ref", "temu", "whop_ref", "salarium"]) {
     assert.ok(keys.includes(step), `seed missing ${step}`);
   }
   assert.equal(SEED_CATALOG.find((p) => p.key === "higgsfield")?.missing, true);
-  assert.equal(SEED_CATALOG.find((p) => p.key === "muse")?.source, "local");
+  const museSeed = SEED_CATALOG.find((p) => p.key === "muse")!;
+  assert.equal(museSeed.source, "mcp"); // muse is a record step since 2026-11-21
+  assert.equal(museSeed.example, "https://www.plunderandriffle.com/muse-invite");
+  assert.equal(museSeed.pageSlug, "muse-invite");
+  assert.equal(SEED_CATALOG.filter((p) => p.key === "muse").length, 1);
   assert.equal(SEED_CATALOG.find((p) => p.key === "salarium")?.name, "DH Media");
+});
+
+// Fixture matching the LIVE list_my_offers shape after 2026-11-21, when the
+// record gained a real muse step + the muse-invite page (saveAs "muse").
+const MUSE_SAVED_FIXTURE = {
+  offers: [
+    { step: "muse", name: "Muse invite link", why: "People you invite join Muse through your link. When they redeem your invite code in Settings within 48 hours of joining, you each get 1 billion Muse tokens.", link: "https://www.plunderandriffle.com/muse-invite" },
+  ],
+  missing: [],
+  pages: [
+    { slug: "muse-invite", name: "Muse", note: "n", url: "https://www.plunderandriffle.com/muse-invite", button: "yours", yourLink: "https://www.plunderandriffle.com/muse-invite", saveAs: "muse", views: 0, visitors: 0, clicks: 0 },
+  ],
+};
+
+test("normalize: a real muse step in the payload wins — one muse entry, source mcp", () => {
+  const cat = normalizeOffersPayload(MUSE_SAVED_FIXTURE);
+  const muses = cat.filter((p) => p.key === "muse");
+  assert.equal(muses.length, 1, "exactly one muse entry ever");
+  const muse = muses[0];
+  assert.equal(muse.source, "mcp");
+  assert.equal(muse.missing, false);
+  assert.equal(muse.name, "Muse"); // page name wins
+  assert.equal(muse.example, "https://www.plunderandriffle.com/muse-invite");
+  assert.equal(muse.pageSlug, "muse-invite");
+  assert.equal(partnerPageUrl(muse), "https://www.plunderandriffle.com/muse-invite");
+});
+
+test("normalize: muse under missing stays a single mcp entry, flagged, no local duplicate", () => {
+  const cat = normalizeOffersPayload({
+    offers: [],
+    missing: [{ step: "muse", name: "Muse invite link" }],
+    pages: [
+      { slug: "muse-invite", name: "Muse", note: "n", url: "https://www.plunderandriffle.com/muse-invite", button: "house", yourLink: null, saveAs: "muse", views: 0, visitors: 0, clicks: 0 },
+    ],
+  });
+  const muses = cat.filter((p) => p.key === "muse");
+  assert.equal(muses.length, 1);
+  assert.equal(muses[0].source, "mcp");
+  assert.equal(muses[0].missing, true);
+  assert.equal(muses[0].example, "");
+  assert.equal(muses[0].pageSlug, "muse-invite");
 });
 
 test("migration map: every legacy bridge key lands on its MCP step", () => {
