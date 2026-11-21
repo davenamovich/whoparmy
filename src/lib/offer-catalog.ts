@@ -260,13 +260,38 @@ export function normalizedHost(raw: string): string | null {
 export type HostVerdict = { ok: true } | { ok: false; expectedHost: string };
 
 /**
+ * Per-step accepted hosts, mirroring the P&R ladder's own validation
+ * (meme-loop-engine credit-ladder.ts). Most steps have exactly one
+ * home — the house example's host, checked below. Muse is the
+ * exception: a genuine Muse invite link lives either on
+ * plunderandriffle.com (the /muse-invite page) or on muse.ai (the
+ * member's own invite), and the ladder accepts both. The allowlist is
+ * consulted FIRST — before the local-extra exemption and before the
+ * house-example comparison — so a step listed here gets real host
+ * validation in every catalog state (mcp, local fallback, and even
+ * while the house example is still missing). Hosts are normalized
+ * (www-insensitive) and matched exactly: suffix spoofs fail.
+ */
+export const STEP_ACCEPTED_HOSTS: Record<string, readonly string[]> = {
+  muse: ["plunderandriffle.com", "muse.ai"],
+};
+
+/**
  * Verify a member's link belongs to the catalog record for its step:
- * the link's host must equal the house link's host. Exempt (ok) when
- * the partner is a local extra, when the house record has no link
- * (missing offers), or when the house example is not a parseable URL
- * (text placeholders carry no host to check against).
+ * steps with an accepted-hosts allowlist must land on one of those
+ * hosts; every other step's link host must equal the house link's
+ * host. Exempt (ok) when the partner is a local extra, when the house
+ * record has no link (missing offers), or when the house example is
+ * not a parseable URL (text placeholders carry no host to check
+ * against).
  */
 export function verifyLinkHost(entry: CatalogPartner, url: string): HostVerdict {
+  const accepted = STEP_ACCEPTED_HOSTS[entry.key];
+  if (accepted) {
+    const actual = normalizedHost(url);
+    if (actual && accepted.includes(actual)) return { ok: true };
+    return { ok: false, expectedHost: accepted.join(" or ") };
+  }
   if (entry.source === "local") return { ok: true };
   const expected = entry.example ? normalizedHost(entry.example) : null;
   if (!expected) return { ok: true };

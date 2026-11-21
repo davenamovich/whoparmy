@@ -181,6 +181,53 @@ test("verifyLinkHost: accepts same host (www-insensitive), rejects foreign hosts
   assert.equal(bad2.ok, false);
 });
 
+const museEntry = (over: Partial<CatalogPartner>): CatalogPartner =>
+  entry({
+    key: "muse",
+    name: "Muse",
+    example: "https://www.plunderandriffle.com/muse-invite",
+    pageSlug: "muse-invite",
+    ...over,
+  });
+
+test("verifyLinkHost: muse accepts both ladder hosts, whichever the house example uses", () => {
+  // House example on plunderandriffle.com — muse.ai links still pass.
+  assert.deepEqual(verifyLinkHost(museEntry({}), "https://muse.ai/invite/abc123"), { ok: true });
+  assert.deepEqual(verifyLinkHost(museEntry({}), "https://www.muse.ai/invite/abc123?ref=x"), { ok: true });
+  assert.deepEqual(verifyLinkHost(museEntry({}), "https://www.plunderandriffle.com/muse-invite"), { ok: true });
+  assert.deepEqual(verifyLinkHost(museEntry({}), "https://plunderandriffle.com/muse-invite"), { ok: true });
+  // House example on muse.ai — plunderandriffle.com links still pass (cross-host).
+  const houseOnMuseAi = museEntry({ example: "https://muse.ai/invite/house" });
+  assert.deepEqual(verifyLinkHost(houseOnMuseAi, "https://www.plunderandriffle.com/muse-invite"), { ok: true });
+  assert.deepEqual(verifyLinkHost(houseOnMuseAi, "https://muse.ai/invite/mine"), { ok: true });
+});
+
+test("verifyLinkHost: muse rejects foreign hosts and suffix spoofs, naming both hosts", () => {
+  for (const url of [
+    "https://evil.example/invite",
+    "https://muse.ai.evil.example/invite",
+    "https://plunderandriffle.com.evil.example/muse-invite",
+    "not a url",
+  ]) {
+    const bad = verifyLinkHost(museEntry({}), url);
+    assert.equal(bad.ok, false, url);
+    if (!bad.ok) assert.equal(bad.expectedHost, "plunderandriffle.com or muse.ai");
+  }
+});
+
+test("verifyLinkHost: muse allowlist validates even while the house example is missing", () => {
+  const missingMuse = museEntry({ missing: true, example: "" });
+  assert.deepEqual(verifyLinkHost(missingMuse, "https://muse.ai/invite/abc"), { ok: true });
+  assert.deepEqual(verifyLinkHost(missingMuse, "https://www.plunderandriffle.com/muse-invite"), { ok: true });
+  const bad = verifyLinkHost(missingMuse, "https://evil.example/invite");
+  assert.equal(bad.ok, false);
+  if (!bad.ok) assert.equal(bad.expectedHost, "plunderandriffle.com or muse.ai");
+  // The local-fallback muse entry is held to the same allowlist.
+  const localMuse = museEntry({ source: "local" });
+  assert.deepEqual(verifyLinkHost(localMuse, "https://muse.ai/invite/abc"), { ok: true });
+  assert.equal(verifyLinkHost(localMuse, "https://evil.example/invite").ok, false);
+});
+
 test("verifyLinkHost: local extras, missing offers and host-less examples are exempt", () => {
   assert.deepEqual(verifyLinkHost(entry({ source: "local", example: "https://www.plunderandriffle.com/muse-invite" }), "https://anything.example/x"), { ok: true });
   assert.deepEqual(verifyLinkHost(entry({ missing: true, example: "" }), "https://higgsfield.ai/?ref=me"), { ok: true });
