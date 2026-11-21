@@ -54,6 +54,20 @@ export async function consumeTelegramPairCode(code: string): Promise<string | nu
   return row.userId;
 }
 
+/** Peek at a code WITHOUT consuming it: the member's userId, or null
+ *  (unknown, expired, or already used). Spine A (2026-11-21): the
+ *  pair-verify route peeks first so it can refuse an identity-alias
+ *  conflict BEFORE the single-use code is spent; consumption still
+ *  goes through consumeTelegramPairCode's conditional-update lock. */
+export async function peekTelegramPairCode(code: string): Promise<string | null> {
+  if (!code || typeof code !== "string") return null;
+  const row = await prisma.telegramPairCode.findUnique({
+    where: { codeHash: hashCode(code) },
+  });
+  if (!row || row.usedAt || row.expiresAt.getTime() < Date.now()) return null;
+  return row.userId;
+}
+
 /** The bot proves itself with TELEGRAM_PAIR_SECRET (Dave sets the
  *  same value on both services; until then pairing is unarmed and
  *  the verify route answers 503). */

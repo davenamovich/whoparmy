@@ -34,6 +34,13 @@ const PUBLIC_API_PREFIXES = [
   "/api/clips/worker/",
   "/api/telegram/webhook/",
   "/api/telegram/pair/verify",
+  // Attribution Spine A (2026-11-21): the two INTERNAL attribution
+  // endpoints carry their own credential (x-pair-secret vs
+  // TELEGRAM_PAIR_SECRET, checked inside the handlers — same class
+  // as pair verify above). /api/attribution/mine is NOT here: it is
+  // a member read and stays behind the session floor.
+  "/api/attribution/resolve",
+  "/api/attribution/pending-referral",
   "/api/showcase",
   // Whop Army 2.0 public agent profiles (Slice 2, 2026-11-21):
   // read-only directory/profile JSON. Handlers serve ONLY agents the

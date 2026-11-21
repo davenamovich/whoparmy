@@ -80,6 +80,8 @@ model User {
   clipJobs     ClipJob[]
   userRotator UserRotator?
   agentRotators AgentRotator[]
+  identityLinks IdentityLink[]
+  pendingReferralsMade PendingReferral[] @relation("PendingReferrer")
 }
 
 // ─── Brand profiles (multiple allowed for agencies) ─────────────────
@@ -1198,6 +1200,53 @@ model TelegramPairCode {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+// ─── ATTRIBUTION SPINE A — identity binding (2026-11-21) ────────────
+// One person = one Whop Army User (the root). Every other identifier
+// is an ALIAS bound to that root here. An alias belongs to exactly one
+// user, ever (@@unique([kind, value])): binding an already-bound alias
+// to a different user is refused, never a silent rebind
+// (lib/identity.ts). Written this slice: kind "telegram" (the Telegram
+// user id as a string), by the pair-verify flow. Reserved kinds from
+// ATTRIBUTION-SPINE-DESIGN-2026-11-21.md — documented, NOT written by
+// this slice: "telegram_bot_ref", "agent_game", "wallet_evm",
+// "wallet_btc" (wallet storage already lives in AgentWallet / the
+// User BTC address fields and is not duplicated here).
+model IdentityLink {
+  id         String    @id @default(cuid())
+  userId     String
+  kind       String // "telegram" in this slice
+  value      String // telegram: the Telegram user id, as a string
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([kind, value])
+  @@index([userId])
+}
+
+// A referral captured BEFORE the recruit has a Whop account: a
+// Telegram-first arrival binds the alias to the referrer here. First
+// referrer wins — set-once, never overwritten (@@unique([kind,
+// value])). When that person joins Whop and pairs their Telegram, the
+// claim (lib/identity.ts claimPendingReferral) moves referrerId onto
+// User.referredById — also set-once — and this row is consumed. No
+// ReferralEarning is created here: earnings still fire from the
+// existing conversion path once the recruit converts.
+model PendingReferral {
+  id         String   @id @default(cuid())
+  kind       String // "telegram" in this slice
+  value      String
+  referrerId String
+  createdAt  DateTime @default(now())
+
+  referrer User @relation("PendingReferrer", fields: [referrerId], references: [id], onDelete: Cascade)
+
+  @@unique([kind, value])
+  @@index([referrerId])
 }
 
 // ─── Pick a Phone (public game) ─────────────────────────────────────

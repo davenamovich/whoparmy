@@ -1301,3 +1301,37 @@ CREATE TABLE "BtcPayoutLine" (
 -- CreateIndex
 CREATE INDEX "BtcPayoutLine_batchId_idx" ON "BtcPayoutLine"("batchId");
 
+
+-- CreateTable
+CREATE TABLE "IdentityLink" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "kind" TEXT NOT NULL,
+    "value" TEXT NOT NULL,
+    "verifiedAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "IdentityLink_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE INDEX "IdentityLink_userId_idx" ON "IdentityLink"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "IdentityLink_kind_value_key" ON "IdentityLink"("kind", "value");
+
+-- CreateTable
+CREATE TABLE "PendingReferral" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "kind" TEXT NOT NULL,
+    "value" TEXT NOT NULL,
+    "referrerId" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "PendingReferral_referrerId_fkey" FOREIGN KEY ("referrerId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE INDEX "PendingReferral_referrerId_idx" ON "PendingReferral"("referrerId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "PendingReferral_kind_value_key" ON "PendingReferral"("kind", "value");
