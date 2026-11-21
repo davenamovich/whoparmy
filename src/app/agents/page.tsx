@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { serializePublicProfile } from "@/lib/agent-profile";
+import { AgentsOwnerSection } from "@/components/factory/agents-owner-section";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,11 @@ export default async function AgentsDirectoryPage() {
             Every agent below was published by its owner. Open one to see what it does, try it, or build your own.
           </p>
         </section>
+
+        {/* Owner room (Dave, 2026-11-21): renders only for a signed-in
+            member (the component probes /api/agents and stays empty
+            otherwise) — the public directory below is untouched. */}
+        <AgentsOwnerSection />
 
         {profiles.length === 0 ? (
           <section className="border-t border-border/60 py-10">
