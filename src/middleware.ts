@@ -41,6 +41,14 @@ const PUBLIC_API_PREFIXES = [
   // serializer — same public class as /api/showcase. The member agent
   // routes (/api/agents, /api/agents/[id]) stay behind the floor.
   "/api/agents/public",
+  // Whop Army 2.0 public applications (Slice 3, 2026-11-21):
+  // read-only showcase JSON. Handlers serve ONLY applications the
+  // owner marked public, through the lib/application.ts serializer.
+  // The write routes (/api/apps, /api/apps/[id]) stay behind the
+  // floor — except a POST to /api/apps itself, which carries its own
+  // credentials (session OR bridge bearer token) and is let through
+  // by the method check in middleware() below, like /api/bridge/mcp.
+  "/api/apps/public",
   // The trends ingest route carries its own credential (x-trends-key)
   // and rejects bad keys with 401 inside the handler; the middleware
   // floor must not block it first (2026-11-19: the daily X-trends cron
@@ -68,9 +76,15 @@ const SESSION_COOKIE_NAME = "pr_session";
 
 export function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
+  // POST /api/apps (Slice 3) authenticates inside the handler —
+  // session cookie OR a member's bridge bearer token (prb_…), the
+  // same own-credential class as /api/bridge/mcp. Only that exact
+  // method+path is let through; /api/apps/[id] writes stay floored.
+  const bridgePublishPost = path === "/api/apps" && req.method === "POST";
   if (
     path.startsWith("/api/") &&
     process.env.ALLOW_OPERATOR_FALLBACK !== "1" &&
+    !bridgePublishPost &&
     !PUBLIC_API_PREFIXES.some((p) => path.startsWith(p)) &&
     !req.cookies.get(SESSION_COOKIE_NAME)?.value
   ) {

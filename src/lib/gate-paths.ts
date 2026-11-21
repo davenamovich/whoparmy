@@ -29,8 +29,11 @@
 /** Pages reachable while the site gate is ON. Exact path or `<path>/…`.
  *  /agents + /agent/{slug} are the Whop Army 2.0 public showcase
  *  (Slice 2): they render only rows the owner marked publicProfile,
- *  through the lib/agent-profile.ts serializer — no member data. */
-export const GATE_EXEMPT_PATHS = ["/gate", "/connect", "/bridge", "/claim", "/agents", "/agent"] as const;
+ *  through the lib/agent-profile.ts serializer — no member data.
+ *  /apps + /apps/{slug} are the Slice 3 applications showcase: same
+ *  rule, only rows the owner marked public, through
+ *  lib/application.ts — no member data. */
+export const GATE_EXEMPT_PATHS = ["/gate", "/connect", "/bridge", "/claim", "/agents", "/agent", "/apps"] as const;
 
 /** Pages a sign-in may return to (a subset of the exempt ones, plus home). */
 const RETURN_PATHS = new Set(["/", "/bridge", "/claim"]);

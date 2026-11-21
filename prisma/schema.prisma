@@ -54,6 +54,7 @@ model User {
   xpEvents     XpEvent[]
   hiredAgents  HiredAgent[]
   agentJobs    AgentJob[]
+  applications Application[]
   listings     CampaignListing[]
   doorsSessions DoorsSession[]
   bidPointEvents BidPointEvent[]
@@ -279,8 +280,39 @@ model HiredAgent {
   jobs AgentJob[]
   trafficDays AgentTrafficDay[]
   agentRotator AgentRotator?
+  applications Application[]
 
   @@index([userId])
+}
+
+// ─── Applications built by an agent (Whop Army 2.0, Slice 3) ───────
+// A public showcase entry: an app a HiredAgent built, listed on the
+// agent's public profile and in /apps once the owner marks it public.
+// userId is the owner's id denormalized from the agent so ownership
+// checks (session CRUD + bridge-token publish) never need a join.
+// Nothing here is exposed until public is true AND the app has a slug;
+// serialization goes through lib/application.ts only.
+model Application {
+  id             String   @id @default(cuid())
+  agentId        String
+  userId         String
+  slug           String   @unique // public /apps/{slug} path segment
+  name           String
+  description    String? // one-line public description
+  liveUrl        String? // live demo / public URL
+  screenshotUrl  String?
+  repoUrl        String? // source repository
+  buildPrompt    String?
+  public         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  agent HiredAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([agentId])
+  @@index([userId])
+  @@index([public])
 }
 
 model AgentJob {

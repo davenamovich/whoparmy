@@ -201,6 +201,25 @@ CREATE TABLE "AgentJob" (
 );
 
 -- CreateTable
+CREATE TABLE "Application" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "agentId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "slug" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "liveUrl" TEXT,
+    "screenshotUrl" TEXT,
+    "repoUrl" TEXT,
+    "buildPrompt" TEXT,
+    "public" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "Application_agentId_fkey" FOREIGN KEY ("agentId") REFERENCES "HiredAgent" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "Application_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
 CREATE TABLE "CampaignListing" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "posterId" TEXT NOT NULL,
@@ -588,6 +607,18 @@ CREATE INDEX "AgentJob_userId_idx" ON "AgentJob"("userId");
 
 -- CreateIndex
 CREATE INDEX "AgentJob_hireId_idx" ON "AgentJob"("hireId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Application_slug_key" ON "Application"("slug");
+
+-- CreateIndex
+CREATE INDEX "Application_agentId_idx" ON "Application"("agentId");
+
+-- CreateIndex
+CREATE INDEX "Application_userId_idx" ON "Application"("userId");
+
+-- CreateIndex
+CREATE INDEX "Application_public_idx" ON "Application"("public");
 
 -- CreateIndex
 CREATE INDEX "CampaignListing_posterId_idx" ON "CampaignListing"("posterId");

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/db";
 import { capabilitiesFromJson, serializePublicProfile } from "@/lib/agent-profile";
+import { publicApplicationInclude, serializePublicApplication } from "@/lib/application";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,15 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ s
   const profile = serializePublicProfile(agent, agent.user);
   const capabilities = capabilitiesFromJson(agent.capabilitiesJson);
   const tryUrl = profile.demoUrl ?? profile.appUrl ?? "/bridge";
+
+  // Applications built by this agent (Slice 3): only the ones the
+  // owner marked public, serialized like everywhere else.
+  const appRows = await db.application.findMany({
+    where: { agentId: agent.id, public: true },
+    orderBy: [{ createdAt: "desc" }],
+    include: publicApplicationInclude,
+  });
+  const applications = appRows.map((row) => serializePublicApplication(row, row.agent, row.user));
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -89,6 +99,28 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ s
               {capabilities.map((capability) => (
                 <li key={capability} className="rounded-full border border-border px-3 py-1.5 text-sm font-semibold">
                   {capability}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        {applications.length > 0 ? (
+          <section className="space-y-4 border-t border-border/60 py-10">
+            <h2 className={label}>Applications built by this agent</h2>
+            <ul className="grid gap-4 sm:grid-cols-2">
+              {applications.map((app) => (
+                <li key={app.slug} className="rounded-2xl border border-border p-5">
+                  <a href={`/apps/${app.slug}`} className="block space-y-3">
+                    {app.screenshotUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={app.screenshotUrl} alt="" className="aspect-video w-full rounded-xl object-cover" />
+                    ) : null}
+                    <span className="block font-black leading-tight">{app.name}</span>
+                    {app.description ? (
+                      <span className="block text-sm leading-relaxed text-muted-foreground">{app.description}</span>
+                    ) : null}
+                  </a>
                 </li>
               ))}
             </ul>
