@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ArrowRight, Check, Copy, ExternalLink, Loader2 } from "lucide-react";
-import { BtcAddressesCard } from "@/components/bridge/btc-addresses-card";
+import { BtcAddressesSection } from "@/components/bridge/btc-addresses-section";
 import type { BridgeState } from "@/lib/bridge";
 import { clearStashedRef, readStashedRef, stashRefFromUrl } from "@/lib/ref-stash";
 
@@ -377,15 +377,11 @@ function SignedIn() {
         </p>
       </section>
 
-      {/* Barry's onboarding asks for these; optional, public only. */}
-      <details className="rounded-2xl border border-border bg-card">
-        <summary className="cursor-pointer px-5 py-4 text-sm font-semibold">
-          Your BTC addresses (optional — your agent will ask)
-        </summary>
-        <div className="px-5 pb-5">
-          <BtcAddressesCard />
-        </div>
-      </details>
+      {/* Barry's onboarding asks for these; public receive addresses
+          only. Presentation follows the Real BTC collection toggle
+          (admin): optional as today, or prominent payout collection
+          when the operator turns collection on. */}
+      <BtcAddressesSection />
     </div>
   );
 }

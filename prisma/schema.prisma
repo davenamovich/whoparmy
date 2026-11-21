@@ -1285,3 +1285,47 @@ model AgentGameEvent {
   @@index([type])
   @@index([createdAt])
 }
+
+// ─── BTC Experiment — Real BTC (Dave, 2026-11-21) ────────────────────
+// Internal rails only: a funding ledger, and payout batches Dave
+// approves and pays from his OWN wallet. The app never holds keys,
+// never generates wallets, never sends BTC — accounting, math, lists,
+// and records. All money is integer sats; BTC decimals exist only at
+// the input/display edge (lib/btc-payouts-logic.ts). Public surfaces
+// keep their SIMULATION framing; nothing here changes public copy.
+
+model BtcFundingEntry {
+  id         String   @id @default(cuid())
+  amountSats Int
+  txid       String?
+  note       String   @default("")
+  createdAt  DateTime @default(now())
+}
+
+model BtcPayoutBatch {
+  id        String          @id @default(cuid())
+  // Sum of the batch's lines, recomputed on every line edit. The
+  // undistributed remainder of a create request never lands here —
+  // it stays in the ledger balance.
+  totalSats Int
+  status    String          @default("DRAFT") // DRAFT | APPROVED | PAID | CANCELLED
+  note      String          @default("") // the win / reference for this run
+  txid      String? // required before the batch can be marked PAID
+  createdAt DateTime        @default(now())
+  paidAt    DateTime?
+  lines     BtcPayoutLine[]
+}
+
+model BtcPayoutLine {
+  id      String         @id @default(cuid())
+  batchId String
+  batch   BtcPayoutBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  // Plain id, no FK: the line is a snapshot. The address below is the
+  // member's saved address AT RUN CREATION — a later address change
+  // never rewrites an existing run.
+  userId     String
+  address    String
+  amountSats Int
+
+  @@index([batchId])
+}

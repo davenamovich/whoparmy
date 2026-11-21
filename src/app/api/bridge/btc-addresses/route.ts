@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { getBtcAddresses, saveBtcAddresses } from "@/lib/btc-addresses";
+import { getCollectBtcAddresses } from "@/lib/btc-payouts";
+import { bridgeBtcMode } from "@/lib/btc-payouts-logic";
 
 /**
  * The member's BTC receive addresses (BTC Experiment, Flow v2).
@@ -13,7 +15,11 @@ import { getBtcAddresses, saveBtcAddresses } from "@/lib/btc-addresses";
 export async function GET() {
   try {
     const user = await getWhopUser();
-    return NextResponse.json({ addresses: await getBtcAddresses(user.id) });
+    const [addresses, collectOn] = await Promise.all([getBtcAddresses(user.id), getCollectBtcAddresses()]);
+    // collectMode drives the /bridge presentation (Real BTC toggle,
+    // 2026-11-21): "optional" is the historical block; "collect"
+    // presents the same fields as required payout collection.
+    return NextResponse.json({ addresses, collectMode: bridgeBtcMode(collectOn) });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Could not load your BTC addresses" },

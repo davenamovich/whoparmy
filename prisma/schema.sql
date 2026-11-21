@@ -1223,3 +1223,36 @@ CREATE TABLE "ClaimVoidedNonce" (
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- CreateTable
+CREATE TABLE "BtcFundingEntry" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "amountSats" INTEGER NOT NULL,
+    "txid" TEXT,
+    "note" TEXT NOT NULL DEFAULT '',
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- CreateTable
+CREATE TABLE "BtcPayoutBatch" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "totalSats" INTEGER NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'DRAFT',
+    "note" TEXT NOT NULL DEFAULT '',
+    "txid" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "paidAt" DATETIME
+);
+
+-- CreateTable
+CREATE TABLE "BtcPayoutLine" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "batchId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "address" TEXT NOT NULL,
+    "amountSats" INTEGER NOT NULL,
+    CONSTRAINT "BtcPayoutLine_batchId_fkey" FOREIGN KEY ("batchId") REFERENCES "BtcPayoutBatch" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE INDEX "BtcPayoutLine_batchId_idx" ON "BtcPayoutLine"("batchId");
+

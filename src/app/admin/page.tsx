@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getGateState, getSessionOperator } from "@/lib/site-gate";
 import { getStacks, API_KEY_UNLOCKS } from "@/lib/stacks";
 import { AdminPanel } from "@/components/admin/admin-panel";
+import { BtcRealPanel } from "@/components/admin/btc-real-panel";
 import { RotatorAdmin } from "@/components/bridge/rotator-admin";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -118,6 +119,10 @@ export default async function AdminPage() {
       </Card>
 
       <AdminPanel gate={gate} stacks={stacks} />
+
+      {/* BTC Experiment — Real BTC (Dave, 2026-11-21). Internal rails
+          only; renders nothing unless the operator-gated API answers. */}
+      <BtcRealPanel />
 
       {/* Moved here from /bridge with the one-time-door overhaul
           (Dave, 2026-11-20). Renders nothing unless the operator-only

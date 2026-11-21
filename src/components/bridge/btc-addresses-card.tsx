@@ -16,7 +16,7 @@ import type { BtcAddresses } from "@/lib/btc-addresses";
  * one-time-door overhaul. Receive-only: no wallet is ever generated,
  * no key is ever held, nothing is custodied.
  */
-export function BtcAddressesCard() {
+export function BtcAddressesCard({ collectMode = false }: { collectMode?: boolean }) {
   const { toast } = useToast();
   const [loaded, setLoaded] = useState(false);
   const [receive, setReceive] = useState("");
@@ -73,6 +73,12 @@ export function BtcAddressesCard() {
       <h2 className="text-sm font-bold flex items-center gap-2">
         <Bitcoin className="h-4 w-4 text-primary" /> Your BTC addresses — The BTC Experiment
       </h2>
+      {collectMode && !receive.trim() ? (
+        <p className="rounded-md border border-primary/50 bg-primary/10 px-3 py-2 text-sm">
+          <b>You haven&apos;t saved a payout address yet.</b> Add your BTC receive address below — a payout
+          address is required to receive BTC payouts, and without one there is nowhere to send yours.
+        </p>
+      ) : null}
       <Card>
         <CardContent className="py-5 space-y-4">
           <p className="text-sm text-muted-foreground">
@@ -84,6 +90,7 @@ export function BtcAddressesCard() {
             <div className="space-y-1.5">
               <label htmlFor="btc-receive" className="text-sm font-medium">
                 Your BTC receive address
+                {collectMode ? <span className="text-primary"> — required for BTC payouts</span> : null}
               </label>
               <Input
                 id="btc-receive"
