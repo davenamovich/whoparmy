@@ -20,9 +20,15 @@
  *    here — earnings still fire from the existing conversion path
  *    (lib/referrals.ts recordConversion) once the recruit converts.
  *
- * Kinds written this slice: "telegram" (value = Telegram user id as
- * a string). Reserved by the design doc, not written here:
- * "telegram_bot_ref", "agent_game", "wallet_evm", "wallet_btc".
+ * Kinds written: "telegram" (value = Telegram user id as a string,
+ * Spine A) and — Bankr connection slice, 2026-11-21 — "wallet_evm"
+ * (value = EVM address, lowercased), "wallet_solana" (value =
+ * base58 address, as-is) and "bankr_ref" (value = Bankr referral
+ * code). Wallet bindings are written by lib/wallet-bind.ts (it
+ * normalizes addresses and applies this module's set-once rule);
+ * "bankr_ref" is written through bindIdentityLink directly.
+ * Reserved by the design doc, not written: "telegram_bot_ref",
+ * "agent_game", "wallet_btc".
  */
 
 export interface IdentityLinkRow {
@@ -89,6 +95,10 @@ export function normalizeIdentityValue(kind: string, value: unknown): string {
   // Telegram user ids are bare numerics; a stray leading "+" from a
   // hand-built payload is the same id.
   if (kind === "telegram") return v.replace(/^\+/, "");
+  // Wallet kinds ("wallet_evm" / "wallet_solana") are normalized by
+  // lib/wallet-bind.ts BEFORE they reach this generic path (EVM
+  // lowercasing + shape checks live there, single-sourced); values
+  // arriving here are stored as given.
   return v;
 }
 

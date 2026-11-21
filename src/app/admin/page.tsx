@@ -6,6 +6,7 @@ import { AdminPanel } from "@/components/admin/admin-panel";
 import { BtcRealPanel } from "@/components/admin/btc-real-panel";
 import { RotatorAdmin } from "@/components/bridge/rotator-admin";
 import { RotatorSummaryCard } from "@/components/admin/rotator-summary-card";
+import { SettlementsCard } from "@/components/admin/settlements-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const runtime = "nodejs";
@@ -129,6 +130,13 @@ export default async function AdminPage() {
           Renders nothing unless the operator-only summary API answers. */}
       <div className="mt-10">
         <RotatorSummaryCard />
+      </div>
+
+      {/* Bankr connection (2026-11-21): house wallet binding + the
+          rotator split settlement ledger (SIMULATED). Renders
+          nothing unless the operator-only APIs answer. */}
+      <div className="mt-10">
+        <SettlementsCard />
       </div>
 
       {/* Moved here from /bridge with the one-time-door overhaul

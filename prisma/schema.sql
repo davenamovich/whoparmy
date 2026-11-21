@@ -1337,3 +1337,72 @@ CREATE INDEX "PendingReferral_referrerId_idx" ON "PendingReferral"("referrerId")
 
 -- CreateIndex
 CREATE UNIQUE INDEX "PendingReferral_kind_value_key" ON "PendingReferral"("kind", "value");
+
+
+-- CreateTable
+CREATE TABLE "AgentWallet" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "agentId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "chain" TEXT NOT NULL,
+    "address" TEXT NOT NULL,
+    "source" TEXT NOT NULL DEFAULT 'bankr',
+    "verifiedAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "AgentWallet_agentId_fkey" FOREIGN KEY ("agentId") REFERENCES "HiredAgent" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "AgentWallet_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE INDEX "AgentWallet_userId_idx" ON "AgentWallet"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "AgentWallet_chain_address_key" ON "AgentWallet"("chain", "address");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "AgentWallet_agentId_chain_key" ON "AgentWallet"("agentId", "chain");
+
+-- CreateTable
+CREATE TABLE "Settlement" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "date" TEXT NOT NULL,
+    "rotatorDayId" TEXT,
+    "grossCents" INTEGER NOT NULL DEFAULT 0,
+    "currency" TEXT NOT NULL DEFAULT 'USD',
+    "simulated" BOOLEAN NOT NULL DEFAULT true,
+    "status" TEXT NOT NULL DEFAULT 'DRAFT',
+    "referrerUnassigned" BOOLEAN NOT NULL DEFAULT false,
+    "notes" TEXT,
+    "bankrJobId" TEXT,
+    "txRef" TEXT,
+    "confirmedAt" DATETIME,
+    "settledAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateIndex
+CREATE INDEX "Settlement_date_idx" ON "Settlement"("date");
+
+-- CreateIndex
+CREATE INDEX "Settlement_status_idx" ON "Settlement"("status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Settlement_rotatorDayId_key" ON "Settlement"("rotatorDayId");
+
+-- CreateTable
+CREATE TABLE "SettlementLine" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "settlementId" TEXT NOT NULL,
+    "role" TEXT NOT NULL,
+    "userId" TEXT,
+    "agentId" TEXT,
+    "walletAddress" TEXT,
+    "chain" TEXT,
+    "amountCents" INTEGER NOT NULL,
+    CONSTRAINT "SettlementLine_settlementId_fkey" FOREIGN KEY ("settlementId") REFERENCES "Settlement" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE INDEX "SettlementLine_settlementId_idx" ON "SettlementLine"("settlementId");

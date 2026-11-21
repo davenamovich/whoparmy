@@ -82,6 +82,7 @@ model User {
   agentRotators AgentRotator[]
   identityLinks IdentityLink[]
   pendingReferralsMade PendingReferral[] @relation("PendingReferrer")
+  agentWallets AgentWallet[]
 }
 
 // ─── Brand profiles (multiple allowed for agencies) ─────────────────
@@ -283,6 +284,7 @@ model HiredAgent {
   trafficDays AgentTrafficDay[]
   agentRotator AgentRotator?
   applications Application[]
+  wallets AgentWallet[]
 
   @@index([userId])
 }
@@ -1209,17 +1211,19 @@ model TelegramPairCode {
 // is an ALIAS bound to that root here. An alias belongs to exactly one
 // user, ever (@@unique([kind, value])): binding an already-bound alias
 // to a different user is refused, never a silent rebind
-// (lib/identity.ts). Written this slice: kind "telegram" (the Telegram
-// user id as a string), by the pair-verify flow. Reserved kinds from
-// ATTRIBUTION-SPINE-DESIGN-2026-11-21.md — documented, NOT written by
-// this slice: "telegram_bot_ref", "agent_game", "wallet_evm",
-// "wallet_btc" (wallet storage already lives in AgentWallet / the
-// User BTC address fields and is not duplicated here).
+// (lib/identity.ts). Written by Spine A: kind "telegram" (the Telegram
+// user id as a string), by the pair-verify flow. Written by the Bankr
+// connection slice (2026-11-21): "wallet_evm" (value = the EVM
+// address, lowercased), "wallet_solana" (value = the base58 address,
+// as-is) and "bankr_ref" (value = the Bankr referral code — the
+// arrival identity for Bankr links). Still reserved, NOT written:
+// "telegram_bot_ref", "agent_game", "wallet_btc" (BTC receive
+// addresses live on the User BTC fields and are not duplicated here).
 model IdentityLink {
   id         String    @id @default(cuid())
   userId     String
-  kind       String // "telegram" in this slice
-  value      String // telegram: the Telegram user id, as a string
+  kind       String // "telegram" | "wallet_evm" | "wallet_solana" | "bankr_ref"
+  value      String // telegram: user id string · wallet_evm: lowercase address · wallet_solana: base58 · bankr_ref: ref code
   verifiedAt DateTime?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
@@ -1228,6 +1232,89 @@ model IdentityLink {
 
   @@unique([kind, value])
   @@index([userId])
+}
+
+// ─── BANKR CONNECTION — agent wallet binding (2026-11-21) ───────────
+// The agent ↔ payout-address map for Bankr settlement. NOTE: earlier
+// comments referred to an "AgentWallet" table as if it existed — it
+// never did (the only wallet storage was the User BTC address
+// fields, which are user-level, BTC-only, and carry no chain / agent
+// / source semantics). This is that table, created by this slice.
+// An address serves exactly ONE agent per chain
+// (@@unique([chain, address])) so resolveWallet is deterministic;
+// the owner is denormalized from the agent row at bind time. The
+// user-level half of every binding is the IdentityLink above
+// (lib/wallet-bind.ts writes both, and refuses when the address is
+// bound to a different user). Addresses are PUBLIC receive addresses
+// only — the app never holds keys and never moves money; settlement
+// execution happens outside the server (operator + Bankr connector).
+model AgentWallet {
+  id         String    @id @default(cuid())
+  agentId    String
+  userId     String // owner, denormalized from HiredAgent.userId at bind time
+  chain      String // "evm" | "solana"
+  address    String // normalized: evm lowercased, solana base58 as-is
+  source     String    @default("bankr") // "bankr" in this slice
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  agent HiredAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([chain, address])
+  @@unique([agentId, chain])
+  @@index([userId])
+}
+
+// ─── BANKR CONNECTION — rotator split settlement ledger (2026-11-21) ─
+// One settlement per confirmed rotator day (rotatorDayId unique).
+// Dave's split: 25% Plunder & Riffle / 25% referrer / 50% agent
+// owner, keyed by the agent's rotator sub-ID (the HiredAgent id the
+// ?sub= stamp carries). Money stays SIMULATED: confirmed revenue is
+// $0 and today's auction settles in free generations, so drafts are
+// born simulated=true with grossCents=0 until an operator marks a
+// real payable event. Status flow is operator-driven only:
+// DRAFT → CONFIRMED → SETTLED (or VOID). Confirming produces a Bankr
+// instruction packet; SETTLED only records the refs of an execution
+// that happened OUTSIDE the server — the server never moves money
+// and never claims it did.
+model Settlement {
+  id                 String    @id @default(cuid())
+  date               String // ET calendar day, yyyy-mm-dd
+  rotatorDayId       String?   @unique
+  grossCents         Int       @default(0)
+  currency           String    @default("USD")
+  simulated          Boolean   @default(true)
+  status             String    @default("DRAFT") // DRAFT | CONFIRMED | SETTLED | VOID
+  referrerUnassigned Boolean   @default(false) // true when the winner's owner has no referrer — the 25% is recorded, never folded into another line
+  notes              String?
+  bankrJobId         String? // operator-recorded after executing via Bankr (outside the server)
+  txRef              String? // operator-recorded transaction reference
+  confirmedAt        DateTime?
+  settledAt          DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  lines SettlementLine[]
+
+  @@index([date])
+  @@index([status])
+}
+
+model SettlementLine {
+  id            String  @id @default(cuid())
+  settlementId  String
+  role          String // PR | REFERRER | OWNER
+  userId        String? // null on REFERRER when unassigned; null on PR until the house wallet is bound
+  agentId       String? // the agent's rotator sub-ID (HiredAgent.id) when the win came through an agent
+  walletAddress String? // resolved from bindings at build time; null = unbound (the packet refuses)
+  chain         String? // "evm" | "solana" — the network walletAddress lives on
+  amountCents   Int
+
+  settlement Settlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+
+  @@index([settlementId])
 }
 
 // A referral captured BEFORE the recruit has a Whop account: a
