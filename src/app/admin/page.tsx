@@ -7,6 +7,7 @@ import { BtcRealPanel } from "@/components/admin/btc-real-panel";
 import { RotatorAdmin } from "@/components/bridge/rotator-admin";
 import { RotatorSummaryCard } from "@/components/admin/rotator-summary-card";
 import { SettlementsCard } from "@/components/admin/settlements-card";
+import { BarryRotatorCard } from "@/components/admin/barry-rotator-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const runtime = "nodejs";
@@ -137,6 +138,13 @@ export default async function AdminPage() {
           nothing unless the operator-only APIs answer. */}
       <div className="mt-10">
         <SettlementsCard />
+      </div>
+
+      {/* Barry's rotator provisioning (Dave, 2026-11-21): one tap
+          creates Barry's AgentRotator + syncs the operator's saved
+          links, turning the Ride door on /agent/btc-barry live. */}
+      <div className="mt-10">
+        <BarryRotatorCard />
       </div>
 
       {/* Moved here from /bridge with the one-time-door overhaul

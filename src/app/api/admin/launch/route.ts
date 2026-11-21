@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionOperator } from "@/lib/site-gate";
 import { stackById } from "@/lib/stacks";
 import { getSavedDhMediaLink } from "@/lib/btc-addresses";
-import { ensureBarryAgent } from "@/lib/barry-agent";
+import { ensureBarryAgent, ensureBarryRotatorForOperator } from "@/lib/barry-agent";
 import { fillStackPrompt } from "@/lib/stack-prompt";
 import { ownBalanceBudget } from "@/lib/experiment-scope";
 import {
@@ -86,6 +86,15 @@ export async function POST(req: NextRequest) {
         await ensureBarryAgent(operator.id, operator.plan);
       } catch (err) {
         console.error("[launch] ensureBarryAgent failed:", err);
+      }
+      // Barry's rotator (Dave, 2026-11-21): this route is operator-
+      // only, so a launch also self-heals the operator Barry's
+      // AgentRotator + saved-link rotation. Best-effort, separately
+      // guarded — it must never eat a launch that already minted.
+      try {
+        await ensureBarryRotatorForOperator(operator.id);
+      } catch (err) {
+        console.error("[launch] ensureBarryRotator failed:", err);
       }
     }
     // One prompt builder for every hand-out (lib/stack-prompt.ts).

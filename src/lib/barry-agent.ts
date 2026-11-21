@@ -4,6 +4,13 @@ import { internalBotBudget } from "@/lib/agents";
 import { isDesignatedOperator } from "@/lib/auth";
 import { capabilitiesToJson } from "@/lib/agent-profile";
 import { BARRY_TEMPLATE_KEY, barryHireData, selectBarryRecord } from "@/lib/barry-agent-core";
+import {
+  provisionBarryRotator,
+  type BarryRotatorDb,
+  type EnsureBarryRotatorResult,
+} from "@/lib/barry-rotator-core";
+
+export type { EnsureBarryRotatorResult };
 
 /**
  * Whop Army 2.0, Slice 2: the HOUSE Barry — a designated operator's
@@ -81,4 +88,32 @@ export async function ensureBarryAgent(userId: string, planKey: string) {
   });
   await applyBarryProfileDefaults(created.id, userId);
   return db.hiredAgent.findUnique({ where: { id: created.id } });
+}
+
+/**
+ * Barry's rotator, for the DESIGNATED OPERATOR's Barry only (Dave,
+ * 2026-11-21): find-or-create his AgentRotator through the shared
+ * creation path and add-only sync his destinations from the
+ * operator's saved EngineLinks, so /agent/btc-barry's Ride door is
+ * live. Selection follows the house rule — the operator's OWN
+ * oldest btc-barry row (selectBarryRecord, exactly as
+ * ensureBarryAgent above) — and the provisioning flow itself lives
+ * in lib/barry-rotator-core.ts (provisionBarryRotator, structural
+ * db); this wrapper resolves the record and binds the real db.
+ *
+ * Callers run it best-effort exactly like ensureBarryAgent — a
+ * provisioning failure must never eat a launch or a kit mint — and
+ * ONLY for the operator: members' Barrys (and members' agents
+ * generally) provision through their own owner API, untouched.
+ */
+export async function ensureBarryRotatorForOperator(operatorUserId: string): Promise<EnsureBarryRotatorResult> {
+  const candidates = await db.hiredAgent.findMany({
+    where: { userId: operatorUserId, templateKey: BARRY_TEMPLATE_KEY },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+  });
+  const barry = selectBarryRecord(candidates);
+  return provisionBarryRotator(db as unknown as BarryRotatorDb, {
+    barry: barry ? { id: barry.id, name: barry.name, status: barry.status, expiresAt: barry.expiresAt } : null,
+    operatorUserId,
+  });
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getWhopUser, UnauthorizedError } from "@/lib/auth";
+import { getWhopUser, isDesignatedOperator, UnauthorizedError } from "@/lib/auth";
 import { stackById } from "@/lib/stacks";
-import { ensureBarryAgent } from "@/lib/barry-agent";
+import { ensureBarryAgent, ensureBarryRotatorForOperator } from "@/lib/barry-agent";
 import { fillStackPrompt } from "@/lib/stack-prompt";
 import { ownBalanceBudget } from "@/lib/experiment-scope";
 import {
@@ -46,6 +46,17 @@ export async function POST() {
       await ensureBarryAgent(user.id, user.plan);
     } catch (err) {
       console.error("[bridge/agent] ensureBarryAgent failed:", err);
+    }
+    // Barry's rotator self-heal — DESIGNATED OPERATOR ONLY (Dave,
+    // 2026-11-21). This kit route serves every member; a member's
+    // own Barry provisions through their owner rotator API, never
+    // here. Best-effort, separately guarded, same as above.
+    if (isDesignatedOperator(user)) {
+      try {
+        await ensureBarryRotatorForOperator(user.id);
+      } catch (err) {
+        console.error("[bridge/agent] ensureBarryRotator failed:", err);
+      }
     }
     const prompt = await fillStackPrompt(stack, user, minted.code);
     return NextResponse.json(

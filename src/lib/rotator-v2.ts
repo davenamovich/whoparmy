@@ -164,6 +164,23 @@ function etMidnight(date: string): Date {
 }
 
 /**
+ * Find-or-create an agent's rotator row — THE creation path for
+ * AgentRotator, shared by the member agent-rotator API (below) and
+ * Barry's provisioning (lib/barry-rotator.ts, which issues this
+ * exact upsert against its structural db). The create payload is
+ * only { agentId, userId }: mode (WEIGHTED) and enabled defaults
+ * live in the schema, and the signed serve code is derived from
+ * the row id at read time (mintAgentRotatorCode), never stored.
+ */
+export async function ensureAgentRotatorRow(agentId: string, userId: string) {
+  return db.agentRotator.upsert({
+    where: { agentId },
+    create: { agentId, userId },
+    update: {},
+  });
+}
+
+/**
  * Loads an agent's rotator and today's hop counts for its saved links.
  */
 export async function getAgentRotator(ownerUserId: string, agentId: string) {
@@ -172,11 +189,7 @@ export async function getAgentRotator(ownerUserId: string, agentId: string) {
     return null;
   }
 
-  const rotator = await db.agentRotator.upsert({
-    where: { agentId },
-    create: { agentId, userId: agent.userId },
-    update: {},
-  });
+  const rotator = await ensureAgentRotatorRow(agentId, agent.userId);
   const today = etDateString();
   const [links, hops] = await Promise.all([
     db.agentRotatorLink.findMany({
@@ -241,11 +254,7 @@ export async function updateAgentRotator(ownerUserId: string, agentId: string, i
     validated = validateLinkSet(new Set(owned.map((row) => row.id)), body.links);
     if (!validated.ok) return validated;
   }
-  const rotator = await db.agentRotator.upsert({
-    where: { agentId },
-    create: { agentId, userId: agent.userId },
-    update: {},
-  });
+  const rotator = await ensureAgentRotatorRow(agentId, agent.userId);
   await db.$transaction(async (tx) => {
     await tx.agentRotator.update({
       where: { id: rotator.id },
