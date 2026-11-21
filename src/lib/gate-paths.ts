@@ -32,8 +32,12 @@
  *  through the lib/agent-profile.ts serializer — no member data.
  *  /apps + /apps/{slug} are the Slice 3 applications showcase: same
  *  rule, only rows the owner marked public, through
- *  lib/application.ts — no member data. */
-export const GATE_EXEMPT_PATHS = ["/gate", "/connect", "/bridge", "/claim", "/agents", "/agent", "/apps"] as const;
+ *  lib/application.ts — no member data.
+ *  /rotator is the Slice 5 public rotator marketplace: it renders
+ *  only the public-safe marketplace serialization from
+ *  lib/rotator-market-server.ts (partner, display name, host) —
+ *  no member data. */
+export const GATE_EXEMPT_PATHS = ["/gate", "/connect", "/bridge", "/claim", "/agents", "/agent", "/apps", "/rotator"] as const;
 
 /** Pages a sign-in may return to (a subset of the exempt ones, plus
  *  home). /build (Whop Army 2.0, Slice 4) is a member page, not a

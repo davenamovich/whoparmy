@@ -16,7 +16,9 @@ import { stashRefFromUrl } from "@/lib/ref-stash";
  * Destinations are existing surfaces only:
  *   - DISCOVER AGENTS  -> /agents (the public agent directory,
  *                          Whop Army 2.0 Slice 2)
- *   - ENTER THE ROTATOR -> the live rotator serve (/api/bridge/rotator/go)
+ *   - ENTER THE ROTATOR -> /rotator (the public rotator marketplace,
+ *                          Whop Army 2.0 Slice 5; its house/default
+ *                          destination is The BTC Experiment)
  *   - BUILD AN AGENT    -> /build (the Build-an-Agent flow,
  *                          Whop Army 2.0 Slice 4: research → quiz →
  *                          agent → prompt + bridge code)
@@ -27,7 +29,7 @@ import { stashRefFromUrl } from "@/lib/ref-stash";
  */
 
 const DISCOVER_URL = "/agents";
-const ROTATOR_URL = "/api/bridge/rotator/go";
+const ROTATOR_URL = "/rotator";
 const BUILD_URL = "/build";
 const CONNECT_URL = "/api/auth/whop";
 

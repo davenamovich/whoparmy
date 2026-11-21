@@ -49,6 +49,13 @@ const PUBLIC_API_PREFIXES = [
   // credentials (session OR bridge bearer token) and is let through
   // by the method check in middleware() below, like /api/bridge/mcp.
   "/api/apps/public",
+  // Whop Army 2.0 public rotator marketplace (Slice 5, 2026-11-21):
+  // GET /api/rotator/today is read-only public JSON (public-safe
+  // serialization only) and GET /api/rotator/launch is a redirect
+  // surface in the same class as /api/bridge/rotator/go — the
+  // destination is resolved server-side, never taken from the query.
+  // No other routes exist under /api/rotator/.
+  "/api/rotator/",
   // The trends ingest route carries its own credential (x-trends-key)
   // and rejects bad keys with 401 inside the handler; the middleware
   // floor must not block it first (2026-11-19: the daily X-trends cron

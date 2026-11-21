@@ -4,13 +4,13 @@ import { isGateExempt, safeReturnPath } from "./gate-paths.ts";
 
 describe("isGateExempt", () => {
   it("keeps the game hand-off pages open", () => {
-    for (const p of ["/gate", "/connect", "/connect/ABCD-1234", "/bridge", "/claim", "/agents", "/agent/btc-barry", "/apps", "/apps/roofing-lead-finder"]) {
+    for (const p of ["/gate", "/connect", "/connect/ABCD-1234", "/bridge", "/claim", "/agents", "/agent/btc-barry", "/apps", "/apps/roofing-lead-finder", "/rotator"]) {
       assert.equal(isGateExempt(p), true, p);
     }
   });
 
   it("keeps everything else behind the gate", () => {
-    for (const p of ["/", "/admin", "/clips", "/muse-week", "/bridgex", "/claims", "/gateway", "/appsx", "/r/abc"]) {
+    for (const p of ["/", "/admin", "/clips", "/muse-week", "/bridgex", "/claims", "/gateway", "/appsx", "/rotatorx", "/r/abc"]) {
       assert.equal(isGateExempt(p), false, p);
     }
   });

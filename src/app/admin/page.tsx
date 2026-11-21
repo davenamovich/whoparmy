@@ -5,6 +5,7 @@ import { getStacks, API_KEY_UNLOCKS } from "@/lib/stacks";
 import { AdminPanel } from "@/components/admin/admin-panel";
 import { BtcRealPanel } from "@/components/admin/btc-real-panel";
 import { RotatorAdmin } from "@/components/bridge/rotator-admin";
+import { RotatorSummaryCard } from "@/components/admin/rotator-summary-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const runtime = "nodejs";
@@ -123,6 +124,12 @@ export default async function AdminPage() {
       {/* BTC Experiment — Real BTC (Dave, 2026-11-21). Internal rails
           only; renders nothing unless the operator-gated API answers. */}
       <BtcRealPanel />
+
+      {/* Whop Army 2.0 Slice 5: the public marketplace summary.
+          Renders nothing unless the operator-only summary API answers. */}
+      <div className="mt-10">
+        <RotatorSummaryCard />
+      </div>
 
       {/* Moved here from /bridge with the one-time-door overhaul
           (Dave, 2026-11-20). Renders nothing unless the operator-only
