@@ -9,6 +9,7 @@ import {
   normalizeOffersPayload,
   normalizedHost,
   partnerNameSync,
+  partnerPageUrl,
   verifyLinkHost,
   type CatalogPartner,
 } from "./offer-catalog.ts";
@@ -139,6 +140,16 @@ test("verifyLinkHost: local extras, missing offers and host-less examples are ex
   assert.deepEqual(verifyLinkHost(entry({ source: "local", example: "https://www.plunderandriffle.com/muse-invite" }), "https://anything.example/x"), { ok: true });
   assert.deepEqual(verifyLinkHost(entry({ missing: true, example: "" }), "https://higgsfield.ai/?ref=me"), { ok: true });
   assert.deepEqual(verifyLinkHost(entry({ example: "Your Freebuff referral link" }), "https://freebuff.com/get-started?ref=me"), { ok: true });
+});
+
+test("partnerPageUrl: the offsite P&R page from the record's slug, null without one", () => {
+  const cat = normalizeOffersPayload(LIVE_FIXTURE);
+  const a37 = cat.find((p) => p.key === "agent37_ref")!;
+  assert.equal(partnerPageUrl(a37), "https://www.plunderandriffle.com/agent37");
+  const dh = cat.find((p) => p.key === "salarium")!;
+  assert.equal(partnerPageUrl(dh), null); // no page in the record for DH Media
+  const muse = cat.find((p) => p.key === "muse")!;
+  assert.equal(partnerPageUrl(muse), null); // local extra has no record page
 });
 
 test("normalizedHost strips www and rejects junk", () => {

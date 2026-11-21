@@ -17,6 +17,10 @@ import {
   type BarryRotatorDb,
   type EnsureBarryRotatorResult,
 } from "@/lib/barry-rotator-core";
+import {
+  seedOperatorLinksFromOfferCatalog,
+  type CatalogSeedSource,
+} from "@/lib/operator-catalog-seed";
 
 export type { EnsureBarryRotatorResult };
 
@@ -166,15 +170,42 @@ export async function ensureBarryAgent(userId: string, planKey: string) {
  * generally) provision through their own owner API, untouched.
  */
 /** The provision result plus the guarded profile-copy refresh
- *  outcome (Dave, 2026-11-21) — the /admin card prints both. */
+ *  outcome and the P&R-record catalog pull (Dave, 2026-11-21) —
+ *  the /admin card prints all three. */
 export interface EnsureBarryRotatorWithProfileResult extends EnsureBarryRotatorResult {
   profileRefreshed: boolean;
   profileRefreshReason: string;
+  /** EngineLinks created by the catalog pull on this run — the
+   *  operator's P&R record links he had not already saved. */
+  catalogSeeded: number;
+  /** Which catalog rung served the pull, or "failed" (the pull is
+   *  best-effort: provisioning proceeded with existing links). */
+  catalogSource: CatalogSeedSource;
 }
 
 export async function ensureBarryRotatorForOperator(
   operatorUserId: string,
 ): Promise<EnsureBarryRotatorWithProfileResult> {
+  // FIRST: pull the operator's links from his P&R record (Dave,
+  // 2026-11-21: "Links should be pulled from P&R MCP"). The seed is
+  // create-only — partners he already saved (by hand or bridge
+  // sync) always win — and best-effort in its own guard: a catalog
+  // outage never blocks provisioning, it just reports "failed" and
+  // the sync below runs on whatever links already exist. It runs
+  // before the rotator sync and independent of Barry's gate: the
+  // links are the operator's setup data, populated whether or not
+  // Barry is currently working.
+  let catalogSeeded = 0;
+  let catalogSource: CatalogSeedSource = "failed";
+  try {
+    const seed = await seedOperatorLinksFromOfferCatalog(operatorUserId);
+    catalogSeeded = seed.seeded;
+    catalogSource = seed.source;
+  } catch (err) {
+    console.error("[barry] operator catalog seed failed:", err);
+  }
+  const catalog = { catalogSeeded, catalogSource };
+
   const candidates = await db.hiredAgent.findMany({
     where: { userId: operatorUserId, templateKey: BARRY_TEMPLATE_KEY },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
@@ -188,15 +219,15 @@ export async function ensureBarryRotatorForOperator(
   // provisioning actually proceeded (a working Barry): a refused
   // gate changes nothing at all.
   if (!barry) {
-    return { ...result, profileRefreshed: false, profileRefreshReason: "No Barry record — no profile copy to refresh." };
+    return { ...result, ...catalog, profileRefreshed: false, profileRefreshReason: "No Barry record — no profile copy to refresh." };
   }
   const gate = barryRotatorGate(
     { id: barry.id, name: barry.name, status: barry.status, expiresAt: barry.expiresAt },
     new Date(),
   );
   if (!gate.ok) {
-    return { ...result, profileRefreshed: false, profileRefreshReason: "Barry is not working — profile copy left as-is." };
+    return { ...result, ...catalog, profileRefreshed: false, profileRefreshReason: "Barry is not working — profile copy left as-is." };
   }
   const refresh = await refreshBarryProfileCopy(barry.id, operatorUserId);
-  return { ...result, profileRefreshed: refresh.profileRefreshed, profileRefreshReason: refresh.reason };
+  return { ...result, ...catalog, profileRefreshed: refresh.profileRefreshed, profileRefreshReason: refresh.reason };
 }

@@ -7,8 +7,10 @@ export const runtime = "nodejs";
 /**
  * OPERATOR ONLY — provision BTC Barry's rotator (Dave, 2026-11-21).
  *
- * POST runs ensureBarryRotator for the REQUESTING operator: find-or-
- * create the AgentRotator on their own btc-barry record (the shared
+ * POST runs ensureBarryRotator for the REQUESTING operator: first
+ * pull their links from their P&R record (the MCP offers catalog —
+ * create-only, lib/operator-catalog-seed.ts), then find-or-create
+ * the AgentRotator on their own btc-barry record (the shared
  * creation path, lib/rotator-v2.ts ensureAgentRotatorRow) and add-
  * only sync its destinations from their saved EngineLinks. Returns
  * the plain summary the /admin card prints. Idempotent — Dave taps

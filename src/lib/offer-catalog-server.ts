@@ -30,13 +30,25 @@ import {
 export const OFFER_CATALOG_TTL_MS = 15 * 60 * 1000;
 const SNAPSHOT_KEY = "offer-catalog:v1";
 
+/** Which rung of the freshness ladder served a catalog read —
+ *  reported by the operator catalog seed (lib/operator-catalog-
+ *  seed.ts) so /admin can say honestly where Barry's links were
+ *  pulled from. "cache" = the in-memory copy (whatever rung filled
+ *  it); the rest name the rung that produced the data on a miss. */
+export type OfferCatalogSource = "cache" | "live" | "snapshot" | "seed";
+
+export interface OfferCatalogResult {
+  partners: CatalogPartner[];
+  source: OfferCatalogSource;
+}
+
 interface Snapshot {
   fetchedAt: string;
   partners: CatalogPartner[];
 }
 
 let memoryCache: { fetchedAt: number; partners: CatalogPartner[] } | null = null;
-let inflight: Promise<CatalogPartner[]> | null = null;
+let inflight: Promise<OfferCatalogResult> | null = null;
 
 async function readSnapshot(): Promise<Snapshot | null> {
   try {
@@ -64,10 +76,11 @@ async function fetchFromMcp(): Promise<CatalogPartner[]> {
   return partners;
 }
 
-/** Resolve the catalog, refreshing from the MCP when the cache is stale. */
-export async function getOfferCatalog(now = Date.now()): Promise<CatalogPartner[]> {
+/** Resolve the catalog, refreshing from the MCP when the cache is
+ *  stale, and report which ladder rung served the data. */
+export async function getOfferCatalogWithSource(now = Date.now()): Promise<OfferCatalogResult> {
   if (memoryCache && now - memoryCache.fetchedAt < OFFER_CATALOG_TTL_MS) {
-    return memoryCache.partners;
+    return { partners: memoryCache.partners, source: "cache" };
   }
   if (inflight) return inflight;
   inflight = (async () => {
@@ -76,7 +89,7 @@ export async function getOfferCatalog(now = Date.now()): Promise<CatalogPartner[
       memoryCache = { fetchedAt: Date.now(), partners };
       setActiveCatalog(partners);
       await writeSnapshot(partners);
-      return partners;
+      return { partners, source: "live" as const };
     } catch {
       // Engine unreachable / unconfigured: last-good snapshot, then seed.
       const snapshot = await readSnapshot();
@@ -85,12 +98,22 @@ export async function getOfferCatalog(now = Date.now()): Promise<CatalogPartner[
       // every request, but retry well before the full TTL.
       memoryCache = { fetchedAt: Date.now() - (OFFER_CATALOG_TTL_MS - 60_000), partners };
       setActiveCatalog(partners);
-      return partners;
+      // The rung label names where the DATA came from: the stored
+      // snapshot when one exists; otherwise the last-resort seed
+      // (the in-memory active catalog in that path is the seed, or a
+      // stale copy of an earlier fetch — labeled "seed" so the label
+      // never overstates freshness).
+      return { partners, source: snapshot ? ("snapshot" as const) : ("seed" as const) };
     } finally {
       inflight = null;
     }
   })();
   return inflight;
+}
+
+/** Resolve the catalog, refreshing from the MCP when the cache is stale. */
+export async function getOfferCatalog(now = Date.now()): Promise<CatalogPartner[]> {
+  return (await getOfferCatalogWithSource(now)).partners;
 }
 
 /** Test/dev seam: drop the in-memory cache so the next read refetches. */

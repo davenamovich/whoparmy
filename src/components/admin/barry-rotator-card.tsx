@@ -14,6 +14,8 @@ interface ProvisionSummary {
   leadNames?: string[];
   profileRefreshed?: boolean;
   profileRefreshReason?: string;
+  catalogSeeded?: number;
+  catalogSource?: string;
 }
 
 /**
@@ -55,12 +57,14 @@ export function BarryRotatorCard() {
       <CardHeader>
         <CardTitle>Barry&apos;s rotator</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Provisions BTC Barry&apos;s agent rotator from your saved links — that is what turns the Ride door on{" "}
-          <span className="font-mono">/agent/btc-barry</span> live. Links come only from your saved EngineLinks
-          (never a typed-in URL), existing rotation state is kept, and re-running only adds what is missing. Your
-          Muse and Agent37 links lead the rotation at triple weight — offers rotate behind them, never in front.
-          The same tap refreshes Barry&apos;s profile copy to the outcome-led defaults when it still carries the
-          old house copy untouched.
+          Provisions BTC Barry&apos;s agent rotator — that is what turns the Ride door on{" "}
+          <span className="font-mono">/agent/btc-barry</span> live. First it pulls your links from your P&amp;R
+          record (the MCP offers catalog): any partner you have not saved yet is added from the record, and links
+          you already saved are never overwritten. Then the rotation syncs add-only from those saved links —
+          existing rotation state is kept, and re-running only adds what is missing. Your Muse and Agent37 links
+          lead the rotation at triple weight — offers rotate behind them, never in front. The same tap refreshes
+          Barry&apos;s profile copy to the outcome-led defaults when it still carries the old house copy
+          untouched.
         </p>
       </CardHeader>
       <CardContent>
@@ -77,6 +81,17 @@ export function BarryRotatorCard() {
           )}
         </div>
         {error && <p className="mt-3 text-sm text-amber-600 dark:text-amber-400">{error}</p>}
+        {summary?.catalogSource &&
+          (summary.catalogSource === "failed" ? (
+            <p className="mt-3 text-sm text-muted-foreground">
+              Links pull from your P&amp;R record failed — provisioned with the links already saved.
+            </p>
+          ) : (
+            <p className="mt-3 text-sm text-muted-foreground">
+              Links pulled from your P&amp;R record: {summary.catalogSeeded ?? 0} added (source:{" "}
+              {summary.catalogSource}).
+            </p>
+          ))}
         {summary && <p className="mt-3 text-sm text-muted-foreground">{summary.detail}</p>}
         {summary?.profileRefreshReason && (
           <p className="mt-2 text-sm text-muted-foreground">Profile: {summary.profileRefreshReason}</p>

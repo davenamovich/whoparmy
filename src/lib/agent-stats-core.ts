@@ -95,11 +95,16 @@ export interface PublicAgentStats {
  * them — populated when their Muse connected via the bridge and
  * synced their offers (POST /api/bridge/links/sync from their
  * list_my_offers) — so the owner's attribution rides along. The
- * house URLs below are the fallback for owners with no such link
- * saved: the muse-invite page carries the house invite code by
- * design, and /agent37 is the P&R Agent37 partner page. Per-link
- * resolution: each of the two links resolves independently, and
- * each carries its source so consumers can tell whose link it is.
+ * house fallback for owners with no such link saved is itself
+ * pulled from the P&R record (Dave, 2026-11-21: links come from
+ * the MCP): the server layer resolves it from the offers catalog —
+ * Muse from the catalog's muse entry, Agent37 from the catalog's
+ * agent37 page (www.plunderandriffle.com/agent37) — and the
+ * constants below survive only as the last-resort seed when the
+ * catalog has neither. The muse-invite page carries the house
+ * invite code by design. Per-link resolution: each of the two
+ * links resolves independently, and each carries its source so
+ * consumers can tell whose link it is.
  */
 export const HOUSE_CTA = {
   museUrl: "https://www.plunderandriffle.com/muse-invite",
@@ -119,18 +124,32 @@ export interface HouseCta {
 }
 
 /** Owner-first resolution, per link: the owner's own link wins when
- *  present (non-empty), the house URL otherwise. */
-export function resolveHouseCta(ownerLinks: {
-  museUrl?: string | null;
-  agent37Url?: string | null;
-}): HouseCta {
+ *  present (non-empty); otherwise the house fallback the server
+ *  resolved from the offers catalog (houseFallback), with the
+ *  HOUSE_CTA constants as the last-resort seed. Either way the
+ *  fallback reports source "house" — the public shape never
+ *  changes, only where the fallback URL came from. */
+export function resolveHouseCta(
+  ownerLinks: {
+    museUrl?: string | null;
+    agent37Url?: string | null;
+  },
+  houseFallback?: {
+    museUrl?: string | null;
+    agent37Url?: string | null;
+  },
+): HouseCta {
   const muse = ownerLinks.museUrl?.trim();
   const agent37 = ownerLinks.agent37Url?.trim();
+  const fallbackMuse = houseFallback?.museUrl?.trim();
+  const fallbackAgent37 = houseFallback?.agent37Url?.trim();
   return {
-    muse: muse ? { url: muse, source: "owner" } : { url: HOUSE_CTA.museUrl, source: "house" },
+    muse: muse
+      ? { url: muse, source: "owner" }
+      : { url: fallbackMuse || HOUSE_CTA.museUrl, source: "house" },
     agent37: agent37
       ? { url: agent37, source: "owner" }
-      : { url: HOUSE_CTA.agent37Url, source: "house" },
+      : { url: fallbackAgent37 || HOUSE_CTA.agent37Url, source: "house" },
   };
 }
 

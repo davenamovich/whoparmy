@@ -106,6 +106,17 @@ export function migratePartnerKey(key: string): string {
   return PARTNER_KEY_MIGRATION[key] ?? key;
 }
 
+/**
+ * The partner's public page on plunderandriffle.com, when the MCP
+ * record carries one (pages[].slug joined on saveAs). This is the
+ * OFFSITE P&R page a CTA points at — distinct from `example`, which
+ * is the affiliate DESTINATION link a saved EngineLink stores.
+ * Null when the record has no page for the step.
+ */
+export function partnerPageUrl(partner: CatalogPartner): string | null {
+  return partner.pageSlug ? `https://www.plunderandriffle.com/${partner.pageSlug}` : null;
+}
+
 // ─── Active catalog (sync access for pure consumers) ────────────────
 // The server half refreshes this from the MCP; until the first
 // refresh lands it is the seed. Sync consumers (rotator house pool,

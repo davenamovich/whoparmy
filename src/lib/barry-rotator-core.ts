@@ -208,8 +208,19 @@ export function planAddOnlyLinkSync(
   }
 
   const missing = owned.filter((l) => !inRotator.has(l.id));
+  // Lead additions are ordered canonically (Muse before Agent37 —
+  // the order the summary names them), stable within each lead, so
+  // the front of a fresh rotation does not depend on the order the
+  // links happened to be saved in (the catalog seed creates them in
+  // one pass, often inside the same millisecond).
+  const leadRank = (partner: string): number => {
+    const idx = LEAD_DISPLAY_NAMES.findIndex((entry) => entry.keys.includes(partner));
+    return idx === -1 ? LEAD_DISPLAY_NAMES.length : idx;
+  };
   const ordered = [
-    ...missing.filter((l) => isLeadPartner(l.partner)),
+    ...missing
+      .filter((l) => isLeadPartner(l.partner))
+      .sort((a, b) => leadRank(a.partner) - leadRank(b.partner)),
     ...missing.filter((l) => !isLeadPartner(l.partner)),
   ];
   const toAdd: Array<{ engineLinkId: string; position: number; weight: number }> = [];

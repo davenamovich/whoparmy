@@ -27,6 +27,8 @@ import {
   resolveSigningSecret,
   rotatorV2Enabled,
 } from "@/lib/rotator-v2-core";
+import { getOfferCatalog } from "@/lib/offer-catalog-server";
+import { partnerPageUrl } from "@/lib/offer-catalog";
 
 /**
  * ─── PUBLIC AGENT STATS — server layer ──────────────────────────────
@@ -63,7 +65,7 @@ export async function getPublicAgentBundles(
   const todayEt = etDateStringFrom(now);
   const sevenDaysAgo = new Date(now.getTime() - SEVEN_DAYS_MS);
 
-  const [agents, { allotment }, rotators] = await Promise.all([
+  const [agents, { allotment }, rotators, catalog] = await Promise.all([
     db.hiredAgent.findMany({
       where: { id: { in: ids } },
       select: { id: true, userId: true, status: true, expiresAt: true, createdAt: true },
@@ -73,7 +75,20 @@ export async function getPublicAgentBundles(
       where: { agentId: { in: ids } },
       select: { id: true, agentId: true, enabled: true },
     }),
+    // The house CTA fallback is pulled from the P&R record too
+    // (Dave, 2026-11-21): Muse from the catalog's muse entry,
+    // Agent37 from the catalog's agent37 partner PAGE — the same
+    // www.plunderandriffle.com/agent37 the old constant named, now
+    // sourced from the record. The catalog ladder never throws by
+    // design; the catch keeps the constants as last resort anyway.
+    getOfferCatalog().catch(() => null),
   ]);
+  const museEntry = catalog?.find((p) => p.key === "muse");
+  const agent37Entry = catalog?.find((p) => p.key === "agent37_ref");
+  const houseFallback = {
+    museUrl: museEntry && !museEntry.missing ? museEntry.example : null,
+    agent37Url: agent37Entry ? partnerPageUrl(agent37Entry) : null,
+  };
 
   // ── Hops, merged per agent per surface ────────────────────────────
   // Keyed by ROTATOR, not by the hop's agentId: a counted hop counts
@@ -221,7 +236,7 @@ export async function getPublicAgentBundles(
         rotator: access,
         dailyRotatorUrl: "/rotator",
         ownRotatorUrl: "/bridge",
-        houseCta: resolveHouseCta(ctaByOwner.get(agent.userId) ?? {}),
+        houseCta: resolveHouseCta(ctaByOwner.get(agent.userId) ?? {}, houseFallback),
       },
     });
   }

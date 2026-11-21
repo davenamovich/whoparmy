@@ -327,6 +327,22 @@ describe("planAddOnlyLinkSync", () => {
     assert.equal(plan.leadSource, null);
   });
 
+  it("orders lead additions canonically (Muse before Agent37) regardless of saved order", () => {
+    // The catalog seed creates the operator's links in one pass —
+    // saved order between the two leads is arbitrary, the front of
+    // the rotation is not.
+    const plan = planAddOnlyLinkSync([], [
+      { id: "a37", partner: "agent37_ref", source: "pr-mcp" },
+      { id: "fish", partner: "fish-audio", source: "manual" },
+      { id: "muse", partner: "muse", source: "pr-mcp" },
+    ]);
+    assert.deepEqual(plan.toAdd, [
+      { engineLinkId: "muse", position: 0, weight: 3 },
+      { engineLinkId: "a37", position: 1, weight: 3 },
+      { engineLinkId: "fish", position: 2, weight: 1 },
+    ]);
+  });
+
   it("adds nothing when every saved link is already in the rotator", () => {
     const plan = planAddOnlyLinkSync(
       [{ engineLinkId: "a", position: 3, weight: 1 }],

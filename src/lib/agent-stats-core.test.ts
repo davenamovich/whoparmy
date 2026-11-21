@@ -47,6 +47,36 @@ describe("resolveHouseCta — owner-first, per link (Dave, 2026-11-21)", () => {
     assert.equal(cta.muse.source, "house");
     assert.equal(cta.agent37.source, "house");
   });
+
+  it("house fallback comes from the catalog when the server supplies one (still source house)", () => {
+    // The fallback URLs are pulled from the P&R record (offers
+    // catalog) by the server layer; the shape and the "house"
+    // source label do not change — only the fallback's origin.
+    const cta = resolveHouseCta(
+      {},
+      {
+        museUrl: "https://www.plunderandriffle.com/muse-invite",
+        agent37Url: "https://www.plunderandriffle.com/agent37",
+      },
+    );
+    assert.deepEqual(cta.muse, { url: "https://www.plunderandriffle.com/muse-invite", source: "house" });
+    assert.deepEqual(cta.agent37, { url: "https://www.plunderandriffle.com/agent37", source: "house" });
+  });
+
+  it("owner links still beat the catalog fallback, per link", () => {
+    const cta = resolveHouseCta(
+      { agent37Url: "https://www.agent37.com/?via=owner" },
+      { museUrl: "https://catalog.example/muse", agent37Url: "https://catalog.example/a37" },
+    );
+    assert.deepEqual(cta.muse, { url: "https://catalog.example/muse", source: "house" });
+    assert.deepEqual(cta.agent37, { url: "https://www.agent37.com/?via=owner", source: "owner" });
+  });
+
+  it("blank catalog fallback degrades to the constants", () => {
+    const cta = resolveHouseCta({}, { museUrl: " ", agent37Url: null });
+    assert.deepEqual(cta.muse, { url: HOUSE_CTA.museUrl, source: "house" });
+    assert.deepEqual(cta.agent37, { url: HOUSE_CTA.agent37Url, source: "house" });
+  });
 });
 
 describe("summarizeAgentHops", () => {
