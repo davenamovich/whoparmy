@@ -35,8 +35,11 @@
  *  lib/application.ts — no member data. */
 export const GATE_EXEMPT_PATHS = ["/gate", "/connect", "/bridge", "/claim", "/agents", "/agent", "/apps"] as const;
 
-/** Pages a sign-in may return to (a subset of the exempt ones, plus home). */
-const RETURN_PATHS = new Set(["/", "/bridge", "/claim"]);
+/** Pages a sign-in may return to (a subset of the exempt ones, plus
+ *  home). /build (Whop Army 2.0, Slice 4) is a member page, not a
+ *  gate hand-off — it is NOT gate-exempt — but a member who signs in
+ *  from its Connect card should land back on the flow, not home. */
+const RETURN_PATHS = new Set(["/", "/bridge", "/claim", "/build"]);
 
 const MAX_RETURN_LENGTH = 1000;
 

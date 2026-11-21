@@ -1,0 +1,390 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { ArrowRight, Check, Copy, Loader2 } from "lucide-react";
+import { BUILD_QUIZ, type BuildQuizAnswers } from "@/lib/build-agent";
+import { stashRefFromUrl } from "@/lib/ref-stash";
+
+/**
+ * ─── /build — the Build-an-Agent flow (Whop Army 2.0, Slice 4) ─────
+ * Dave's order: deep research about the user → a short interactive
+ * quiz → build their agent → they get the prompt (+ their bridge
+ * code), built on the Super Muse base, and their own Muse builds
+ * out their Spaces so they hit the ground running.
+ *
+ * Member page: signed-out visitors see only a Connect card (the
+ * bridge pattern); every API is session-authenticated and the flow
+ * state is per-member (AppSetting buildflow:<userId>). Research runs
+ * on the existing background research lane — this page polls.
+ */
+
+type Session = { connected: boolean; admin: boolean; user: { name: string | null; whopUsername: string | null } | null };
+
+interface FlowResearch {
+  analysisSummary?: string;
+  offer?: string;
+  audience?: string;
+  voice?: string;
+  pains?: string[];
+  angles?: string[];
+  competitors?: string[];
+}
+
+interface FlowState {
+  website?: string;
+  brandName?: string;
+  researchStatus?: "running" | "done" | "failed" | "reused";
+  researchNote?: string;
+  research?: FlowResearch | null;
+  quizAnswers?: BuildQuizAnswers;
+  agentId?: string;
+  agentSlug?: string;
+  prompt?: string;
+  promptCreatedAt?: string;
+  bridgeEligible?: boolean;
+}
+
+interface CreateResult {
+  agent: { id: string; name: string; slug: string | null; category: string | null; capabilities: string[]; description: string | null };
+  prompt: string;
+  bridgeCode: string | null;
+  connectLink: string | null;
+  bridgeEligible: boolean;
+}
+
+const step = "rounded-2xl border border-border bg-card p-5 sm:p-6 space-y-3";
+const label = "font-mono text-[11px] font-semibold tracking-[0.18em] text-primary uppercase";
+
+function CopyButton({ text, children }: { text: string; children: React.ReactNode }) {
+  const [done, setDone] = useState(false);
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => {
+        void navigator.clipboard
+          .writeText(text)
+          .then(() => {
+            setDone(true);
+            setTimeout(() => setDone(false), 1600);
+          })
+          .catch(() => undefined);
+      }}
+    >
+      {done ? <Check className="h-4 w-4 mr-1.5" /> : <Copy className="h-4 w-4 mr-1.5" />}
+      {done ? "Copied" : children}
+    </Button>
+  );
+}
+
+export default function BuildPage() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [state, setState] = useState<FlowState | null>(null);
+  const [website, setWebsite] = useState("");
+  const [brandName, setBrandName] = useState("");
+  const [answers, setAnswers] = useState<BuildQuizAnswers>({});
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [created, setCreated] = useState<CreateResult | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const loadState = useCallback(async () => {
+    const res = await fetch("/api/build-agent", { cache: "no-store" });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { state: FlowState | null };
+    if (data.state) {
+      setState(data.state);
+      if (data.state.website) setWebsite(data.state.website);
+      if (data.state.brandName) setBrandName(data.state.brandName);
+      if (data.state.quizAnswers) setAnswers(data.state.quizAnswers);
+    }
+    return data.state;
+  }, []);
+
+  useEffect(() => {
+    stashRefFromUrl();
+    void fetch("/api/auth/session", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((s: Session) => {
+        setSession(s);
+        if (s.connected) void loadState();
+      })
+      .catch(() => setSession({ connected: false, admin: false, user: null }));
+  }, [loadState]);
+
+  // Poll while research is running (the lane takes ~2 minutes).
+  useEffect(() => {
+    if (state?.researchStatus !== "running") {
+      if (pollRef.current) clearInterval(pollRef.current);
+      pollRef.current = null;
+      return;
+    }
+    if (!pollRef.current) {
+      pollRef.current = setInterval(() => void loadState(), 4000);
+    }
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      pollRef.current = null;
+    };
+  }, [state?.researchStatus, loadState]);
+
+  async function call(path: string, init: RequestInit, busyKey: string) {
+    setBusy(busyKey);
+    setError(null);
+    try {
+      const res = await fetch(path, { ...init, headers: { "Content-Type": "application/json" } });
+      const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Something went wrong. Try again.");
+      return data;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong. Try again.");
+      return null;
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function startResearch() {
+    const data = await call("/api/build-agent/research", { method: "POST", body: JSON.stringify({ website, brandName }) }, "research");
+    if (data?.state) setState(data.state as FlowState);
+  }
+
+  async function saveQuiz() {
+    const data = await call("/api/build-agent/quiz", { method: "POST", body: JSON.stringify({ answers }) }, "quiz");
+    if (data?.state) setState(data.state as FlowState);
+  }
+
+  async function buildAgent() {
+    const data = await call("/api/build-agent/create", { method: "POST", body: JSON.stringify({}) }, "create");
+    if (data) {
+      setCreated(data as unknown as CreateResult);
+      void loadState();
+    }
+  }
+
+  const researchDone = state?.researchStatus === "done" || state?.researchStatus === "reused";
+  const quizSaved = Boolean(state?.quizAnswers);
+  const prompt = created?.prompt ?? state?.prompt ?? null;
+  const agentName = created?.agent.name ?? null;
+
+  return (
+    <main className="min-h-screen bg-background text-foreground">
+      <div className="mx-auto max-w-2xl px-5 py-14 sm:py-20 space-y-10">
+        <header>
+          <p translate="no" className="text-xs font-black tracking-[0.14em]">
+            PLUNDER <span className="text-primary">&amp;</span> RIFFLE
+          </p>
+        </header>
+
+        {session === null ? (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground" aria-label="Loading">
+            <Loader2 className="h-4 w-4 animate-spin" />
+          </p>
+        ) : !session.connected ? (
+          <section className={step}>
+            <p className={label}>Build an agent</p>
+            <h1 className="text-3xl font-black tracking-tight">First, sign in.</h1>
+            <p className="text-muted-foreground leading-relaxed">
+              The build starts from deep research on your business and a short quiz — both tied to your account, so
+              sign in with Whop first. It takes one sitting.
+            </p>
+            <Button asChild>
+              <a href="/api/auth/whop?next=%2Fbuild">
+                Sign in with Whop <ArrowRight className="h-4 w-4 ml-1.5" />
+              </a>
+            </Button>
+          </section>
+        ) : (
+          <>
+            <section className="space-y-3">
+              <p className={label}>Whop Army · Build an agent</p>
+              <h1 className="text-4xl sm:text-5xl font-black leading-[1.02] tracking-tight">We research. You answer 7 questions. Your agent gets built.</h1>
+              <p className="text-muted-foreground leading-relaxed">
+                Deep research on your business, a short quiz, and an agent designed from both — then the prompt and
+                bridge code that let your own Muse build out your Spaces, so you hit the ground running.
+              </p>
+            </section>
+
+            {error ? (
+              <p role="alert" className="rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm">
+                {error}
+              </p>
+            ) : null}
+
+            {/* ─── Step 1 · Research ─────────────────────────────── */}
+            <section className={step} aria-label="Step 1: research">
+              <p className={label}>1 · Deep research</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Your website is the starting point — the same deep research every Whop Army agent works from. It
+                takes about two minutes.
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://yourbusiness.com" aria-label="Your website" />
+                <Input value={brandName} onChange={(e) => setBrandName(e.target.value)} placeholder="Business name (optional)" aria-label="Business name" className="sm:max-w-52" />
+                <Button onClick={() => void startResearch()} disabled={busy !== null || !website.trim()}>
+                  {busy === "research" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Research my business"}
+                </Button>
+              </div>
+              {state?.researchStatus === "running" ? (
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Researching — this page checks back on its own.
+                </p>
+              ) : null}
+              {state?.researchStatus === "failed" ? (
+                <p className="text-sm text-destructive">{state.researchNote ?? "Research failed — run it again."}</p>
+              ) : null}
+              {researchDone ? (
+                <Card>
+                  <CardContent className="space-y-2 pt-5 text-sm leading-relaxed">
+                    <p className="font-semibold">{state?.brandName ?? "Your business"} — research on file</p>
+                    {state?.research?.analysisSummary ? <p>{state.research.analysisSummary}</p> : null}
+                    {state?.research?.offer ? (
+                      <p>
+                        <span className="text-muted-foreground">Offer:</span> {state.research.offer}
+                      </p>
+                    ) : null}
+                    {state?.research?.audience ? (
+                      <p>
+                        <span className="text-muted-foreground">Audience:</span> {state.research.audience}
+                      </p>
+                    ) : null}
+                    {state?.researchNote ? <p className="text-muted-foreground">{state.researchNote}</p> : null}
+                  </CardContent>
+                </Card>
+              ) : null}
+            </section>
+
+            {/* ─── Step 2 · Quiz ─────────────────────────────────── */}
+            <section className={step} aria-label="Step 2: quiz">
+              <p className={label}>2 · The short quiz — 7 questions</p>
+              {BUILD_QUIZ.map((q) => (
+                <fieldset key={q.id} className="space-y-2">
+                  <legend className="text-sm font-semibold">{q.prompt}</legend>
+                  {q.kind === "choice" ? (
+                    <div className="flex flex-wrap gap-2">
+                      {q.options!.map((o) => {
+                        const active = answers[q.id as keyof BuildQuizAnswers] === o.id;
+                        return (
+                          <button
+                            key={o.id}
+                            type="button"
+                            title={o.hint}
+                            onClick={() => setAnswers((a) => ({ ...a, [q.id]: o.id }))}
+                            className={`rounded-full border px-3.5 py-1.5 text-sm transition-colors ${
+                              active ? "border-primary bg-primary text-primary-foreground font-semibold" : "border-border hover:border-primary/60"
+                            }`}
+                          >
+                            {o.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <Input
+                      value={(answers[q.id as keyof BuildQuizAnswers] as string | undefined) ?? ""}
+                      onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
+                      placeholder={q.placeholder}
+                      maxLength={q.maxLength}
+                      aria-label={q.prompt}
+                    />
+                  )}
+                </fieldset>
+              ))}
+              <Button onClick={() => void saveQuiz()} disabled={busy !== null} variant={quizSaved ? "outline" : "default"}>
+                {busy === "quiz" ? <Loader2 className="h-4 w-4 animate-spin" /> : quizSaved ? "Quiz saved — update it" : "Save my answers"}
+              </Button>
+              {quizSaved ? <p className="text-sm text-muted-foreground">Saved. Your agent is designed from these answers plus the research.</p> : null}
+            </section>
+
+            {/* ─── Step 3 · Build + delivery ─────────────────────── */}
+            <section className={step} aria-label="Step 3: build your agent">
+              <p className={label}>3 · Build your agent</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                One tap designs your agent from the research + quiz, creates it on your account (its public profile
+                stays off until you publish it), writes your personalized build prompt, and mints your bridge code.
+              </p>
+              <Button onClick={() => void buildAgent()} disabled={busy !== null || !researchDone || !quizSaved}>
+                {busy === "create" ? <Loader2 className="h-4 w-4 animate-spin" /> : state?.agentId ? "Rebuild prompt + fresh code" : "Build my agent"}
+              </Button>
+              {!researchDone || !quizSaved ? (
+                <p className="text-sm text-muted-foreground">
+                  {!researchDone ? "Finish step 1 (research) " : ""}
+                  {!researchDone && !quizSaved ? "and " : ""}
+                  {!quizSaved ? "step 2 (save the quiz) " : ""}
+                  first.
+                </p>
+              ) : null}
+
+              {prompt ? (
+                <div className="space-y-4 pt-2">
+                  <Card>
+                    <CardContent className="space-y-2 pt-5 text-sm leading-relaxed">
+                      <p className="font-semibold">{agentName ?? "Your agent"} is created</p>
+                      <p className="text-muted-foreground">
+                        Its profile is prefilled from your research and answers, and stays private until you publish
+                        it
+                        {state?.agentSlug ? (
+                          <>
+                            {" "}
+                            — it will live at <span className="font-mono">/agent/{state.agentSlug}</span>
+                          </>
+                        ) : null}
+                        .
+                      </p>
+                      {created ? (
+                        created.bridgeEligible && created.bridgeCode ? (
+                          <p>
+                            Bridge code: <span className="font-mono font-bold">{created.bridgeCode}</span>
+                            <br />
+                            <span className="text-muted-foreground">
+                              Connect link: <span className="font-mono">{created.connectLink}</span> — 7 days, on your
+                              own credits, content-only.
+                            </span>
+                          </p>
+                        ) : (
+                          <p className="text-muted-foreground">
+                            The bridge is an Operator + Agency offer, so no code was minted on your current plan —
+                            the prompt itself tells your Muse the one step to get your link when you're ready.
+                          </p>
+                        )
+                      ) : (
+                        <p className="text-muted-foreground">
+                          Your prompt from before is below. Bridge codes retire when a new one is minted — tap
+                          “Rebuild prompt + fresh code” above for a fresh one.
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <div>
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-sm font-semibold">Your build prompt</p>
+                      <CopyButton text={prompt}>Copy the prompt</CopyButton>
+                    </div>
+                    <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-border bg-muted/40 p-4 font-mono text-xs leading-relaxed">
+                      {prompt}
+                    </pre>
+                  </div>
+
+                  <ol className="list-decimal space-y-1.5 pl-5 text-sm leading-relaxed text-muted-foreground">
+                    <li>Open Super Muse in your Muse (it comes with your membership — the prompt is built on it).</li>
+                    <li>Paste the prompt — or open the connect link — and give it your “go” on the quoted budget.</li>
+                    <li>Watch your Spaces get built out, pre-populated from your research, with your first work waiting for your approval.</li>
+                  </ol>
+                </div>
+              ) : null}
+            </section>
+          </>
+        )}
+
+        <footer className="border-t border-border/60 pt-6 text-xs text-muted-foreground">
+          Nothing publishes, sends or spends without your yes on that item. Affiliate and referral money shown anywhere
+          is simulated until it&apos;s actually paid. Nothing is guaranteed.
+        </footer>
+      </div>
+    </main>
+  );
+}

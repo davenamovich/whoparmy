@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getWhopUser, isDesignatedOperator, UnauthorizedError } from "@/lib/auth";
+import { verifyBridgeToken } from "@/lib/muse-bridge";
 import { isGrantExpired } from "@/lib/bot-grants";
 import { toolsFromJson, toolsToJson } from "@/lib/agent-architect-core";
 import { capabilitiesToJson, isAgentCategory, isHttpUrl, isValidSlug, slugify } from "@/lib/agent-profile";
@@ -9,10 +10,40 @@ export const runtime = "nodejs";
 
 /** Pause/resume one of your hired agents, or update its Factory
  *  settings (name, role, instructions, tools) from the control
- *  center's Settings tab. */
+ *  center's Settings tab.
+ *
+ *  Two auth paths (Whop Army 2.0, Slice 4 addition — Dave: "can
+ *  their Muse connect with their agent via the bridge code in Whop
+ *  to make changes?"):
+ *   (a) Session — as before; designated operators may also manage
+ *       house agents.
+ *   (b) Bridge token — `Authorization: Bearer prb_…` from the
+ *       member's own Muse (verified by lib/muse-bridge
+ *       verifyBridgeToken). OWNER-ONLY: the token's user must own
+ *       the agent, no operator override. The token path may update
+ *       the agent's PROFILE/design fields only (name, description,
+ *       category, capabilities, avatarUrl, demoUrl, appUrl, gitUrl,
+ *       buildPrompt, spaceUrl, publicProfile) — never status, role,
+ *       instructions, tools, slug, ownership, budgets or agent37Ref.
+ *       This is agent-record management, not content publishing:
+ *       the bridge's content-only posting rule is untouched. */
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await getWhopUser();
+    const auth = req.headers.get("authorization") ?? "";
+    const bearer = /^Bearer\s+(\S+)$/i.exec(auth.trim())?.[1] ?? null;
+    let actorId: string;
+    let operator = false;
+    let viaToken = false;
+    if (bearer) {
+      const bridgeSession = await verifyBridgeToken(bearer);
+      if (!bridgeSession) return NextResponse.json({ error: "Invalid or expired bridge token." }, { status: 401 });
+      actorId = bridgeSession.user.id;
+      viaToken = true;
+    } else {
+      const user = await getWhopUser();
+      actorId = user.id;
+      operator = isDesignatedOperator(user);
+    }
     const { id } = await params;
     const body = (await req.json()) as {
       status?: string;
@@ -35,10 +66,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     };
     const hire = await db.hiredAgent.findFirst({ where: { id } });
     if (!hire) return NextResponse.json({ error: "Bot not found." }, { status: 404 });
-    // Owner-only, except designated operators (who manage house
-    // agents like BTC Barry). Everyone else is refused outright.
-    if (hire.userId !== user.id && !isDesignatedOperator(user)) {
+    // Owner-only, except designated operators on the SESSION path
+    // (who manage house agents like BTC Barry). The bridge-token
+    // path has no operator override: the token's user must own it.
+    if (hire.userId !== actorId && !operator) {
       return NextResponse.json({ error: "This agent belongs to another member." }, { status: 403 });
+    }
+    // Bridge-token path: profile/design fields only. Anything else
+    // is refused by name, so the member's Muse learns the boundary
+    // instead of silently half-applying an update.
+    if (viaToken) {
+      const restricted = (["status", "role", "instructions", "toolsJson", "slug", "agent37Ref", "tokenBudget", "userId"] as const).filter(
+        (k) => (body as Record<string, unknown>)[k] !== undefined,
+      );
+      if (restricted.length > 0) {
+        return NextResponse.json(
+          { error: `A bridge token can only update the agent's profile fields (name, description, category, capabilities, avatarUrl, demoUrl, appUrl, gitUrl, buildPrompt, spaceUrl, publicProfile). Refused: ${restricted.join(", ")}.` },
+          { status: 400 },
+        );
+      }
     }
 
     // Settings update (no status in the body): name / role /

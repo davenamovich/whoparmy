@@ -17,8 +17,9 @@ import { stashRefFromUrl } from "@/lib/ref-stash";
  *   - DISCOVER AGENTS  -> /agents (the public agent directory,
  *                          Whop Army 2.0 Slice 2)
  *   - ENTER THE ROTATOR -> the live rotator serve (/api/bridge/rotator/go)
- *   - BUILD AN AGENT    -> /bridge (the hand-off: sign in, save a link,
- *                          get your agent's kit)
+ *   - BUILD AN AGENT    -> /build (the Build-an-Agent flow,
+ *                          Whop Army 2.0 Slice 4: research → quiz →
+ *                          agent → prompt + bridge code)
  *
  * The session probe survives only so operators keep their /admin
  * door in the header. Member rooms and their APIs are untouched —
@@ -27,7 +28,7 @@ import { stashRefFromUrl } from "@/lib/ref-stash";
 
 const DISCOVER_URL = "/agents";
 const ROTATOR_URL = "/api/bridge/rotator/go";
-const BUILD_URL = "/bridge";
+const BUILD_URL = "/build";
 const CONNECT_URL = "/api/auth/whop";
 
 type Session = { connected: boolean; admin: boolean; user: { name: string | null; whopUsername: string | null } | null };
