@@ -410,6 +410,24 @@ async function gatherHopHistory(ipHash: string | null, linkId: string | null, us
   };
 }
 
+/**
+ * House Barry is DH Media ONLY on his Ride rotator (Dave,
+ * 2026-11-22): the public btc-barry agent's serve must never send
+ * a rider to Muse, Agent37, Fish or any other saved link, even if
+ * an older provisioning left those rows in his rotator. Filtering
+ * at serve time makes the rule live immediately; provisioning
+ * (lib/barry-rotator-core.ts) prunes the rows themselves.
+ */
+export const BARRY_SLUG = "btc-barry";
+export const BARRY_DH_MEDIA_PARTNERS: readonly string[] = ["salarium", "dh-media"];
+export function filterBarryRideRows<T extends { engineLink: { partner: string } }>(
+  agentSlug: string | null | undefined,
+  rows: T[],
+): T[] {
+  if (agentSlug !== BARRY_SLUG) return rows;
+  return rows.filter((row) => BARRY_DH_MEDIA_PARTNERS.includes(row.engineLink.partner));
+}
+
 /** Serves an agent's signed rotator link and records the selected hop. */
 export async function serveAgentRotator(
   code: string,
@@ -429,7 +447,7 @@ export async function serveAgentRotator(
   if (!rotator?.enabled) {
     return null;
   }
-  const agent = await db.hiredAgent.findUnique({ where: { id: rotator.agentId }, select: { status: true, expiresAt: true } });
+  const agent = await db.hiredAgent.findUnique({ where: { id: rotator.agentId }, select: { status: true, expiresAt: true, slug: true } });
   if (!agent || !isAgentWorking(agent.status, agent.expiresAt, new Date())) {
     return null;
   }
@@ -439,7 +457,7 @@ export async function serveAgentRotator(
 
   const today = etDateString();
   const window = { gte: dayStart(today), lt: dayEnd(today) };
-  const [rows, hopCount, hopRows] = await Promise.all([
+  const [allRows, hopCount, hopRows] = await Promise.all([
     db.agentRotatorLink.findMany({
       where: {
         rotatorId: rotator.id,
@@ -458,6 +476,7 @@ export async function serveAgentRotator(
       _count: { _all: true },
     }),
   ]);
+  const rows = filterBarryRideRows(agent.slug, allRows);
   const counts = new Map(hopRows.map((hop) => [hop.linkId!, hop._count._all]));
   const picks: PickableLink[] = rows.map((link) => ({
     linkId: link.id,
@@ -495,7 +514,7 @@ export async function resolveAgentRotatorDestination(agentId: string) {
   if (!rotator?.enabled) {
     return null;
   }
-  const agent = await db.hiredAgent.findUnique({ where: { id: rotator.agentId }, select: { status: true, expiresAt: true } });
+  const agent = await db.hiredAgent.findUnique({ where: { id: rotator.agentId }, select: { status: true, expiresAt: true, slug: true } });
   if (!agent || !isAgentWorking(agent.status, agent.expiresAt, new Date())) {
     return null;
   }
@@ -506,7 +525,7 @@ export async function resolveAgentRotatorDestination(agentId: string) {
 
   const today = etDateString();
   const window = { gte: dayStart(today), lt: dayEnd(today) };
-  const [rows, hopCount, hopRows] = await Promise.all([
+  const [allRows, hopCount, hopRows] = await Promise.all([
     db.agentRotatorLink.findMany({
       where: {
         rotatorId: rotator.id,
@@ -525,6 +544,7 @@ export async function resolveAgentRotatorDestination(agentId: string) {
       _count: { _all: true },
     }),
   ]);
+  const rows = filterBarryRideRows(agent.slug, allRows);
   const counts = new Map(hopRows.map((hop) => [hop.linkId!, hop._count._all]));
   const picks: PickableLink[] = rows.map((link) => ({
     linkId: link.id,

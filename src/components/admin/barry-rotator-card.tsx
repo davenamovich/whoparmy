@@ -9,9 +9,9 @@ interface ProvisionSummary {
   rotatorCreated: boolean;
   linksAdded: number;
   linksTotal: number;
+  linksRemoved?: number;
   state: string;
   detail: string;
-  leadNames?: string[];
   profileRefreshed?: boolean;
   profileRefreshReason?: string;
   catalogSeeded?: number;
@@ -19,15 +19,15 @@ interface ProvisionSummary {
 }
 
 /**
- * Operator card: provision BTC Barry's rotator (Dave, 2026-11-21).
- * One tap runs POST /api/admin/provision-barry-rotator — find-or-
- * create Barry's AgentRotator and add-only sync its destinations
- * from the operator's saved EngineLinks, which is what turns the
- * Ride door on /agent/btc-barry live. Idempotent: re-running only
- * adds saved links that are missing, and the launch + agent-kit
- * wiring keeps it provisioned after this first tap. The summary
- * printed is the server's own plain-language result — no invented
- * state.
+ * Operator card: provision BTC Barry's rotator (Dave, 2026-11-21;
+ * DH-only rule 2026-11-22). One tap runs
+ * POST /api/admin/provision-barry-rotator — find-or-create Barry's
+ * AgentRotator and sync ONLY the operator's DH Media destination
+ * into it (pruning any non-DH rows), which is what turns the Ride
+ * door on /agent/btc-barry live. Idempotent, and the launch +
+ * agent-kit wiring keeps it provisioned after this first tap. The
+ * summary printed is the server's own plain-language result — no
+ * invented state.
  */
 export function BarryRotatorCard() {
   const [summary, setSummary] = useState<ProvisionSummary | null>(null);
@@ -58,13 +58,11 @@ export function BarryRotatorCard() {
         <CardTitle>Barry&apos;s rotator</CardTitle>
         <p className="text-sm text-muted-foreground">
           Provisions BTC Barry&apos;s agent rotator — that is what turns the Ride door on{" "}
-          <span className="font-mono">/agent/btc-barry</span> live. First it pulls your links from your P&amp;R
-          record (the MCP offers catalog): any partner you have not saved yet is added from the record, and links
-          you already saved are never overwritten. Then the rotation syncs add-only from those saved links —
-          existing rotation state is kept, and re-running only adds what is missing. Your Muse and Agent37 links
-          lead the rotation at triple weight — offers rotate behind them, never in front. The same tap refreshes
-          Barry&apos;s profile copy to the outcome-led defaults when it still carries the old house copy
-          untouched.
+          <span className="font-mono">/agent/btc-barry</span> live. Barry&apos;s Ride is DH Media only: the
+          rotation syncs only your saved DH Media link, and any non-DH link an earlier sync put in the rotation
+          is removed. Your Muse, Agent37 and other links stay on Barry&apos;s profile CTA strip — they never
+          ride the rotator. The same tap refreshes Barry&apos;s profile copy to the outcome-led defaults when
+          it still carries the old house copy untouched.
         </p>
       </CardHeader>
       <CardContent>
@@ -76,6 +74,7 @@ export function BarryRotatorCard() {
             <span>
               State: <strong>{summary.state}</strong> · links {summary.linksTotal} total
               {summary.linksAdded > 0 ? ` · ${summary.linksAdded} added` : ""}
+              {summary.linksRemoved ? ` · ${summary.linksRemoved} non-DH removed` : ""}
               {summary.rotatorCreated ? " · rotator created" : ""}
             </span>
           )}

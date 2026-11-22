@@ -87,15 +87,13 @@ function fakeDb(seed: {
         for (const row of data) store.rotatorLinks.push({ ...row });
         return { count: data.length };
       },
-      async updateMany({ where, data }) {
-        let count = 0;
-        for (const row of store.rotatorLinks) {
-          if (row.rotatorId === where.rotatorId && row.engineLinkId === where.engineLinkId) {
-            row.weight = data.weight;
-            count += 1;
-          }
-        }
-        return { count };
+      async deleteMany({ where }) {
+        const before = store.rotatorLinks.length;
+        const ids = new Set(where.engineLinkId.in);
+        store.rotatorLinks = store.rotatorLinks.filter(
+          (l) => !(l.rotatorId === where.rotatorId && ids.has(l.engineLinkId)),
+        );
+        return { count: before - store.rotatorLinks.length };
       },
     },
   };
@@ -148,7 +146,7 @@ describe("provisionBarryRotator — gate", () => {
 });
 
 describe("provisionBarryRotator — provisioning", () => {
-  it("creates the rotator and syncs the operator's saved links", async () => {
+  it("creates the rotator and syncs ONLY the operator's DH Media link", async () => {
     const { db, store } = fakeDb({
       engineLinks: [linkRow("el-dh", "salarium", "2026-11-19T00:00:00Z"), linkRow("el-fish", "fish-audio", "2026-11-20T00:00:00Z")],
     });
@@ -156,18 +154,15 @@ describe("provisionBarryRotator — provisioning", () => {
     assert.equal(res.state, "enabled");
     assert.equal(res.agentName, "BTC Barry");
     assert.equal(res.rotatorCreated, true);
-    assert.equal(res.linksAdded, 2);
-    assert.equal(res.linksTotal, 2);
-    assert.match(res.detail, /DH Media link is in the rotation/);
+    assert.equal(res.linksAdded, 1);
+    assert.equal(res.linksTotal, 1);
+    assert.match(res.detail, /DH Media only/);
     assert.equal(store.rotators.length, 1);
     assert.equal(store.rotators[0].agentId, "agent-barry");
     assert.equal(store.rotators[0].userId, OP);
     assert.deepEqual(
       store.rotatorLinks.map((l) => [l.engineLinkId, l.position]),
-      [
-        ["el-dh", 0],
-        ["el-fish", 1],
-      ],
+      [["el-dh", 0]],
     );
   });
 
@@ -179,28 +174,31 @@ describe("provisionBarryRotator — provisioning", () => {
     const res = await provisionBarryRotator(db, { barry: barry(), operatorUserId: OP, now: NOW });
     assert.equal(res.rotatorCreated, false);
     assert.equal(res.linksAdded, 0);
-    assert.equal(res.linksTotal, 2);
+    assert.equal(res.linksRemoved, 0);
+    assert.equal(res.linksTotal, 1);
     assert.equal(store.rotators.length, 1);
-    assert.equal(store.rotatorLinks.length, 2);
+    assert.equal(store.rotatorLinks.length, 1);
   });
 
-  it("add-only: existing links keep position/state, stale ones stay, new ones append", async () => {
+  it("DH rows keep position; non-DH and unverifiable rows are pruned; non-DH saves never add", async () => {
     const { db, store } = fakeDb({
       rotators: [{ id: "rot-1", agentId: "agent-barry", userId: OP, enabled: true }],
       engineLinks: [linkRow("el-dh", "salarium"), linkRow("el-new", "bankr")],
       rotatorLinks: [
         { rotatorId: "rot-1", engineLinkId: "el-dh", position: 5, weight: 1 },
         { rotatorId: "rot-1", engineLinkId: "el-stale", position: 2, weight: 1 },
+        { rotatorId: "rot-1", engineLinkId: "el-new", position: 3, weight: 1 },
       ],
     });
     const res = await provisionBarryRotator(db, { barry: barry(), operatorUserId: OP, now: NOW });
     assert.equal(res.rotatorCreated, false);
-    assert.equal(res.linksAdded, 1);
-    assert.equal(res.linksTotal, 3);
+    assert.equal(res.linksAdded, 0);
+    assert.equal(res.linksRemoved, 2);
+    assert.equal(res.linksTotal, 1);
     const byId = new Map(store.rotatorLinks.map((l) => [l.engineLinkId, l.position]));
-    assert.equal(byId.get("el-dh"), 5, "existing link keeps its position");
-    assert.equal(byId.get("el-stale"), 2, "a link no longer saved is NOT removed");
-    assert.equal(byId.get("el-new"), 6, "new link appends after the max position");
+    assert.equal(byId.get("el-dh"), 5, "existing DH link keeps its position");
+    assert.equal(byId.has("el-stale"), false, "unverifiable row is pruned");
+    assert.equal(byId.has("el-new"), false, "non-DH row is pruned and never re-added");
   });
 
   it("honest no-links state: rotator created, zero destinations, says so", async () => {
@@ -213,11 +211,13 @@ describe("provisionBarryRotator — provisioning", () => {
     assert.equal(store.rotators.length, 1);
   });
 
-  it("links without a DH Media link: enabled, but the summary flags the missing gate link", async () => {
-    const { db } = fakeDb({ engineLinks: [linkRow("el-fish", "fish-audio")] });
+  it("links without a DH Media link: no-links — non-DH links never enter Barry's rotator", async () => {
+    const { db, store } = fakeDb({ engineLinks: [linkRow("el-fish", "fish-audio")] });
     const res = await provisionBarryRotator(db, { barry: barry(), operatorUserId: OP, now: NOW });
-    assert.equal(res.state, "enabled");
-    assert.match(res.detail, /no DH Media link is saved/);
+    assert.equal(res.state, "no-links");
+    assert.equal(res.linksTotal, 0);
+    assert.equal(store.rotatorLinks.length, 0);
+    assert.match(res.detail, /DH Media only/);
   });
 
   it("a switched-off rotator is left off and reported disabled", async () => {
@@ -249,140 +249,83 @@ describe("provisionBarryRotator — provisioning", () => {
   });
 });
 
-describe("provisionBarryRotator — the lead is the outcome, never an offer (Dave, 2026-11-21)", () => {
-  it("fresh sync: Muse + Agent37 take the front at weight 3, offers behind at 1", async () => {
+describe("provisionBarryRotator — DH Media only (Dave, 2026-11-22)", () => {
+  it("a polluted rotator (Muse, Agent37, offers) is pruned down to DH Media alone", async () => {
     const { db, store } = fakeDb({
+      rotators: [{ id: "rot-1", agentId: "agent-barry", userId: OP, enabled: true }],
       engineLinks: [
         linkRow("el-dh", "salarium", "2026-11-18T00:00:00Z"),
         linkRow("el-muse", "muse", "2026-11-19T00:00:00Z", "pr-mcp"),
         linkRow("el-a37", "agent37_ref", "2026-11-20T00:00:00Z", "pr-mcp"),
         linkRow("el-fish", "fish-audio", "2026-11-21T00:00:00Z"),
       ],
-    });
-    const res = await provisionBarryRotator(db, { barry: barry(), operatorUserId: OP, now: NOW });
-    assert.equal(res.state, "enabled");
-    assert.deepEqual(res.leadNames, ["Muse", "Agent37"]);
-    assert.equal(res.leadSource, "pr-mcp");
-    assert.match(res.detail, /Lead: Muse \+ Agent37 — offers rotate behind\./);
-    assert.match(res.detail, /Lead links populated from your P&R record via the bridge sync\./);
-    assert.match(res.detail, /DH Media link is in the rotation behind the lead\./);
-    const byPosition = [...store.rotatorLinks].sort((a, b) => a.position - b.position);
-    assert.deepEqual(
-      byPosition.map((l) => [l.engineLinkId, l.weight]),
-      [
-        ["el-muse", 3],
-        ["el-a37", 3],
-        ["el-dh", 1],
-        ["el-fish", 1],
-      ],
-    );
-  });
-
-  it("re-sync raises an existing lead link's weight to 3 and leaves standards alone", async () => {
-    const { db, store } = fakeDb({
-      rotators: [{ id: "rot-1", agentId: "agent-barry", userId: OP, enabled: true }],
-      engineLinks: [linkRow("el-muse", "muse"), linkRow("el-dh", "salarium")],
       rotatorLinks: [
-        { rotatorId: "rot-1", engineLinkId: "el-muse", position: 0, weight: 1 },
-        { rotatorId: "rot-1", engineLinkId: "el-dh", position: 1, weight: 2 },
+        { rotatorId: "rot-1", engineLinkId: "el-muse", position: 0, weight: 3 },
+        { rotatorId: "rot-1", engineLinkId: "el-a37", position: 1, weight: 3 },
+        { rotatorId: "rot-1", engineLinkId: "el-dh", position: 2, weight: 1 },
+        { rotatorId: "rot-1", engineLinkId: "el-fish", position: 3, weight: 1 },
       ],
     });
     const res = await provisionBarryRotator(db, { barry: barry(), operatorUserId: OP, now: NOW });
-    assert.equal(res.linksAdded, 0);
-    const byId = new Map(store.rotatorLinks.map((l) => [l.engineLinkId, l]));
-    assert.equal(byId.get("el-muse")!.weight, 3, "lead raised to lead weight");
-    assert.equal(byId.get("el-muse")!.position, 0, "position untouched");
-    assert.equal(byId.get("el-dh")!.weight, 2, "standard link weight never touched");
+    assert.equal(res.state, "enabled");
+    assert.equal(res.linksRemoved, 3);
+    assert.equal(res.linksTotal, 1);
+    assert.match(res.detail, /DH Media only/);
+    assert.deepEqual(store.rotatorLinks.map((l) => l.engineLinkId), ["el-dh"]);
   });
 
-  it("no Muse/Agent37 saved: provisions as today but the summary flags the missing lead", async () => {
-    const { db } = fakeDb({ engineLinks: [linkRow("el-dh", "salarium")] });
+  it("the legacy dh-media key also counts as DH Media", async () => {
+    const { db, store } = fakeDb({ engineLinks: [linkRow("el-dh", "dh-media")] });
     const res = await provisionBarryRotator(db, { barry: barry(), operatorUserId: OP, now: NOW });
     assert.equal(res.state, "enabled");
-    assert.deepEqual(res.leadNames, []);
-    assert.match(res.detail, /no Muse link saved — rotator has no lead destination/);
-  });
-
-  it("manually saved lead links say so in the summary", async () => {
-    const { db } = fakeDb({ engineLinks: [linkRow("el-muse", "muse", "2026-11-19T00:00:00Z", "manual")] });
-    const res = await provisionBarryRotator(db, { barry: barry(), operatorUserId: OP, now: NOW });
-    assert.equal(res.leadSource, "manual");
-    assert.match(res.detail, /Lead links saved manually\./);
+    assert.equal(res.linksTotal, 1);
+    assert.equal(store.rotatorLinks[0].engineLinkId, "el-dh");
   });
 });
 
 describe("planAddOnlyLinkSync", () => {
-  it("starts positions at 0 for an empty rotator and detects the DH Media link", () => {
+  it("adds only DH Media links, starting positions at 0 for an empty rotator", () => {
     const plan = planAddOnlyLinkSync([], [
       { id: "a", partner: "fish-audio", source: "manual" },
       { id: "b", partner: "dh-media", source: "manual" },
     ]);
-    assert.deepEqual(plan.toAdd, [
-      { engineLinkId: "a", position: 0, weight: 1 },
-      { engineLinkId: "b", position: 1, weight: 1 },
-    ]);
-    assert.equal(plan.total, 2);
+    assert.deepEqual(plan.toAdd, [{ engineLinkId: "b", position: 0, weight: 1 }]);
+    assert.deepEqual(plan.toRemove, []);
+    assert.equal(plan.total, 1);
     assert.equal(plan.hasDhMediaLink, true);
-    assert.deepEqual(plan.leadNames, []);
-    assert.equal(plan.leadSource, null);
   });
 
-  it("orders lead additions canonically (Muse before Agent37) regardless of saved order", () => {
-    // The catalog seed creates the operator's links in one pass —
-    // saved order between the two leads is arbitrary, the front of
-    // the rotation is not.
-    const plan = planAddOnlyLinkSync([], [
-      { id: "a37", partner: "agent37_ref", source: "pr-mcp" },
-      { id: "fish", partner: "fish-audio", source: "manual" },
-      { id: "muse", partner: "muse", source: "pr-mcp" },
-    ]);
-    assert.deepEqual(plan.toAdd, [
-      { engineLinkId: "muse", position: 0, weight: 3 },
-      { engineLinkId: "a37", position: 1, weight: 3 },
-      { engineLinkId: "fish", position: 2, weight: 1 },
-    ]);
-  });
-
-  it("adds nothing when every saved link is already in the rotator", () => {
+  it("adds nothing when the DH link is already in the rotator", () => {
     const plan = planAddOnlyLinkSync(
       [{ engineLinkId: "a", position: 3, weight: 1 }],
       [{ id: "a", partner: "salarium", source: "manual" }],
     );
     assert.deepEqual(plan.toAdd, []);
+    assert.deepEqual(plan.toRemove, []);
     assert.equal(plan.total, 1);
   });
 
-  it("puts lead links first at lead weight, standards behind at weight 1", () => {
-    const plan = planAddOnlyLinkSync([], [
-      { id: "dh", partner: "salarium", source: "manual" },
-      { id: "muse", partner: "muse", source: "pr-mcp" },
-      { id: "a37", partner: "agent37_ref", source: "pr-mcp" },
-      { id: "fish", partner: "fish-audio", source: "manual" },
-    ]);
-    assert.deepEqual(plan.toAdd, [
-      { engineLinkId: "muse", position: 0, weight: 3 },
-      { engineLinkId: "a37", position: 1, weight: 3 },
-      { engineLinkId: "dh", position: 2, weight: 1 },
-      { engineLinkId: "fish", position: 3, weight: 1 },
-    ]);
-    assert.deepEqual(plan.leadNames, ["Muse", "Agent37"]);
-    assert.equal(plan.leadSource, "pr-mcp");
-  });
-
-  it("raises an existing lead link below lead weight — and never lowers anything", () => {
+  it("prunes every non-DH row and keeps the DH row", () => {
     const plan = planAddOnlyLinkSync(
       [
-        { engineLinkId: "muse", position: 0, weight: 1 },
-        { engineLinkId: "a37", position: 1, weight: 7 },
-        { engineLinkId: "dh", position: 2, weight: 2 },
+        { engineLinkId: "muse", position: 0, weight: 3 },
+        { engineLinkId: "a37", position: 1, weight: 3 },
+        { engineLinkId: "dh", position: 2, weight: 1 },
+        { engineLinkId: "fish", position: 3, weight: 1 },
       ],
       [
         { id: "muse", partner: "muse", source: "manual" },
         { id: "a37", partner: "agent37_ref", source: "manual" },
         { id: "dh", partner: "salarium", source: "manual" },
+        { id: "fish", partner: "fish-audio", source: "manual" },
       ],
     );
-    assert.deepEqual(plan.weightRaises, [{ engineLinkId: "muse", weight: 3 }]);
     assert.deepEqual(plan.toAdd, []);
+    assert.deepEqual(plan.toRemove, [
+      { engineLinkId: "muse" },
+      { engineLinkId: "a37" },
+      { engineLinkId: "fish" },
+    ]);
+    assert.equal(plan.total, 1);
   });
 });

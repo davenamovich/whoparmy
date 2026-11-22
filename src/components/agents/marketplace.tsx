@@ -450,8 +450,8 @@ function SpotBoard({ agents, pool }: { agents: MarketAgent[]; pool: MarketPool }
               ) : (
                 <a
                   key={i}
-                  href="/build"
-                  title={`Open spot on ${t.name}'s pool — claim it`}
+                  href={`/agent/${t.slug}`}
+                  title={`Open spot on ${t.name}'s pool — go to ${t.name}'s rotator page`}
                   className="grid aspect-square place-items-center rounded-md border border-dashed border-primary/40 text-primary/50 transition hover:border-primary hover:bg-primary/10 hover:text-primary"
                 >
                   <span className="text-xs font-bold">+</span>

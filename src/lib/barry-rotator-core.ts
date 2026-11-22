@@ -19,25 +19,16 @@
  *   (rotator-v2-core isAgentWorking) would refuse him anyway, so
  *   provisioning a dead rotator would only lie on the profile.
  *   The check below mirrors isAgentWorking exactly.
- * - ADD-ONLY LINK SYNC. Destinations come ONLY from the operator's
- *   saved EngineLink records — never a hardcoded URL. Links already
- *   in the rotator keep their row (cap / position / enabled state
- *   untouched); saved links not yet in the rotator append after the
- *   current maximum position. Nothing is removed, ever: the member
- *   PUT flow replaces link sets, provisioning must not.
- * - THE LEAD IS THE OUTCOME, NEVER AN OFFER (Dave, 2026-11-21):
- *   the Muse and Agent37 links are LEAD destinations — on a sync
- *   they are added ahead of every standard link and carry
- *   LEAD_WEIGHT (3× a standard link's 1) in the WEIGHTED pick.
- *   Offers (DH Media included) are standard rotation members:
- *   present, never first, never weighted up. The one routing
- *   exception to add-only purity: an existing lead link whose
- *   weight sits BELOW the lead weight is raised to it — weights
- *   are routing config, not owner content. A weight is never
- *   lowered, and caps / enabled / positions of existing rows are
- *   still never touched (new links append; leads among the new
- *   ones go first, which is what puts them at the front on the
- *   first sync of a fresh rotator).
+ * - DH MEDIA ONLY (Dave, 2026-11-22 — supersedes the 2026-11-21
+ *   lead rule for Barry's rotator): Barry's Ride rotator carries
+ *   ONLY the operator's DH Media link(s) (DH_MEDIA_PARTNER_KEYS).
+ *   Every other saved link — Muse, Agent37, Fish, Temu, any other
+ *   P&R offer — stays on Barry's profile CTA strip where it
+ *   belongs, but NEVER enters this rotation. The sync therefore
+ *   both adds missing DH Media links AND prunes any non-DH row
+ *   already in the rotator (earlier syncs added the full saved
+ *   set; add-only could never undo that). DH rows already in the
+ *   rotator keep their cap / position / enabled state untouched.
  * - HONEST EMPTY STATE. No saved links → the rotator still gets
  *   created (so the next save can sync into it), but the summary
  *   says plainly that it has no destinations.
@@ -58,50 +49,15 @@
  *  lib/btc-addresses.ts getSavedDhMediaLink reads. */
 export const DH_MEDIA_PARTNER_KEYS: readonly string[] = ["salarium", "dh-media"];
 
-/**
- * Lead destinations (Dave, 2026-11-21): Barry's rotator leads with
- * the outcome pages — Muse (the workhouse; "muse" is the offers
- * catalog's local-extra partner key) and Agent37 (the workforce;
- * canonical MCP step "agent37_ref", plus the legacy "agent37" key
- * for any row the boot migration has not rewritten yet). Every
- * other saved link — every offer — rotates behind them at the
- * standard weight.
- */
-export const LEAD_PARTNER_KEYS: readonly string[] = ["muse", "agent37_ref", "agent37"];
+/** True only for Barry's DH Media gate link keys — the sole
+ *  partners allowed in Barry's Ride rotator (Dave, 2026-11-22). */
+export function isBarryRotatorPartner(partner: string): boolean {
+  return DH_MEDIA_PARTNER_KEYS.includes(partner);
+}
 
-/** Weight a lead link carries in the WEIGHTED pick (rotator-v2-core
- *  pickWeighted): 3× a standard link, so the outcome pages take
- *  roughly three of every five rides when both leads are present. */
-export const LEAD_WEIGHT = 3;
-
-/** Weight every non-lead (offer) link is created with — the schema
- *  default, stated here so the sync plan is explicit. */
+/** Weight every link in Barry's rotator is created with — the
+ *  schema default, stated here so the sync plan is explicit. */
 export const STANDARD_WEIGHT = 1;
-
-const LEAD_DISPLAY_NAMES: ReadonlyArray<{ keys: readonly string[]; name: string }> = [
-  { keys: ["muse"], name: "Muse" },
-  { keys: ["agent37_ref", "agent37"], name: "Agent37" },
-];
-
-/** Display name for a lead partner key, or null for standard links. */
-export function leadPartnerName(partner: string): string | null {
-  for (const entry of LEAD_DISPLAY_NAMES) {
-    if (entry.keys.includes(partner)) return entry.name;
-  }
-  return null;
-}
-
-export function isLeadPartner(partner: string): boolean {
-  return LEAD_PARTNER_KEYS.includes(partner);
-}
-
-/** Lead display names present among the given partner keys, in
- *  canonical order (Muse before Agent37), de-duplicated across
- *  canonical/legacy key spellings. */
-export function leadNamesFor(partners: readonly string[]): string[] {
-  const present = new Set(partners);
-  return LEAD_DISPLAY_NAMES.filter((entry) => entry.keys.some((k) => present.has(k))).map((entry) => entry.name);
-}
 
 export interface BarryRotatorCandidate {
   id: string;
@@ -162,92 +118,51 @@ export interface ExistingRotatorLinkInput {
 }
 
 export interface LinkSyncPlan {
-  /** New AgentRotatorLink rows to create, in order: lead links
-   *  first (so a fresh rotator's front positions are the outcome
-   *  pages), then standard links in saved order. */
+  /** New AgentRotatorLink rows to create: the operator's DH Media
+   *  link(s) not already in the rotator, in saved order. */
   toAdd: Array<{ engineLinkId: string; position: number; weight: number }>;
-  /** Existing LEAD links whose weight is below LEAD_WEIGHT, to be
-   *  raised to it. Raise-only: a weight is never lowered here, and
-   *  standard links never appear. */
-  weightRaises: Array<{ engineLinkId: string; weight: number }>;
+  /** Existing rows to DELETE: anything that is not a DH Media
+   *  link (a known non-DH partner, or a row whose link is no
+   *  longer among the operator's saved links and so cannot be
+   *  verified as DH Media). Barry's rotator is DH-only, so an
+   *  unverifiable row does not stay. */
+  toRemove: Array<{ engineLinkId: string }>;
   /** Total links in the rotator after the sync. */
   total: number;
   /** Any of the operator's saved links is the DH Media gate link. */
   hasDhMediaLink: boolean;
-  /** Lead display names ("Muse", "Agent37") among the saved links. */
-  leadNames: string[];
-  /** Where the lead links came from: all populated from the owner's
-   *  P&R record via the bridge offers sync ("pr-mcp"), all saved
-   *  manually, a mix — or null when there are no lead links. */
-  leadSource: "pr-mcp" | "manual" | "mixed" | null;
 }
 
 /**
- * The add-only sync plan: every saved EngineLink not already in the
- * rotator is appended after the current maximum position (saved
- * links arrive in the caller's stable order — createdAt, then id),
- * with lead links ahead of standard ones among the additions and
- * carrying LEAD_WEIGHT. Existing rows keep their cap, position and
- * enabled state; the single exception is a lead link's weight,
- * raised to LEAD_WEIGHT when it sits below it (never lowered).
+ * The DH-only sync plan (Dave, 2026-11-22): only the operator's
+ * DH Media EngineLinks may sit in Barry's rotator. Missing DH
+ * links append after the current maximum position; every existing
+ * non-DH (or unverifiable) row is pruned; DH rows already present
+ * keep their cap, position, weight and enabled state untouched.
  */
 export function planAddOnlyLinkSync(
   existing: ExistingRotatorLinkInput[],
   owned: OwnedLinkInput[],
 ): LinkSyncPlan {
+  const dhOwned = owned.filter((l) => isBarryRotatorPartner(l.partner));
+  const dhIds = new Set(dhOwned.map((l) => l.id));
   const inRotator = new Set(existing.map((l) => l.engineLinkId));
-  const partnerById = new Map(owned.map((l) => [l.id, l.partner]));
   let nextPosition = existing.reduce((max, l) => Math.max(max, l.position), -1) + 1;
 
-  const weightRaises: Array<{ engineLinkId: string; weight: number }> = [];
-  for (const row of existing) {
-    const partner = partnerById.get(row.engineLinkId);
-    if (partner !== undefined && isLeadPartner(partner) && row.weight < LEAD_WEIGHT) {
-      weightRaises.push({ engineLinkId: row.engineLinkId, weight: LEAD_WEIGHT });
-    }
-  }
+  const toRemove = existing
+    .filter((row) => !dhIds.has(row.engineLinkId))
+    .map((row) => ({ engineLinkId: row.engineLinkId }));
 
-  const missing = owned.filter((l) => !inRotator.has(l.id));
-  // Lead additions are ordered canonically (Muse before Agent37 —
-  // the order the summary names them), stable within each lead, so
-  // the front of a fresh rotation does not depend on the order the
-  // links happened to be saved in (the catalog seed creates them in
-  // one pass, often inside the same millisecond).
-  const leadRank = (partner: string): number => {
-    const idx = LEAD_DISPLAY_NAMES.findIndex((entry) => entry.keys.includes(partner));
-    return idx === -1 ? LEAD_DISPLAY_NAMES.length : idx;
-  };
-  const ordered = [
-    ...missing
-      .filter((l) => isLeadPartner(l.partner))
-      .sort((a, b) => leadRank(a.partner) - leadRank(b.partner)),
-    ...missing.filter((l) => !isLeadPartner(l.partner)),
-  ];
   const toAdd: Array<{ engineLinkId: string; position: number; weight: number }> = [];
-  for (const link of ordered) {
-    toAdd.push({
-      engineLinkId: link.id,
-      position: nextPosition,
-      weight: isLeadPartner(link.partner) ? LEAD_WEIGHT : STANDARD_WEIGHT,
-    });
+  for (const link of dhOwned.filter((l) => !inRotator.has(l.id))) {
+    toAdd.push({ engineLinkId: link.id, position: nextPosition, weight: STANDARD_WEIGHT });
     nextPosition += 1;
   }
-  const leadOwned = owned.filter((l) => isLeadPartner(l.partner));
-  const leadSource: LinkSyncPlan["leadSource"] =
-    leadOwned.length === 0
-      ? null
-      : leadOwned.every((l) => l.source === "pr-mcp")
-        ? "pr-mcp"
-        : leadOwned.every((l) => l.source !== "pr-mcp")
-          ? "manual"
-          : "mixed";
   return {
     toAdd,
-    weightRaises,
-    total: existing.length + toAdd.length,
-    hasDhMediaLink: owned.some((l) => DH_MEDIA_PARTNER_KEYS.includes(l.partner)),
-    leadNames: leadNamesFor(owned.map((l) => l.partner)),
-    leadSource,
+    toRemove,
+    total: existing.length - toRemove.length + toAdd.length,
+    hasDhMediaLink: dhOwned.length > 0,
   };
 }
 
@@ -268,10 +183,9 @@ export function summarizeBarryProvision(input: {
   gate: BarryRotatorGate;
   rotatorEnabled: boolean;
   linksAdded: number;
+  linksRemoved?: number;
   linksTotal: number;
   hasDhMediaLink: boolean;
-  leadNames: string[];
-  leadSource: "pr-mcp" | "manual" | "mixed" | null;
 }): BarryProvisionSummary {
   if (!input.gate.ok) {
     return { state: input.gate.state, detail: input.gate.detail };
@@ -280,7 +194,7 @@ export function summarizeBarryProvision(input: {
     return {
       state: "no-links",
       detail:
-        "Barry's rotator is created but has no destinations — no saved links to rotate yet. Links come only from your saved EngineLinks: save your Muse and Agent37 links on /bridge so Barry has lead destinations, plus any offers you want rotating behind them, then provision again.",
+        "Barry's rotator is created but has no destinations — Barry's Ride is DH Media only, and no DH Media link is saved yet. Save your DH Media link, then provision again. Your other saved links stay off this rotator by design.",
     };
   }
   if (!input.rotatorEnabled) {
@@ -290,30 +204,14 @@ export function summarizeBarryProvision(input: {
     };
   }
   const added =
-    input.linksAdded > 0 ? ` ${input.linksAdded} saved link(s) were added to the rotation this run.` : " No new links to add — the rotation already matches your saved links.";
-  // The lead is stated by name when outcome pages are saved; when
-  // none are, the gap is named instead of letting an offer look
-  // like the lead (Dave, 2026-11-21: never lead with an offer).
-  const leadOrigin =
-    input.leadSource === "pr-mcp"
-      ? " Lead links populated from your P&R record via the bridge sync."
-      : input.leadSource === "mixed"
-        ? " Lead links populated from your P&R record and manual saves."
-        : input.leadSource === "manual"
-          ? " Lead links saved manually."
-          : "";
-  const lead =
-    input.leadNames.length > 0
-      ? ` Lead: ${input.leadNames.join(" + ")} — offers rotate behind.${leadOrigin}`
-      : " Note: no Muse link saved — rotator has no lead destination. Save your Muse and Agent37 links on /bridge so the outcome pages lead.";
-  const dh = input.hasDhMediaLink
-    ? input.leadNames.length > 0
-      ? " Your DH Media link is in the rotation behind the lead."
-      : " Your DH Media link is in the rotation."
-    : " Note: no DH Media link is saved, so Barry's gate link is not in the rotation.";
+    input.linksAdded > 0 ? ` ${input.linksAdded} DH Media link(s) were added to the rotation this run.` : "";
+  const removed =
+    input.linksRemoved && input.linksRemoved > 0
+      ? ` ${input.linksRemoved} non-DH link(s) were removed from the rotation this run.`
+      : "";
   return {
     state: "enabled",
-    detail: `Barry's rotator is live with ${input.linksTotal} destination(s).${lead}${added}${dh}`,
+    detail: `Barry's rotator is live with ${input.linksTotal} destination(s) — DH Media only.${added}${removed} Your DH Media link is the rotation.`,
   };
 }
 
@@ -330,10 +228,9 @@ export function summarizeBarryProvision(input: {
  *
  * Idempotent and self-healing: re-running creates nothing twice
  * (rotator upsert + @@unique([rotatorId, engineLinkId])), adds only
- * saved links that are missing, and never removes a link, resets a
- * cap, or flips the rotator's enabled switch. The one weight change
- * it ever makes is raising a lead link to LEAD_WEIGHT (see the
- * header rules).
+ * the missing DH Media link(s), prunes any non-DH row left by an
+ * earlier full-set sync, and never resets a DH row's cap or flips
+ * the rotator's enabled switch.
  */
 export interface BarryRotatorDb {
   agentRotator: {
@@ -359,9 +256,8 @@ export interface BarryRotatorDb {
     createMany(args: {
       data: Array<{ rotatorId: string; engineLinkId: string; position: number; weight: number }>;
     }): Promise<{ count: number }>;
-    updateMany(args: {
-      where: { rotatorId: string; engineLinkId: string };
-      data: { weight: number };
+    deleteMany(args: {
+      where: { rotatorId: string; engineLinkId: { in: string[] } };
     }): Promise<{ count: number }>;
   };
 }
@@ -370,12 +266,9 @@ export interface EnsureBarryRotatorResult extends BarryProvisionSummary {
   agentName: string | null;
   rotatorCreated: boolean;
   linksAdded: number;
+  /** Non-DH rows pruned from the rotation on this run. */
+  linksRemoved: number;
   linksTotal: number;
-  /** Lead display names ("Muse", "Agent37") among the operator's
-   *  saved links — the destinations the rotation leads with. */
-  leadNames: string[];
-  /** Where the lead links came from (bridge sync vs manual save). */
-  leadSource: "pr-mcp" | "manual" | "mixed" | null;
 }
 
 /**
@@ -396,17 +289,15 @@ export async function provisionBarryRotator(
       agentName: barry?.name ?? null,
       rotatorCreated: false,
       linksAdded: 0,
+      linksRemoved: 0,
       linksTotal: 0,
-      leadNames: [],
-      leadSource: null,
       ...summarizeBarryProvision({
         gate,
         rotatorEnabled: false,
         linksAdded: 0,
+        linksRemoved: 0,
         linksTotal: 0,
         hasDhMediaLink: false,
-        leadNames: [],
-        leadSource: null,
       }),
     };
   }
@@ -427,12 +318,10 @@ export async function provisionBarryRotator(
     db.agentRotatorLink.findMany({ where: { rotatorId: rotator.id } }),
   ]);
   const plan = planAddOnlyLinkSync(rotatorLinks, ownedLinks);
-  // Raise-only lead weights on existing rows (routing config, never
-  // a lowering, never a cap/enabled/position change).
-  for (const raise of plan.weightRaises) {
-    await db.agentRotatorLink.updateMany({
-      where: { rotatorId: rotator.id, engineLinkId: raise.engineLinkId },
-      data: { weight: raise.weight },
+  // DH-only prune: remove every non-DH row an earlier sync added.
+  if (plan.toRemove.length > 0) {
+    await db.agentRotatorLink.deleteMany({
+      where: { rotatorId: rotator.id, engineLinkId: { in: plan.toRemove.map((l) => l.engineLinkId) } },
     });
   }
   if (plan.toAdd.length > 0) {
@@ -450,17 +339,15 @@ export async function provisionBarryRotator(
     agentName: barry.name,
     rotatorCreated,
     linksAdded: plan.toAdd.length,
+    linksRemoved: plan.toRemove.length,
     linksTotal: plan.total,
-    leadNames: plan.leadNames,
-    leadSource: plan.leadSource,
     ...summarizeBarryProvision({
       gate,
       rotatorEnabled: rotator.enabled,
       linksAdded: plan.toAdd.length,
+      linksRemoved: plan.toRemove.length,
       linksTotal: plan.total,
       hasDhMediaLink: plan.hasDhMediaLink,
-      leadNames: plan.leadNames,
-      leadSource: plan.leadSource,
     }),
   };
 }
