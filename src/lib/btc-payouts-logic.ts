@@ -74,6 +74,16 @@ export function splitEqually(
 }
 
 /** A batch (or its edited lines) may never exceed the current balance. */
+/**
+ * What a NEW spend may use: the balance minus every batch that is
+ * APPROVED but not yet PAID. Approved batches are promises against the
+ * same sats — without this, two runs that each fit the balance alone
+ * could both be approved and together overcommit it.
+ */
+export function availableBalance(balanceSats: number, committedSats: number): number {
+  return balanceSats - committedSats;
+}
+
 export function exceedsBalance(totalSats: number, balanceSats: number): boolean {
   return totalSats > balanceSats;
 }

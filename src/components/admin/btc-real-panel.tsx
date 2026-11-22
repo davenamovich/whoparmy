@@ -53,7 +53,7 @@ interface PayoutBatch {
 }
 
 interface Overview {
-  ledger: { fundedSats: number; paidOutSats: number; balanceSats: number };
+  ledger: { fundedSats: number; paidOutSats: number; balanceSats: number; committedSats: number; availableSats: number };
   entries: FundingEntry[];
   roster: { withAddress: RosterEntry[]; withoutAddress: RosterEntry[] };
   batches: PayoutBatch[];
@@ -197,6 +197,11 @@ export function BtcRealPanel() {
           <CardContent>
             <p className="text-2xl font-bold">{formatSatsWithBtc(ledger.balanceSats)}</p>
             <p className="mt-1 text-xs text-muted-foreground">funded minus PAID payouts</p>
+            {ledger.committedSats > 0 && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {formatSatsWithBtc(ledger.committedSats)} approved, not yet paid · {formatSatsWithBtc(ledger.availableSats)} available
+              </p>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -426,7 +431,7 @@ export function BtcRealPanel() {
             <p className="text-sm text-muted-foreground">Enter a share between 0.01% and 100% to preview the run.</p>
           ) : preview.ok ? (
             <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
-              <div><p className="text-xs text-muted-foreground">Pool balance</p><p className="font-semibold">{formatSatsWithBtc(preview.plan.balanceSats)}</p></div>
+              <div><p className="text-xs text-muted-foreground">Available pool</p><p className="font-semibold">{formatSatsWithBtc(preview.plan.balanceSats)}</p></div>
               <div><p className="text-xs text-muted-foreground">Distributable ({sharePct || "0"}%)</p><p className="font-semibold">{formatSatsWithBtc(preview.plan.distributableSats)}</p></div>
               <div><p className="text-xs text-muted-foreground">Eligible members</p><p className="font-semibold">{preview.plan.memberCount}</p></div>
               <div><p className="text-xs text-muted-foreground">Per member</p><p className="font-semibold">{formatSatsWithBtc(preview.plan.perLineSats)}</p></div>

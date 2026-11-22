@@ -7,6 +7,7 @@ import {
   canMarkPaid,
   canTransition,
   computeRunPlan,
+  availableBalance,
   exceedsBalance,
   ledgerBalance,
   maskAddress,
@@ -62,17 +63,25 @@ export async function setCollectBtcAddresses(on: boolean): Promise<boolean> {
 export interface LedgerState {
   fundedSats: number;
   paidOutSats: number;
+  /** funded − PAID: the sats actually still held. */
   balanceSats: number;
+  /** APPROVED, not yet PAID: promised to members, not yet sent. */
+  committedSats: number;
+  /** balance − committed: what a new run or approval may spend. */
+  availableSats: number;
 }
 
 export async function getLedgerState(): Promise<LedgerState> {
-  const [funding, paid] = await Promise.all([
+  const [funding, paid, approved] = await Promise.all([
     db.btcFundingEntry.aggregate({ _sum: { amountSats: true } }),
     db.btcPayoutBatch.aggregate({ _sum: { totalSats: true }, where: { status: "PAID" } }),
+    db.btcPayoutBatch.aggregate({ _sum: { totalSats: true }, where: { status: "APPROVED" } }),
   ]);
   const fundedSats = funding._sum.amountSats ?? 0;
   const paidOutSats = paid._sum.totalSats ?? 0;
-  return { fundedSats, paidOutSats, balanceSats: ledgerBalance(fundedSats, paidOutSats) };
+  const committedSats = approved._sum.totalSats ?? 0;
+  const balanceSats = ledgerBalance(fundedSats, paidOutSats);
+  return { fundedSats, paidOutSats, balanceSats, committedSats, availableSats: availableBalance(balanceSats, committedSats) };
 }
 
 export async function addFundingEntry(input: { amountSats: number; txid?: string; note?: string }) {
@@ -127,11 +136,16 @@ async function recomputeBatchTotal(batchId: string): Promise<number> {
   return totalSats;
 }
 
+/** Guards a NEW spend (create / edit / approve) against the sats not
+ *  already promised to other APPROVED batches. */
 async function assertWithinBalance(totalSats: number): Promise<void> {
-  const { balanceSats } = await getLedgerState();
-  if (exceedsBalance(totalSats, balanceSats)) {
+  const { balanceSats, committedSats, availableSats } = await getLedgerState();
+  if (exceedsBalance(totalSats, availableSats)) {
+    const held = committedSats > 0
+      ? ` (${balanceSats.toLocaleString("en-US")} sats held, ${committedSats.toLocaleString("en-US")} already approved for other runs)`
+      : "";
     throw new BtcAdminError(
-      `This run totals ${totalSats.toLocaleString("en-US")} sats but the current real-BTC balance is ${balanceSats.toLocaleString("en-US")} sats. Fund the ledger or lower the run first.`,
+      `This run totals ${totalSats.toLocaleString("en-US")} sats but only ${availableSats.toLocaleString("en-US")} sats are available${held}. Fund the ledger, pay or cancel an approved run, or lower this one first.`,
       409,
     );
   }
@@ -151,8 +165,8 @@ async function eligibleMembers() {
  * per-member sats, undistributed remainder) before a run is created.
  */
 export async function previewRun(payoutBps: number): Promise<RunPlanResult> {
-  const [{ balanceSats }, members] = await Promise.all([getLedgerState(), eligibleMembers()]);
-  return computeRunPlan(balanceSats, payoutBps, members.length);
+  const [{ availableSats }, members] = await Promise.all([getLedgerState(), eligibleMembers()]);
+  return computeRunPlan(availableSats, payoutBps, members.length);
 }
 
 /**
@@ -165,8 +179,8 @@ export async function previewRun(payoutBps: number): Promise<RunPlanResult> {
  */
 export async function createBatch(input: { payoutBps: number; note?: string }) {
   const members = await eligibleMembers();
-  const { balanceSats } = await getLedgerState();
-  const result = computeRunPlan(balanceSats, input.payoutBps, members.length);
+  const { availableSats } = await getLedgerState();
+  const result = computeRunPlan(availableSats, input.payoutBps, members.length);
   if (!result.ok) throw new BtcAdminError(result.error, 409);
   const plan = result.plan;
   const batch = await db.btcPayoutBatch.create({
@@ -247,6 +261,15 @@ export async function markBatchPaid(batchId: string, txid: unknown) {
       batch.status !== "APPROVED"
         ? `A ${batch.status} batch cannot be marked PAID — it must be APPROVED first.`
         : "A txid is required to mark a batch PAID.",
+      409,
+    );
+  }
+  // Belt and braces: this batch is already counted as committed, so
+  // check it against the sats actually held, not the available figure.
+  const { balanceSats } = await getLedgerState();
+  if (exceedsBalance(batch.totalSats, balanceSats)) {
+    throw new BtcAdminError(
+      `This batch totals ${batch.totalSats.toLocaleString("en-US")} sats but the ledger only holds ${balanceSats.toLocaleString("en-US")} sats.`,
       409,
     );
   }
