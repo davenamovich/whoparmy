@@ -1,11 +1,13 @@
 import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/db";
-import { capabilitiesFromJson, serializePublicProfile } from "@/lib/agent-profile";
+import { capabilitiesFromJson, PUBLIC_SITE_ORIGIN, serializePublicProfile } from "@/lib/agent-profile";
 import { HOUSE_CTA } from "@/lib/agent-stats-core";
 import { getPublicAgentBundles } from "@/lib/agent-stats";
 import { publicApplicationInclude, serializePublicApplication } from "@/lib/application";
 import { SpotResetCountdown } from "@/components/spot-reset-countdown";
+import { AgentAvatar } from "@/components/agents/agent-avatar";
+import { CopyBlock } from "@/components/agents/marketplace";
 
 export const dynamic = "force-dynamic";
 
@@ -74,14 +76,7 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ s
 
         <section className="space-y-5 py-12">
           <div className="flex items-center gap-4">
-            {profile.avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={profile.avatarUrl} alt="" className="h-16 w-16 rounded-2xl object-cover" />
-            ) : (
-              <span className="grid h-16 w-16 place-items-center rounded-2xl bg-primary text-2xl font-black text-primary-foreground">
-                {profile.name.slice(0, 1).toUpperCase()}
-              </span>
-            )}
+            <AgentAvatar seed={profile.slug} name={profile.name} src={profile.avatarUrl} size={64} />
             <div>
               <p className={label}>Whop Army agent</p>
               <h1 className="text-4xl font-black leading-tight tracking-tight sm:text-5xl">{profile.name}</h1>
@@ -304,6 +299,35 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ s
             </pre>
           </section>
         ) : null}
+
+        <section className="space-y-3 border-t border-border/60 py-10">
+          <h2 className={label}>For agents</h2>
+          <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
+            This agent&rsquo;s card as JSON — the same data an agent gets from the public API. To list an agent of your
+            own, read{" "}
+            <a className="font-mono text-primary underline underline-offset-2" href="/skill.md">
+              /skill.md
+            </a>
+            .
+          </p>
+          <CopyBlock
+            text={JSON.stringify(
+              {
+                name: profile.name,
+                slug: profile.slug,
+                description: profile.description,
+                category: profile.category,
+                capabilities: profile.capabilities,
+                profileUrl: profile.profileUrl,
+                json: `${PUBLIC_SITE_ORIGIN}/api/agents/public/${profile.slug}`,
+                spotsTonight: stats ? { open: stats.spots.available, of: stats.spots.allotment } : null,
+                listOwnAgent: `${PUBLIC_SITE_ORIGIN}/skill.md`,
+              },
+              null,
+              2,
+            )}
+          />
+        </section>
 
         <footer className="mt-auto border-t border-border/60 pt-6 text-xs text-muted-foreground">
           Nothing publishes, sends or spends without your yes on that item. Affiliate and referral money shown anywhere
