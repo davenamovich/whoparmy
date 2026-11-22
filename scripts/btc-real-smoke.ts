@@ -38,8 +38,8 @@ try {
     stdio: "pipe",
   });
 
-  const { db } = await import("../src/lib/db.ts");
-  const svc = await import("../src/lib/btc-payouts.ts");
+  const { db } = await import("../src/lib/db");
+  const svc = await import("../src/lib/btc-payouts");
 
   // Seed members: A and B with payout addresses, C without.
   const a = await db.user.create({
@@ -65,7 +65,9 @@ try {
   await svc.addFundingEntry({ amountSats: 1_000_000, txid: "fundtx1", note: "seed" });
   await svc.addFundingEntry({ amountSats: 500 });
   let ledger = await svc.getLedgerState();
-  assert.deepEqual(ledger, { fundedSats: 1_000_500, paidOutSats: 0, balanceSats: 1_000_500 });
+  assert.deepEqual(ledger, {
+    fundedSats: 1_000_500, paidOutSats: 0, balanceSats: 1_000_500, committedSats: 0, availableSats: 1_000_500,
+  });
 
   // Roster: 2 with (masked), 1 without.
   const roster = await svc.getRoster();
@@ -123,7 +125,7 @@ try {
   const lineB = run2.batch.lines.find((l) => l.userId === b.id);
   assert.ok(lineB);
   // Raising B's line by 1 sat would push the batch past the balance.
-  await assert.rejects(() => svc.editLine(run2.batch.id, lineB.id, lineB.amountSats + 1), /balance/);
+  await assert.rejects(() => svc.editLine(run2.batch.id, lineB.id, lineB.amountSats + 1), /available/);
   // The rejected edit left the batch untouched.
   const detail2 = await svc.getBatchDetail(run2.batch.id);
   assert.equal(detail2.totalSats, 500_250);
@@ -141,7 +143,33 @@ try {
   await svc.cancelBatch(run2.batch.id);
   await assert.rejects(() => svc.approveBatch(run2.batch.id), /cannot be approved/);
 
+  // Overcommit guard: two DRAFTs each fit the balance alone, but an
+  // APPROVED batch holds its sats — the second approval must refuse.
+  const run3 = await svc.createBatch({ payoutBps: 6000, note: "smoke win 3" });
+  const run4 = await svc.createBatch({ payoutBps: 6000, note: "smoke win 4" });
+  assert.equal(run3.batch.totalSats, 300_150);
+  assert.equal(run4.batch.totalSats, 300_150);
+  await svc.approveBatch(run3.batch.id);
+  ledger = await svc.getLedgerState();
+  assert.equal(ledger.balanceSats, 500_250, "approval alone moves no sats");
+  assert.equal(ledger.committedSats, 300_150);
+  assert.equal(ledger.availableSats, 200_100);
+  await assert.rejects(() => svc.approveBatch(run4.batch.id), /only 200,100 sats are available/);
+  // A new run is sized from what is still available, not the raw balance.
+  const preview3 = await svc.previewRun(10_000);
+  assert.equal(preview3.ok, true);
+  if (preview3.ok) assert.equal(preview3.plan.distributableSats, 200_100);
+  // Cancelling the approved run frees its sats again.
+  await svc.cancelBatch(run3.batch.id);
+  ledger = await svc.getLedgerState();
+  assert.equal(ledger.committedSats, 0);
+  assert.equal(ledger.availableSats, 500_250);
+  await svc.approveBatch(run4.batch.id);
+
   console.log("BTC REAL SMOKE: all assertions passed");
+  // Close SQLite before the scratch dir is removed — Windows refuses
+  // to delete an open database file (EBUSY).
+  await db.$disconnect();
 } finally {
   rmSync(scratch, { recursive: true, force: true });
 }

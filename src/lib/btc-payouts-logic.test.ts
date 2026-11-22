@@ -7,6 +7,7 @@ import {
   splitEqually,
   computeRunPlan,
   exceedsBalance,
+  availableBalance,
   canTransition,
   canMarkPaid,
   maskAddress,
@@ -64,6 +65,14 @@ describe("funding / balance math", () => {
     assert.equal(exceedsBalance(100, 100), false);
     assert.equal(exceedsBalance(101, 100), true);
     assert.equal(exceedsBalance(0, 0), false);
+  });
+
+  it("availableBalance holds back APPROVED-but-unpaid runs", () => {
+    assert.equal(availableBalance(100_000, 0), 100_000);
+    assert.equal(availableBalance(100_000, 80_000), 20_000);
+    // Two 80k runs against 100k: the second no longer fits.
+    assert.equal(exceedsBalance(80_000, availableBalance(100_000, 0)), false);
+    assert.equal(exceedsBalance(80_000, availableBalance(100_000, 80_000)), true);
   });
 });
 
