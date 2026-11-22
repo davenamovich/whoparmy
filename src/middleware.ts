@@ -108,12 +108,18 @@ export function middleware(req: NextRequest) {
   // /api/agents write stays behind the session floor, and the
   // handler itself 401s a bad token / 403s a non-owner.
   const bridgeAgentPatch = /^\/api\/agents\/[^/]+$/.test(path) && req.method === "PATCH";
+  // GET /api/agents/mine (agent marketplace, 2026-11-21) — the read
+  // half of that PATCH: the owner's Muse lists its own agents' profile
+  // fields with the same bearer token. The handler authenticates
+  // (session OR bridge token) and 401s anything else.
+  const bridgeAgentsMine = path === "/api/agents/mine" && req.method === "GET";
   if (
     path.startsWith("/api/") &&
     process.env.ALLOW_OPERATOR_FALLBACK !== "1" &&
     !bridgePublishPost &&
     !bridgeLinkSyncPost &&
     !bridgeAgentPatch &&
+    !bridgeAgentsMine &&
     !PUBLIC_API_PREFIXES.some((p) => path.startsWith(p)) &&
     !req.cookies.get(SESSION_COOKIE_NAME)?.value
   ) {

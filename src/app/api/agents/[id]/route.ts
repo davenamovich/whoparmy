@@ -4,7 +4,7 @@ import { getWhopUser, isDesignatedOperator, UnauthorizedError } from "@/lib/auth
 import { verifyBridgeToken } from "@/lib/muse-bridge";
 import { isGrantExpired } from "@/lib/bot-grants";
 import { toolsFromJson, toolsToJson } from "@/lib/agent-architect-core";
-import { capabilitiesToJson, isAgentCategory, isHttpUrl, isValidSlug, slugify } from "@/lib/agent-profile";
+import { capabilitiesToJson, isAgentCategory, isHttpUrl, isValidSlug, slugify, uniqueSlug } from "@/lib/agent-profile";
 
 export const runtime = "nodejs";
 
@@ -134,7 +134,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       if (typeof body.publicProfile === "boolean") {
         const effectiveSlug = data.slug !== undefined ? data.slug : hire.slug;
         if (body.publicProfile && !effectiveSlug) {
-          return NextResponse.json({ error: "Set a slug before publishing this profile." }, { status: 400 });
+          // No slug yet: derive a free one from the agent's name. The
+          // bridge-token path may not choose a slug (see the restricted
+          // list above), so without this a member's Muse could never
+          // list its agent (agent marketplace, 2026-11-21). The slug is
+          // server-derived, never caller-chosen on that path.
+          data.slug = await uniqueSlug(typeof data.name === "string" ? data.name : hire.name, async (candidate) =>
+            Boolean(await db.hiredAgent.findFirst({ where: { slug: candidate, id: { not: id } }, select: { id: true } })),
+          );
         }
         data.publicProfile = body.publicProfile;
       }
