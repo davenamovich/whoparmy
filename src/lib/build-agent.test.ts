@@ -189,9 +189,10 @@ describe("composeBuildAgentAddendum", () => {
 
   it("instructs the Spaces build-out, pre-populated, ground running", () => {
     const text = composeBuildAgentAddendum({ ...base, connectLink: null, bridgeCode: null });
-    for (const part of ["Dashboard", "Approvals inbox", "Content library", "Jobs", "Costs", "Settings"]) {
+    for (const part of ["design standard", "Mission Control", "Approvals Studio", "Daily Brief", "Content Engine", "My Links & Rotator", "business-specific app", "Settings"]) {
       assert.ok(text.includes(part), part);
     }
+    assert.doesNotMatch(text, /Dashboard \/ Approvals inbox \/ Content library \/ Jobs \/ Costs/);
     assert.match(text, /hit the ground running/i);
     assert.match(text, /Do not hand me a blank scaffold/);
     assert.match(text, /first work already queued/);

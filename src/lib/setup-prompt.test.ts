@@ -38,12 +38,14 @@ const base = {
 };
 
 describe("composeSetupPrompt — the one agent-creation prompt (2026-11-20)", () => {
-  it("builds the engine as a Space in the member's own Muse", () => {
+  it("builds the life-first home base and starter apps in the member's own Muse", () => {
     const p = composeSetupPrompt({ ...base, link: "https://whop.plunderandriffle.com/connect/CODE1" });
-    assert.match(p, /BUILD MY AUTONOMOUS CONTENT ENGINE/);
-    assert.match(p, /## 4\. Build my engine as a Space/);
-    assert.match(p, /Acme Roofing — Content Engine/);
-    assert.match(p, /Approvals inbox/);
+    assert.match(p, /BUILD MY AI TEAM AND HOME BASE/);
+    assert.match(p, /## 4\. Build my home base and my starter apps/);
+    assert.match(p, /Acme Roofing — Home Base/);
+    for (const app of ["Mission Control", "Approvals Studio", "Daily Brief", "Content Engine", "My Links & Rotator", "business-specific app", "Settings"]) assert.ok(p.includes(app), app);
+    assert.match(p, /Color with meaning/);
+    assert.match(p, /Self-QA gate/);
     assert.doesNotMatch(p, /local web app/);
     assert.doesNotMatch(p, /agent management UI/i);
   });
@@ -54,10 +56,12 @@ describe("composeSetupPrompt — the one agent-creation prompt (2026-11-20)", ()
     assert.match(p, /## 5\. Turn on autopilot generation/);
     assert.match(p, /Schedule a daily run/);
     assert.match(p, /Approvals inbox/);
-    // The one "go" covers generation inside the budget; publishing never rides along.
-    assert.match(p, /My one "go" on this setup authorizes the build and autopilot GENERATION inside the budget/);
+    assert.match(p, /One money rule: generation runs on my credits in the background/);
+    assert.doesNotMatch(p, /quote me|Budget frame|projected daily cost/i);
+    assert.match(p, /Ask me at most three questions/);
+    assert.match(p, /Never lead a message with credits, costs, or limits/);
     assert.match(p, /Publishing, posting, and sending ALWAYS wait for my tap/);
-    assert.match(p, /never spend past the cap/);
+    assert.match(p, /pause and tell me in one plain sentence/);
   });
 
   it("without a link, the prompt carries the get-your-link step instead", () => {

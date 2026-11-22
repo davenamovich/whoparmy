@@ -406,7 +406,7 @@ export function composeBuildAgentAddendum(args: {
     ``,
     `## Build out my Spaces — I hit the ground running`,
     `Do not hand me a blank scaffold. Build out my Spaces in my Muse, finished and pre-populated, so day one is running the system — not setting it up:`,
-    `- The engine Space from the brief above (Dashboard / Approvals inbox / Content library / Jobs / Costs / Settings), named for my business, with my brand voice, my saved offer links and this agent's standing instructions baked in.`,
+    `- The home base Space from the brief above, built to its design standard and pre-populated with Mission Control, Approvals Studio, Daily Brief, Content Engine, My Links & Rotator, my business-specific app, and Settings; bake in my brand voice, saved offer links and this agent's standing instructions.`,
     `- ${design.name} stood up inside it: mission, schedule (${design.schedule}) and approval rules set from my quiz answers, its first work already queued from the research angles above.`,
     `- My first day's work already done or drafted and waiting in the Approvals inbox — the research summary at the top, so I see what you worked from.`,
     `If my answers call for another Space (a lead book for leads work, a research shelf for research work), build that too, the same way: populated, not empty.`,
