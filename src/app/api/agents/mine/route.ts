@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { verifyBridgeToken } from "@/lib/muse-bridge";
-import { AGENT_CATEGORIES, capabilitiesFromJson, PUBLIC_SITE_ORIGIN } from "@/lib/agent-profile";
+import { AGENT_CATEGORIES, ownerProfileView } from "@/lib/agent-profile";
 
 export const runtime = "nodejs";
 
@@ -44,17 +44,13 @@ export async function GET(req: NextRequest) {
         demoUrl: true,
         appUrl: true,
         gitUrl: true,
+        buildPrompt: true,
         spaceUrl: true,
       },
     });
     return NextResponse.json(
       {
-        agents: rows.map(({ capabilitiesJson, ...row }) => ({
-          ...row,
-          capabilities: capabilitiesFromJson(capabilitiesJson),
-          listed: Boolean(row.publicProfile && row.slug),
-          profileUrl: row.slug ? `${PUBLIC_SITE_ORIGIN}/agent/${row.slug}` : null,
-        })),
+        agents: rows.map(ownerProfileView),
         categories: AGENT_CATEGORIES,
         update: "PATCH /api/agents/{id} with the same bearer token — profile fields only.",
       },

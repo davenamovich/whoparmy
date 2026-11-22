@@ -160,6 +160,58 @@ export interface PublicAgentProfile {
 
 export const PUBLIC_SITE_ORIGIN = "https://whop.plunderandriffle.com";
 
+/** The fields a bridge token may read back about its owner's agent:
+ *  what it may write, plus id, status, slug and the public URL. */
+export interface OwnerProfileRow {
+  id: string;
+  name: string;
+  status: string;
+  slug: string | null;
+  publicProfile: boolean;
+  description: string | null;
+  category: string | null;
+  capabilitiesJson: string | null;
+  avatarUrl: string | null;
+  demoUrl: string | null;
+  appUrl: string | null;
+  gitUrl: string | null;
+  buildPrompt: string | null;
+  spaceUrl: string | null;
+}
+
+export interface OwnerProfileView extends Omit<OwnerProfileRow, "capabilitiesJson"> {
+  capabilities: string[];
+  listed: boolean;
+  profileUrl: string | null;
+}
+
+/**
+ * Owner-facing profile view for the bridge-token routes
+ * (GET /api/agents/mine and the PATCH /api/agents/{id} reply). Built
+ * field by field from an allowlist, so a full HiredAgent row passed in
+ * never leaks instructions, tools, budgets, userId or agent37Ref.
+ */
+export function ownerProfileView(row: OwnerProfileRow): OwnerProfileView {
+  return {
+    id: row.id,
+    name: row.name,
+    status: row.status,
+    slug: row.slug,
+    publicProfile: row.publicProfile,
+    description: row.description,
+    category: row.category,
+    capabilities: capabilitiesFromJson(row.capabilitiesJson),
+    avatarUrl: row.avatarUrl,
+    demoUrl: row.demoUrl,
+    appUrl: row.appUrl,
+    gitUrl: row.gitUrl,
+    buildPrompt: row.buildPrompt,
+    spaceUrl: row.spaceUrl,
+    listed: Boolean(row.publicProfile && row.slug),
+    profileUrl: row.slug ? `${PUBLIC_SITE_ORIGIN}/agent/${row.slug}` : null,
+  };
+}
+
 export function serializePublicProfile(agent: PublicProfileAgentRow, owner: PublicProfileOwnerRow): PublicAgentProfile {
   const slug = agent.slug ?? "";
   const displayName = owner.name?.trim() || owner.whopUsername?.trim() || "Whop Army member";
