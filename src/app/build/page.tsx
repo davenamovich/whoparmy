@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ArrowRight, Check, Copy, Loader2 } from "lucide-react";
 import { BUILD_QUIZ, type BuildQuizAnswers } from "@/lib/build-agent";
-import { stashRefFromUrl } from "@/lib/ref-stash";
+import { clearStashedRef, readStashedRef, stashRefFromUrl } from "@/lib/ref-stash";
 
 /**
  * ─── /build — the Build-an-Agent flow (Whop Army 2.0, Slice 4) ─────
@@ -83,6 +83,8 @@ function CopyButton({ text, children }: { text: string; children: React.ReactNod
 export default function BuildPage() {
   const [session, setSession] = useState<Session | null>(null);
   const [state, setState] = useState<FlowState | null>(null);
+  const [walkthrough, setWalkthrough] = useState(false);
+  const [walkthroughTouched, setWalkthroughTouched] = useState(false);
   const [website, setWebsite] = useState("");
   const [brandName, setBrandName] = useState("");
   const [answers, setAnswers] = useState<BuildQuizAnswers>({});
@@ -94,7 +96,8 @@ export default function BuildPage() {
   const loadState = useCallback(async () => {
     const res = await fetch("/api/build-agent", { cache: "no-store" });
     if (!res.ok) return null;
-    const data = (await res.json()) as { state: FlowState | null };
+    const data = (await res.json()) as { state: FlowState | null; suggestWalkthrough: boolean };
+    if (!walkthroughTouched) setWalkthrough(data.suggestWalkthrough);
     if (data.state) {
       setState(data.state);
       if (data.state.website) setWebsite(data.state.website);
@@ -102,7 +105,9 @@ export default function BuildPage() {
       if (data.state.quizAnswers) setAnswers(data.state.quizAnswers);
     }
     return data.state;
-  }, []);
+  }, [walkthroughTouched]);
+
+  const attributedRef = useRef(false);
 
   useEffect(() => {
     stashRefFromUrl();
@@ -114,6 +119,15 @@ export default function BuildPage() {
       })
       .catch(() => setSession({ connected: false, admin: false, user: null }));
   }, [loadState]);
+
+  useEffect(() => {
+    if (!session?.connected || attributedRef.current) return;
+    attributedRef.current = true;
+    const code = new URLSearchParams(window.location.search).get("ref") ?? readStashedRef();
+    if (!code) return;
+    void fetch("/api/referrals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) })
+      .catch(() => undefined).finally(() => clearStashedRef());
+  }, [session]);
 
   // Poll while research is running (the lane takes ~2 minutes).
   useEffect(() => {
@@ -158,7 +172,7 @@ export default function BuildPage() {
   }
 
   async function buildAgent() {
-    const data = await call("/api/build-agent/create", { method: "POST", body: JSON.stringify({}) }, "create");
+    const data = await call("/api/build-agent/create", { method: "POST", body: JSON.stringify({ walkthrough }) }, "create");
     if (data) {
       setCreated(data as unknown as CreateResult);
       void loadState();
@@ -213,6 +227,8 @@ export default function BuildPage() {
                 {error}
               </p>
             ) : null}
+
+            <UpdateTokenCard />
 
             {/* ─── Step 1 · Research ─────────────────────────────── */}
             <section className={step} aria-label="Step 1: research">
@@ -306,6 +322,13 @@ export default function BuildPage() {
                 One tap designs your agent from the research + quiz, creates it on your account (its public profile
                 stays off until you publish it), writes your personalized build prompt, and mints your bridge code.
               </p>
+              <label className="flex items-start gap-3 rounded-xl border border-border p-4 cursor-pointer">
+                <input type="checkbox" className="mt-1 h-4 w-4 accent-primary" checked={walkthrough} onChange={(event) => { setWalkthroughTouched(true); setWalkthrough(event.target.checked); }} />
+                <span className="space-y-1">
+                  <span className="block font-medium">New here? Have Muse walk me through setup first</span>
+                  <span className="block text-sm text-muted-foreground">Muse signs you up for the offers using your referrer's links, saves YOUR links, then builds your agent with them.</span>
+                </span>
+              </label>
               <Button onClick={() => void buildAgent()} disabled={busy !== null || !researchDone || !quizSaved}>
                 {busy === "create" ? <Loader2 className="h-4 w-4 animate-spin" /> : state?.agentId ? "Rebuild prompt + fresh code" : "Build my agent"}
               </Button>
@@ -387,4 +410,27 @@ export default function BuildPage() {
       </div>
     </main>
   );
+}
+
+function UpdateTokenCard() {
+  const [status, setStatus] = useState<{ active: boolean; createdAt: string | null; lastUsedAt: string | null } | null>(null);
+  const [raw, setRaw] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const refresh = () => fetch("/api/bridge/update-token", { cache: "no-store" }).then((r) => r.json()).then(setStatus);
+  useEffect(() => { void refresh().catch(() => setStatus(null)); }, []);
+  async function act(method: "POST" | "DELETE") {
+    setBusy(true); setError(null); setRaw(null);
+    try { const r = await fetch("/api/bridge/update-token", { method }); const d = await r.json(); if (!r.ok) throw new Error(d.error ?? "Request failed"); if (method === "POST") setRaw(d.token); await refresh(); }
+    catch (e) { setError(e instanceof Error ? e.message : "Request failed"); }
+    finally { setBusy(false); }
+  }
+  return <section className={step}>
+    <p className={label}>Permanent update connection</p>
+    <p className="text-sm">Your agent uses this to keep your links and agent updated. It can&apos;t spend credits.</p>
+    <p className="text-sm text-muted-foreground">{status?.active ? `Active since ${new Date(status.createdAt!).toLocaleString()} · Last used ${status.lastUsedAt ? new Date(status.lastUsedAt).toLocaleString() : "never"}` : status ? "No active update token" : "Loading status…"}</p>
+    <div className="flex gap-2"><Button disabled={busy} onClick={() => void act("POST")}>{status?.active ? "Create / Rotate" : "Create"}</Button>{status?.active ? <Button variant="outline" disabled={busy} onClick={() => void act("DELETE")}>Revoke</Button> : null}</div>
+    {raw ? <div className="break-all rounded bg-muted p-3 text-sm"><code>{raw}</code> <CopyButton text={raw}>Copy token</CopyButton><p className="mt-2 text-xs">Copy now; it is shown only once.</p></div> : null}
+    {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+  </section>;
 }

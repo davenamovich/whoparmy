@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getWhopUser, isDesignatedOperator, UnauthorizedError } from "@/lib/auth";
-import { verifyBridgeToken } from "@/lib/muse-bridge";
+import { verifyAnyBridgeToken } from "@/lib/muse-bridge";
 import { isGrantExpired } from "@/lib/bot-grants";
 import { toolsFromJson, toolsToJson } from "@/lib/agent-architect-core";
 import { capabilitiesToJson, isAgentCategory, isHttpUrl, isValidSlug, slugify } from "@/lib/agent-profile";
@@ -35,9 +35,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     let operator = false;
     let viaToken = false;
     if (bearer) {
-      const bridgeSession = await verifyBridgeToken(bearer);
-      if (!bridgeSession) return NextResponse.json({ error: "Invalid or expired bridge token." }, { status: 401 });
-      actorId = bridgeSession.user.id;
+      const credential = await verifyAnyBridgeToken(bearer);
+      if (!credential) return NextResponse.json({ error: "Invalid or expired bridge token." }, { status: 401 });
+      actorId = credential.kind === "spend" ? credential.session.user.id : credential.userId;
       viaToken = true;
     } else {
       const user = await getWhopUser();

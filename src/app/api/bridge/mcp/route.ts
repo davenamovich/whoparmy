@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { canUseForMcp, tokenKind } from "@/lib/update-token-core";
 import { BridgeError, hasLinkedCreditAccount, proxyToolCall, proxyToolsList, verifyBridgeToken } from "@/lib/muse-bridge";
 import { CLIP_TOOLS, callClipTool, isClipTool } from "@/lib/clips/tools";
 
@@ -73,6 +74,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  if (tokenKind(token) === "update" && !canUseForMcp("update")) return rpcError(id, -32001, "The update token can’t generate content.", 403);
   const session = await verifyBridgeToken(token);
   if (!session) {
     return rpcError(id, -32001, "Bridge token missing, expired or revoked. Generate a fresh code on /muse-week and exchange it again.", 401);

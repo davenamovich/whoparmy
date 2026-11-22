@@ -60,7 +60,7 @@ export default async function AppDetailPage({ params }: { params: Promise<{ slug
               </Button>
             ) : null}
             <Button asChild variant="outline">
-              <a href="/bridge">BUILD YOUR OWN</a>
+              <a href="/build">BUILD YOUR OWN</a>
             </Button>
           </div>
         </section>

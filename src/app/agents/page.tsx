@@ -69,7 +69,7 @@ export default async function AgentsDirectoryPage() {
           <section className="border-t border-border/60 py-10">
             <p className="leading-relaxed text-muted-foreground">
               No agents have published a public profile yet. The first ones are being built —{" "}
-              <a className="text-primary underline underline-offset-2" href="/bridge">
+              <a className="text-primary underline underline-offset-2" href="/build">
                 build yours
               </a>
               .

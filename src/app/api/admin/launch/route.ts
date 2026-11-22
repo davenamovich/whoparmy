@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
   }
 
   // BTC Experiment gate (Flow v2, 2026-11-19): the agent build
-  // unlocks only once the member's DH Media link is saved on /bridge.
+  // unlocks only once the member's DH Media link is saved through your agent’s links sync.
   // The save is the gate, and access follows the CURRENT saved link —
   // the prompt below is filled from the link saved right now, never
   // from a cached copy. No code is minted for a gated launch.
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         error:
-          "The BTC Experiment unlocks when your DH Media link is saved. Save your link on the bridge page first — the agent build follows your current saved link.",
+          "The BTC Experiment unlocks when your DH Media link is saved. Have your agent sync your DH Media link first — the operator launch follows your current saved link.",
         code: "NEEDS_DH_MEDIA_LINK",
       },
       { status: 400 },

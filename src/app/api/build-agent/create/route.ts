@@ -12,10 +12,11 @@ export const runtime = "nodejs";
  * member's bridge code. Re-running reuses the same agent and mints a
  * fresh code (the mint retires the old one, as everywhere else).
  */
-export async function POST() {
+export async function POST(request: Request) {
   try {
     const user = await getWhopUser();
-    const out = await createBuildAgent(user);
+    const body = await request.json().catch(() => ({})) as { walkthrough?: unknown };
+    const out = await createBuildAgent(user, { walkthrough: body.walkthrough === true });
     if ("error" in out) return NextResponse.json({ error: out.error }, { status: out.status });
     return NextResponse.json(out.result, { status: 201 });
   } catch (err) {

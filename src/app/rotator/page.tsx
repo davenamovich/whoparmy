@@ -146,7 +146,7 @@ export default async function RotatorMarketplacePage() {
           <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
             Want in? Members bid <strong className="text-foreground">free generations</strong> to feature one of their
             saved links for a day — bidding is in free generations, not money, and paid placements are not live yet.{" "}
-            <a className="text-primary underline underline-offset-2" href="/bridge">
+            <a className="text-primary underline underline-offset-2" href="/build">
               Bid on the bridge
             </a>
             .

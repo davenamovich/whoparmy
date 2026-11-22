@@ -59,7 +59,7 @@ hours for a BTC Experiment code). Do not retry it. Do not guess a
 replacement.
 
 Tell your member, in your own words: "That connection link has
-expired — get a fresh one at https://whop.plunderandriffle.com/bridge
+expired — get a fresh one at https://whop.plunderandriffle.com/build
 and send me the new link." Then stop and wait for the fresh link.`}
       />
     );
@@ -69,7 +69,7 @@ and send me the new link." Then stop and wait for the fresh link.`}
 
   if (live.scope === "experiment") {
     // The BTC Experiment's agent (Dave, 2026-11-20): the same BTC
-    // Barry prompt /bridge hands the member (lib/stack-prompt.ts), plus
+    // Barry prompt the operator launches (lib/stack-prompt.ts), plus
     // the first job — the 24/48-hour Facebook-ads experiment, restated
     // from Super Muse app/experiment/EXPERIMENT-24-48.md for agents
     // that are not Muse. Keep the two in step.

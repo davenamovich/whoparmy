@@ -32,6 +32,7 @@ model User {
   bridgeCodes  BridgeCode[]
   telegramPairCodes TelegramPairCode[]
   bridgeTokens BridgeToken[]
+  bridgeUpdateTokens BridgeUpdateToken[]
   researchJobs ResearchJob[]
   videoJobs    VideoJob[]
   engineLinks  EngineLink[]
@@ -749,6 +750,20 @@ model BridgeToken {
   revokedAt     DateTime?
   lastUsedAt    DateTime?
   createdAt     DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Permanent update-only bridge credential (pru_…). Only its SHA-256 is stored.
+model BridgeUpdateToken {
+  id         String   @id @default(cuid())
+  userId     String
+  tokenHash  String   @unique
+  createdAt  DateTime @default(now())
+  revokedAt  DateTime?
+  lastUsedAt DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

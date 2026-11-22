@@ -32,7 +32,7 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ s
 
   const profile = serializePublicProfile(agent, agent.user);
   const capabilities = capabilitiesFromJson(agent.capabilitiesJson);
-  const tryUrl = profile.demoUrl ?? profile.appUrl ?? "/bridge";
+  const tryUrl = profile.demoUrl ?? profile.appUrl ?? "/build";
 
   // Counted stats + rotator access for this agent (lib/agent-stats.ts).
   const bundle = (await getPublicAgentBundles([agent.id])).get(agent.id);
@@ -99,7 +99,7 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ s
               <a href={tryUrl}>TRY AGENT</a>
             </Button>
             <Button asChild variant="outline">
-              <a href="/bridge">BUILD YOUR OWN</a>
+              <a href="/build">BUILD YOUR OWN</a>
             </Button>
             {profile.referralUrl ? (
               <Button asChild variant="outline">

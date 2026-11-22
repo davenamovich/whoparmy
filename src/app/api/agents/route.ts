@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
     // on the member saving the offer link (Barry: DH Media).
     if (template.viaStack) {
       return NextResponse.json(
-        { error: `${template.name} joins through its stack, not a direct hire — save your offer link and launch the stack from /bridge.` },
+        { error: `${template.name} joins through its stack, not a direct hire — save your offer link and launch the stack from the operator panel.` },
         { status: 400 },
       );
     }

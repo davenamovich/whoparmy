@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { isDesignatedOperator } from "@/lib/auth";
 import { getSavedDhMediaLink } from "@/lib/btc-addresses";
 import { EXPERIMENT_GENERATING_COSTS, codeTtlMsForScope } from "@/lib/experiment-scope";
+import { publicUpdateTokenStatus, tokenKind } from "@/lib/update-token-core";
 
 /**
  * ─── Muse bridge connector (Dave, 2026-11-17) ───────────────────────
@@ -52,6 +53,7 @@ export function bridgeSharedKey(): string | null {
 }
 
 export const BRIDGE_TOKEN_PREFIX = "prb_";
+export const UPDATE_TOKEN_PREFIX = "pru_";
 export const BRIDGE_TOKEN_TTL_MS = 7 * 24 * 60 * 60_000; // one pairing = one week
 export const BRIDGE_CODE_TTL_MS = 15 * 60_000; // copy → paste → Muse's first call
 /** The week at list prices: 7 × create_demo_pack (115). The member sees
@@ -574,6 +576,49 @@ export async function verifyBridgeToken(raw: string | null): Promise<BridgeSessi
     expiresAt: row.expiresAt,
     scope,
   };
+}
+
+export type AnyBridgeToken = { kind: "spend"; session: BridgeSession } | { kind: "update"; userId: string };
+
+export async function verifyUpdateToken(raw: string | null): Promise<{ userId: string } | null> {
+  if (!raw || !raw.startsWith(UPDATE_TOKEN_PREFIX)) return null;
+  const row = await (db as any).bridgeUpdateToken.findUnique({ where: { tokenHash: sha256(raw) } });
+  if (!row || row.revokedAt) return null;
+  await (db as any).bridgeUpdateToken.update({ where: { id: row.id }, data: { lastUsedAt: new Date() } }).catch(() => undefined);
+  return { userId: row.userId };
+}
+
+export async function verifyAnyBridgeToken(raw: string | null): Promise<AnyBridgeToken | null> {
+  if (tokenKind(raw) === "update") {
+    const verified = await verifyUpdateToken(raw);
+    return verified ? { kind: "update", userId: verified.userId } : null;
+  }
+  const session = await verifyBridgeToken(raw);
+  return session ? { kind: "spend", session } : null;
+}
+
+export function bridgeTokenCanSpend(token: AnyBridgeToken | null): token is Extract<AnyBridgeToken, { kind: "spend" }> {
+  return token?.kind === "spend";
+}
+
+export async function mintUpdateToken(userId: string): Promise<{ token: string; createdAt: Date }> {
+  const token = UPDATE_TOKEN_PREFIX + randomBytes(32).toString("base64url");
+  const createdAt = new Date();
+  await db.$transaction(async (tx) => {
+    await (tx as any).bridgeUpdateToken.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: createdAt } });
+    await (tx as any).bridgeUpdateToken.create({ data: { userId, tokenHash: sha256(token), createdAt } });
+  });
+  return { token, createdAt };
+}
+
+export async function revokeUpdateTokens(userId: string): Promise<number> {
+  const out = await (db as any).bridgeUpdateToken.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } });
+  return out.count;
+}
+
+export async function getUpdateTokenStatus(userId: string): Promise<{ active: boolean; createdAt: Date | null; lastUsedAt: Date | null }> {
+  const row = await (db as any).bridgeUpdateToken.findFirst({ where: { userId, revokedAt: null }, orderBy: { createdAt: "desc" }, select: { createdAt: true, lastUsedAt: true } });
+  return publicUpdateTokenStatus(row);
 }
 
 export async function revokeBridgeToken(tokenId: string, userId: string): Promise<boolean> {

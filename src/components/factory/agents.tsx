@@ -301,8 +301,7 @@ export function AgentsView() {
             </Button>
           )}
           <p className="text-[11px] text-muted-foreground">
-            BTC Barry joins your team from the bridge —{" "}
-            <a href="/bridge" className="text-primary underline underline-offset-2">save your DH Media link to unlock him</a>.
+            Build your own agent from <a href="/build" className="text-primary underline underline-offset-2">the build flow</a>; it can enter the rotator when you publish it.
             Your blueprint and workforce design live in My AI System; this prompt carries them into your Muse.
           </p>
         </CardContent>

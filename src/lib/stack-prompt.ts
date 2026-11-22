@@ -9,7 +9,7 @@ import { codeTtlLabel } from "@/lib/experiment-scope";
 /**
  * Fill a stack's ignition prompt for one member and one minted code.
  * One implementation for every place a prompt is handed out — the
- * operator launcher (/api/admin/launch), the member's /bridge
+ * operator launcher (/api/admin/launch), the retired member launcher
  * (/api/bridge/agent) and the agent link (/connect/<code>) — so the
  * three can never disagree about what the agent is told.
  *

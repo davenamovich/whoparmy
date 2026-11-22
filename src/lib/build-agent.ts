@@ -371,6 +371,7 @@ export function composeBuildAgentAddendum(args: {
   agentId: string;
   connectLink: string | null;
   bridgeCode: string | null;
+  updateToken?: string | null;
 }): string {
   const { design } = args;
   const quizLines = quizAnswerLines(args.quiz)
@@ -385,6 +386,7 @@ export function composeBuildAgentAddendum(args: {
     `# YOUR AGENT — BUILT FROM YOUR RESEARCH + QUIZ`,
     ``,
     `Whop Army's Build-an-Agent flow designed ONE agent for me from deep research on my business and my quiz answers. Build THIS agent as the lead of the engine in the brief above.`,
+    `If Section 0 is present, complete its optional offer walkthrough before building; skipping or stopping it never blocks the build.`,
     ``,
     `## The agent`,
     `Name: ${design.name}`,
@@ -411,6 +413,8 @@ export function composeBuildAgentAddendum(args: {
     ``,
     `## Connect + manage through the bridge`,
     connectBlock,
+    `Your permanent update connection: ${args.updateToken ?? "Create it from Whop Army → Build an agent."} Save it in your secure storage and use it for links sync and agent/app updates. It never expires; if it stops working, it was revoked — ask me for a fresh one. It cannot generate content.`,
+    `My own P&R key: if I give you my P&R API key, save it in your secure storage and use it directly against the P&R MCP for generation on my credits. Never paste it into Whop Army, a Space, a file, or a log; never show it back to me in full.`,
     ``,
     `KEEP MY WHOP ARMY AGENT IN SYNC: the connection above gives you my bridge token (the prb_… token the connect link exchanges for). With it, you can update MY OWN agent's Whop Army record — the agent named at the top of this section:`,
     `PATCH https://whop.plunderandriffle.com/api/agents/${args.agentId}`,

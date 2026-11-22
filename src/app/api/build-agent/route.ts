@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getWhopUser, UnauthorizedError } from "@/lib/auth";
 import { getBuildFlow, refreshBuildResearch } from "@/lib/build-agent-server";
+import { getBridgeState } from "@/lib/bridge";
+import { shouldSuggestWalkthrough } from "@/lib/build-walkthrough-core";
 
 export const runtime = "nodejs";
 
@@ -13,7 +15,9 @@ export async function GET() {
   try {
     const user = await getWhopUser();
     const state = await refreshBuildResearch(user);
-    return NextResponse.json({ state: state ?? (await getBuildFlow(user.id)) });
+    const bridgeState = await getBridgeState(user.id);
+    const savedLinkCount = bridgeState.partners.filter((partner) => Boolean(partner.url)).length;
+    return NextResponse.json({ state: state ?? (await getBuildFlow(user.id)), savedLinkCount, suggestWalkthrough: shouldSuggestWalkthrough(savedLinkCount) });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load the build flow" },

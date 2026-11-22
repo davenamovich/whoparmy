@@ -87,7 +87,7 @@ export default function ClaimPage() {
                 </p>
                 {/* /bridge, not "/": home is closed while the site gate
                     is up, and the bridge is the next hand-off step. */}
-                <a href="/bridge" className="inline-block mt-3 text-sm text-primary underline underline-offset-2">
+                <a href="/build" className="inline-block mt-3 text-sm text-primary underline underline-offset-2">
                   Next: get your agent
                 </a>
               </div>

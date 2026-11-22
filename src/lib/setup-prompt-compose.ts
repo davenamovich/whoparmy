@@ -1,5 +1,6 @@
 import type { Blueprint } from "@/lib/blueprint";
 import type { SavedOfferLink } from "@/lib/muse-week-command";
+import type { WalkthroughOffer } from "@/lib/build-walkthrough-core";
 
 /**
  * Pure composition of THE agent-creation prompt (see setup-prompt.ts
@@ -15,13 +16,15 @@ export function composeEnginePrompt(args: {
   savedLinks?: SavedOfferLink[];
   languageLabel?: string;
   teamSection: string;
+  updateToken?: string | null;
+  walkthroughOffers?: WalkthroughOffer[];
 }): string {
   const { business, website, blueprint: bp, link } = args;
   // Saved links bridge over with the member (Dave, 2026-11-19):
   // their crew promotes with the member's own links from Day 1.
   const savedLinksBlock = args.savedLinks?.length
     ? `My saved offer links — when any workflow promotes one of these offers, use MY link exactly as written, never a house link:\n${args.savedLinks.map((l) => `- ${l.name}: ${l.url}`).join("\n")}`
-    : `My saved offer links: none saved yet — if a workflow promotes an offer, ask me to save my link first in Whop Army → Affiliate Manager, so promotions carry my link, not a house link.`;
+    : `My saved offer links: none saved yet — if a workflow promotes an offer, use my agent’s links sync to save the offer link through POST /api/bridge/links/sync before promoting it, so promotions carry my link, not a house link.`;
   const connectBlock = link
     ? `Open this link and follow its brief to connect to my P&R account:\n${link}\nThe link exchanges for a 7-day connection on my own credits, capped at the budget it states. It is CONTENT-ONLY: it generates content; it never publishes, posts, sends, or spends beyond quoted content credits.`
     : `I don't have a live connect link in this prompt. First, tell me the one step to get it: in the Plunder & Riffle app (whop.plunderandriffle.com), Account → "Talk to my Muse" mints my link (Operator and Agency plans). Once I paste it, follow its brief to connect. The connection is 7 days, on my own credits, content-only.`;
@@ -45,15 +48,35 @@ export function composeEnginePrompt(args: {
     })
     .join("\n");
 
+  const walkthroughSection = args.walkthroughOffers?.length
+    ? [
+        `## 0. Set me up first — walk me through my offers`,
+        `Offers to sign up for, in order:`,
+        ...args.walkthroughOffers.map((offer) => `- ${offer.name}: ${offer.signupUrl}${offer.signupSource === "referrer" ? " — this is my referrer's link, so I sign up under them." : ""}`),
+        `Walk me through the offers ONE at a time, DH Media first. For each offer, open or send me the link and wait for me to finish signing up. Logins and passwords are mine to enter — never ask for them, handle passwords, or complete a signup for me. Then ask me for MY new affiliate/referral link for that offer, or help me find it in the program's dashboard. I can skip any offer and stop the whole walkthrough at any time; skipping never blocks the build.`,
+        `After I give you each new link, save it immediately by POSTing { offers: [{ step: "<partner key>", link: "<my link>" }] } to https://whop.plunderandriffle.com/api/bridge/links/sync with my permanent update token from the update-token section below as the Bearer token. If sync skips or rejects a link, tell me plainly which offer failed and keep going — never invent a save.`,
+        `If an offer is one I connect through my own P&R account (per the catalog), use list_my_offers on my key where that applies and sync the result the same way.`,
+        `When the walkthrough ends — done, skipped, or stopped — re-check what got saved from the sync responses, then build my agent using MY saved links from that check. The saved-links block below is the PRE-walkthrough state; my newly saved links replace the “none saved yet” line wherever they exist.`,
+        `No earnings promises: affiliate money is simulated in Whop Army until actually paid.`,
+        ``,
+      ].join("\n")
+    : "";
+
   return [
     `# BUILD MY AUTONOMOUS CONTENT ENGINE`,
     ``,
+    ...(walkthroughSection ? [walkthroughSection] : []),
     `You are my Muse. Plunder & Riffle (P&R) is my creative engine; you are my operator. From this brief, build my complete autonomous content engine TODAY: a Space in my own Muse that holds my workforce, connects to my P&R account through my bridge, and starts generating my content on autopilot. I am a business owner, not an engineer — never ask me to learn tooling, APIs, or agent frameworks. You handle setup; I approve outcomes.`,
     ``,
     `## 1. Connect first`,
     connectBlock,
     `Before building, quote me: the setup cost (the free /before pack is free) and the projected daily cost of the autopilot in section 5, against the budget in section 3. My "go" then covers the whole build AND the autopilot generation inside that budget — I will not be asked to approve each piece as it generates. Anything beyond the budget still waits for me.`,
     ``,
+    `## Your permanent update connection`,
+    args.updateToken ? `Permanent update token: ${args.updateToken}` : `Get your permanent update token from Whop Army → Build an agent.`,
+    `Save this token in your secure storage and use it for links sync and my agent/app updates. It never expires; if it stops working, it was revoked — ask me for a fresh one. It cannot generate content.`,
+    `## My own P&R key`,
+    `If I give you my P&R API key, save it in your secure storage and use it directly against the P&R MCP for generation on my credits. Never paste it into Whop Army, a Space, a file, or a log; never show it back to me in full.`,
     `## 2. My business`,
     `Business: ${business}${website ? `\nWebsite: ${website}` : ""}`,
     `My language: ${args.languageLabel ?? "English"} — build my Space, the engine and my content defaults in my language.`,

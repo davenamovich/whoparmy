@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getWhopUser, isDesignatedOperator, UnauthorizedError } from "@/lib/auth";
-import { verifyBridgeToken } from "@/lib/muse-bridge";
+import { verifyAnyBridgeToken } from "@/lib/muse-bridge";
 import { cleanAppFields, uniqueSlug, type AppFieldInput } from "@/lib/application";
 
 export const runtime = "nodejs";
@@ -34,9 +34,9 @@ export async function POST(req: NextRequest) {
     let userId: string;
     let operator = false;
     if (bearer) {
-      const session = await verifyBridgeToken(bearer);
-      if (!session) return NextResponse.json({ error: "Invalid or expired bridge token." }, { status: 401 });
-      userId = session.user.id;
+      const credential = await verifyAnyBridgeToken(bearer);
+      if (!credential) return NextResponse.json({ error: "Invalid or expired bridge token." }, { status: 401 });
+      userId = credential.kind === "spend" ? credential.session.user.id : credential.userId;
     } else {
       const user = await getWhopUser();
       userId = user.id;

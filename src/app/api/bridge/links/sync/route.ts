@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { verifyBridgeToken } from "@/lib/muse-bridge";
+import { verifyAnyBridgeToken } from "@/lib/muse-bridge";
 import { grantFreePlacement } from "@/lib/bridge";
 import { getOfferCatalog } from "@/lib/offer-catalog-server";
 import { extractAffiliateRef, verifyLinkHost } from "@/lib/offer-catalog";
@@ -50,11 +50,11 @@ function statNum(v: unknown): number {
 export async function POST(req: NextRequest) {
   try {
     const bearer = bearerOf(req);
-    const session = bearer ? await verifyBridgeToken(bearer) : null;
-    if (!session) {
+    const credential = bearer ? await verifyAnyBridgeToken(bearer) : null;
+    if (!credential) {
       return NextResponse.json({ error: "Invalid or expired bridge token." }, { status: 401 });
     }
-    const userId = session.user.id;
+    const userId = credential.kind === "spend" ? credential.session.user.id : credential.userId;
 
     const body = (await req.json().catch(() => null)) as { offers?: unknown; pages?: unknown } | null;
     if (!body || !Array.isArray(body.offers)) {

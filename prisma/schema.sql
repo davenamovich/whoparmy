@@ -437,6 +437,17 @@ CREATE TABLE "BridgeToken" (
 );
 
 -- CreateTable
+CREATE TABLE "BridgeUpdateToken" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "tokenHash" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "revokedAt" DATETIME,
+    "lastUsedAt" DATETIME,
+    CONSTRAINT "BridgeUpdateToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
 CREATE TABLE "RotatorDay" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "date" TEXT NOT NULL,
@@ -692,6 +703,12 @@ CREATE UNIQUE INDEX "BridgeToken_tokenHash_key" ON "BridgeToken"("tokenHash");
 
 -- CreateIndex
 CREATE INDEX "BridgeToken_userId_idx" ON "BridgeToken"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "BridgeUpdateToken_tokenHash_key" ON "BridgeUpdateToken"("tokenHash");
+
+-- CreateIndex
+CREATE INDEX "BridgeUpdateToken_userId_idx" ON "BridgeUpdateToken"("userId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "RotatorDay_date_key" ON "RotatorDay"("date");

@@ -83,4 +83,14 @@ describe("composeSetupPrompt — the one agent-creation prompt (2026-11-20)", ()
     const p = composeSetupPrompt({ ...base, link: null });
     assert.match(p, /## 7\. Stand up my team board/);
   });
+
+  it("adds the optional offer walkthrough with resolved referrer links only when passed", () => {
+    const offer = { step: "salarium", name: "DH Media", signupUrl: "https://referrer.example/dh", signupSource: "referrer" as const };
+    const withWalkthrough = composeSetupPrompt({ ...base, link: null, walkthroughOffers: [offer] });
+    assert.match(withWalkthrough, /## 0\. Set me up first — walk me through my offers/);
+    assert.match(withWalkthrough, /DH Media: https:\/\/referrer\.example\/dh — this is my referrer's link/);
+    assert.match(withWalkthrough, /Logins and passwords are mine to enter/);
+    const withoutWalkthrough = composeSetupPrompt({ ...base, link: null });
+    assert.doesNotMatch(withoutWalkthrough, /## 0\. Set me up first/);
+  });
 });

@@ -6,6 +6,7 @@ import {
   bridgeOffer,
   getMemberEngineKey,
   mintBridgeCode,
+  mintUpdateToken,
   BridgeError,
 } from "@/lib/muse-bridge";
 import { teamBoardSection } from "@/lib/team-board";
@@ -13,6 +14,7 @@ import { getSavedOfferLinks } from "@/lib/bridge";
 import { getMemberLanguage } from "@/lib/member-language";
 import type { SavedOfferLink } from "@/lib/muse-week-command";
 import { composeEnginePrompt } from "@/lib/setup-prompt-compose";
+import type { WalkthroughOffer } from "@/lib/build-walkthrough-core";
 
 /**
  * ─── THE ONE AGENT-CREATION PROMPT (Dave, 2026-11-19; consolidated
@@ -51,8 +53,10 @@ export function composeSetupPrompt(args: {
   website: string | null;
   blueprint: Blueprint;
   link: string | null;
+  updateToken?: string | null;
   savedLinks?: SavedOfferLink[];
   languageLabel?: string;
+  walkthroughOffers?: WalkthroughOffer[];
 }): string {
   return composeEnginePrompt({
     ...args,
@@ -70,6 +74,7 @@ export async function craftSetupPrompt(user: Actor): Promise<SetupPromptResult> 
   });
 
   let link: string | null = null;
+  const updateToken = (await mintUpdateToken(user.id)).token;
   let eligible = false;
   try {
     const full = await db.user.findUnique({ where: { id: user.id } });
@@ -95,6 +100,7 @@ export async function craftSetupPrompt(user: Actor): Promise<SetupPromptResult> 
       website: brand?.website ?? null,
       blueprint: bp,
       link,
+      updateToken,
       savedLinks: await getSavedOfferLinks(user.id).catch(() => []),
       languageLabel: (await getMemberLanguage(user.id).catch(() => null))?.label,
     }),

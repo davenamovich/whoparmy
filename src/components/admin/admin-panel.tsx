@@ -203,8 +203,8 @@ export function AdminPanel({ gate, stacks }: { gate: GateState; stacks: StackRow
                   current saved link, so the prompt always carries the link you have saved now. No bridge code
                   was minted.
                 </p>
-                <a href="/bridge" className="text-sm text-primary underline underline-offset-2">
-                  Save your DH Media link on the bridge page
+                <a href="/build" className="text-sm text-primary underline underline-offset-2">
+                  Manage your agent setup on /build
                 </a>
               </div>
             )}

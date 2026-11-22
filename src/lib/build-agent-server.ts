@@ -13,11 +13,14 @@ import {
   bridgeOffer,
   getMemberEngineKey,
   mintBridgeCode,
+  mintUpdateToken,
 } from "@/lib/muse-bridge";
-import { getSavedOfferLinks } from "@/lib/bridge";
+import { getBridgeState, getSavedOfferLinks } from "@/lib/bridge";
+import { selectWalkthroughOffers, shouldSuggestWalkthrough } from "@/lib/build-walkthrough-core";
 import { getMemberLanguage } from "@/lib/member-language";
 import { saveQuiz } from "@/lib/quiz";
 import { awardXp } from "@/lib/game";
+import { ensureAgentRotatorRow } from "@/lib/rotator-v2";
 import { recordConversion } from "@/lib/referrals";
 import {
   composeAgentInstructions,
@@ -307,7 +310,7 @@ export interface BuildCreateResult {
   bridgeEligible: boolean;
 }
 
-export async function createBuildAgent(user: User): Promise<{ result: BuildCreateResult } | { error: string; status: number }> {
+export async function createBuildAgent(user: User, options: { walkthrough?: boolean } = {}): Promise<{ result: BuildCreateResult } | { error: string; status: number }> {
   let state = await refreshBuildResearch(user);
   state = state ?? (await getBuildFlow(user.id));
   if (!state || (state.researchStatus !== "done" && state.researchStatus !== "reused")) {
@@ -355,6 +358,11 @@ export async function createBuildAgent(user: User): Promise<{ result: BuildCreat
     if (totalHires === 1) void recordConversion(user.id).catch(() => {});
   }
 
+  // Built agents use the same shared rotator row path as other hires.
+  // Best-effort bookkeeping must not interrupt prompt delivery.
+  try { await ensureAgentRotatorRow(agent.id, user.id); }
+  catch (err) { console.error("[build-agent] ensureAgentRotatorRow failed:", err); }
+
   // The prompt: Day-1 engine prompt composed with a freshly minted
   // bridge link when the member is bridge-eligible (the setup-prompt
   // pattern); otherwise the prompt still crafts and says the one step.
@@ -374,13 +382,19 @@ export async function createBuildAgent(user: User): Promise<{ result: BuildCreat
     if (!(e instanceof BridgeError)) throw e;
   }
 
+  const updateToken = (await mintUpdateToken(user.id)).token;
+  const walkthroughOffers = options.walkthrough
+    ? selectWalkthroughOffers((await getBridgeState(user.id)).partners)
+    : undefined;
   const base = composeSetupPrompt({
     business: state.brandName ?? state.profile?.name ?? design.name,
     website: state.website ?? null,
     blueprint,
     link,
+    updateToken,
     savedLinks: await getSavedOfferLinks(user.id).catch(() => []),
     languageLabel: (await getMemberLanguage(user.id).catch(() => null))?.label,
+    walkthroughOffers,
   });
   const addendum = composeBuildAgentAddendum({
     design,
@@ -390,6 +404,7 @@ export async function createBuildAgent(user: User): Promise<{ result: BuildCreat
     agentId: agent.id,
     connectLink: link,
     bridgeCode: code,
+    updateToken,
   });
   const prompt = `${base}\n\n${addendum}`;
 
