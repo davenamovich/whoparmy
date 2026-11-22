@@ -4,8 +4,8 @@ import { getRotatorState, placeRotatorBid } from "@/lib/rotator";
 
 /**
  * The daily rotator auction — member surface.
- * GET  — today's destination + my balance/links + the biddable days.
- * POST — place or update my bid { date, partner, amount } (free gens;
+ * GET  — today's destination + my Bid Points/links + the biddable days.
+ * POST — place or update my bid { date, partner, amount } (Bid Points;
  *        nothing is deducted unless an admin confirms me the winner).
  */
 

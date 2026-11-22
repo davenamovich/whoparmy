@@ -3,6 +3,16 @@ import { db } from "@/lib/db";
 import { etDateString } from "@/lib/rotator";
 import { spotWindowKeyForPlacementDate } from "@/lib/rotator-market";
 import {
+  BARRY_SLUG as POLICY_BARRY_SLUG,
+  DH_MEDIA_PARTNER_KEYS,
+  effectivePolicy,
+  filterRowsByPolicy,
+  planMemberPoolSync,
+  referrerRow,
+  validateOffers,
+  validatePool,
+} from "@/lib/agent-rotator-policy-core";
+import {
   hashIp,
   HOP_FILTER_POLICY,
   isAgentWorking,
@@ -212,6 +222,8 @@ export async function getAgentRotator(ownerUserId: string, agentId: string) {
   const key = secret();
   return {
     ...rotator,
+    /** What the rotator actually serves under, defaults applied. */
+    policy: effectivePolicy(rotator, agent.slug),
     code: key ? mintAgentRotatorCode(rotator.id, key) : null,
     links: links.map((link) => ({ ...link, hopsToday: counts.get(link.id) ?? 0 })),
   };
@@ -235,6 +247,25 @@ export async function updateAgentRotator(ownerUserId: string, agentId: string, i
   }
   if (body.enabled !== undefined && typeof body.enabled !== "boolean") {
     return { ok: false, error: "Enabled must be a boolean." };
+  }
+  // The owner's offer pick (Dave, 2026-11-22: "each agent only promotes
+  // their offers chosen by their owner") and pool. `offers: null`
+  // clears the pick back to unconfigured.
+  let offersJson: string | null | undefined;
+  if (body.offers !== undefined) {
+    if (body.offers === null) {
+      offersJson = null;
+    } else {
+      const offers = validateOffers(body.offers);
+      if (!offers.ok) return offers;
+      offersJson = JSON.stringify(offers.offers);
+    }
+  }
+  let pool: string | undefined;
+  if (body.pool !== undefined) {
+    const checked = validatePool(body.pool);
+    if (!checked.ok) return checked;
+    pool = checked.pool;
   }
 
   let validated: ReturnType<typeof validateLinkSet> | undefined;
@@ -261,6 +292,8 @@ export async function updateAgentRotator(ownerUserId: string, agentId: string, i
       data: {
         ...(body.mode ? { mode: body.mode as string } : {}),
         ...(body.enabled !== undefined ? { enabled: body.enabled as boolean } : {}),
+        ...(offersJson !== undefined ? { offersJson } : {}),
+        ...(pool !== undefined ? { pool } : {}),
       },
     });
 
@@ -411,27 +444,105 @@ async function gatherHopHistory(ipHash: string | null, linkId: string | null, us
 }
 
 /**
- * House Barry is DH Media ONLY on his Ride rotator (Dave,
- * 2026-11-22): the public btc-barry agent's serve must never send
- * a rider to Muse, Agent37, Fish or any other saved link, even if
- * an older provisioning left those rows in his rotator. Filtering
- * at serve time makes the rule live immediately; provisioning
- * (lib/barry-rotator-core.ts) prunes the rows themselves.
+ * Kept for callers and tests of the 2026-11-22 DH-only fix: house
+ * Barry's offers now come from the rotator policy
+ * (lib/agent-rotator-policy-core.ts), whose Barry default is exactly
+ * this DH Media filter.
  */
-export const BARRY_SLUG = "btc-barry";
-export const BARRY_DH_MEDIA_PARTNERS: readonly string[] = ["salarium", "dh-media"];
+export const BARRY_SLUG = POLICY_BARRY_SLUG;
+export const BARRY_DH_MEDIA_PARTNERS: readonly string[] = DH_MEDIA_PARTNER_KEYS;
 export function filterBarryRideRows<T extends { engineLink: { partner: string } }>(
   agentSlug: string | null | undefined,
   rows: T[],
 ): T[] {
   if (agentSlug !== BARRY_SLUG) return rows;
-  return rows.filter((row) => BARRY_DH_MEDIA_PARTNERS.includes(row.engineLink.partner));
+  return rows.filter((row) => DH_MEDIA_PARTNER_KEYS.includes(row.engineLink.partner));
 }
 
-/** Serves an agent's signed rotator link and records the selected hop. */
+type RotatorRow = NonNullable<Awaited<ReturnType<typeof db.agentRotator.findUnique>>>;
+
+/**
+ * A MEMBERS pool picks up every member who has saved a link for one of
+ * the agent's offers: saving the link is how a member gets in on the
+ * rotator. Add-only, appended after the current last position, so the
+ * round robin order of existing members never shifts.
+ */
+async function syncMemberPool(rotatorId: string, offers: string[] | null): Promise<void> {
+  if (!offers || offers.length === 0) return;
+  const [existing, candidates] = await Promise.all([
+    db.agentRotatorLink.findMany({ where: { rotatorId }, select: { engineLinkId: true, position: true } }),
+    db.engineLink.findMany({
+      where: { partner: { in: offers }, url: { startsWith: "http" } },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      select: { id: true },
+    }),
+  ]);
+  const plan = planMemberPoolSync(existing, candidates);
+  for (const row of plan) {
+    // One at a time: SQLite has no createMany skipDuplicates, and a
+    // concurrent serve may have added the same member a moment ago
+    // (the unique [rotatorId, engineLinkId] index rejects the repeat).
+    await db.agentRotatorLink
+      .create({ data: { rotatorId, engineLinkId: row.engineLinkId, position: row.position } })
+      .catch(() => undefined);
+  }
+}
+
+/** Rows this rotator may serve right now, under its offer policy. */
+async function servableRows(rotator: RotatorRow, agentSlug: string | null) {
+  const policy = effectivePolicy(rotator, agentSlug);
+  if (policy.pool === "MEMBERS") await syncMemberPool(rotator.id, policy.offers);
+  const today = etDateString();
+  const window = { gte: dayStart(today), lt: dayEnd(today) };
+  const [allRows, hopCount, hopRows] = await Promise.all([
+    db.agentRotatorLink.findMany({
+      where: {
+        rotatorId: rotator.id,
+        enabled: true,
+        ...(policy.pool === "OWNER" ? { engineLink: { userId: rotator.userId } } : {}),
+      },
+      include: { engineLink: true },
+      orderBy: [{ position: "asc" }, { id: "asc" }],
+    }),
+    db.rotatorHop.count({
+      where: { rotatorId: rotator.id, counted: true, ts: window },
+    }),
+    db.rotatorHop.groupBy({
+      by: ["linkId"],
+      where: { rotatorId: rotator.id, counted: true, ts: window, linkId: { not: null } },
+      _count: { _all: true },
+    }),
+  ]);
+  const rows = filterRowsByPolicy(allRows, policy, rotator.userId);
+  const counts = new Map(hopRows.map((hop) => [hop.linkId!, hop._count._all]));
+  return { policy, rows, hopCount, counts };
+}
+
+function pickRow<T extends { id: string; weight: number; position: number; dailyCap: number | null }>(
+  rows: T[],
+  mode: "SEQUENTIAL" | "WEIGHTED",
+  hopCount: number,
+  counts: Map<string, number>,
+): T | null {
+  const picks: PickableLink[] = rows.map((link) => ({
+    linkId: link.id,
+    weight: link.weight,
+    position: link.position,
+    hopsToday: counts.get(link.id) ?? 0,
+    dailyCap: link.dailyCap,
+  }));
+  const pick = mode === "SEQUENTIAL" ? pickSequential(picks, hopCount) : pickWeighted(picks, Math.random());
+  return pick ? rows.find((link) => link.id === pick.linkId) ?? null : null;
+}
+
+/** Serves an agent's signed rotator link and records the selected hop.
+ *  With `ref` (a member's refCode), a visitor to a MEMBERS pool goes to
+ *  that member's own link for the agent's offers when they have one;
+ *  without it, the rotator's normal pick (a MEMBERS pool's round robin). */
 export async function serveAgentRotator(
   code: string,
   meta: { ip: string | null; ua: string | null; referer: string | null },
+  opts: { ref?: string | null } = {},
 ) {
   const key = secret();
   if (!key) {
@@ -455,42 +566,18 @@ export async function serveAgentRotator(
     return null;
   }
 
-  const today = etDateString();
-  const window = { gte: dayStart(today), lt: dayEnd(today) };
-  const [allRows, hopCount, hopRows] = await Promise.all([
-    db.agentRotatorLink.findMany({
-      where: {
-        rotatorId: rotator.id,
-        enabled: true,
-        engineLink: { userId: rotator.userId },
-      },
-      include: { engineLink: true },
-      orderBy: [{ position: "asc" }, { id: "asc" }],
-    }),
-    db.rotatorHop.count({
-      where: { rotatorId: rotator.id, counted: true, ts: window },
-    }),
-    db.rotatorHop.groupBy({
-      by: ["linkId"],
-      where: { rotatorId: rotator.id, counted: true, ts: window, linkId: { not: null } },
-      _count: { _all: true },
-    }),
-  ]);
-  const rows = filterBarryRideRows(agent.slug, allRows);
-  const counts = new Map(hopRows.map((hop) => [hop.linkId!, hop._count._all]));
-  const picks: PickableLink[] = rows.map((link) => ({
-    linkId: link.id,
-    weight: link.weight,
-    position: link.position,
-    hopsToday: counts.get(link.id) ?? 0,
-    dailyCap: link.dailyCap,
-  }));
-  const pick = rotator.mode === "SEQUENTIAL" ? pickSequential(picks, hopCount) : pickWeighted(picks, Math.random());
-  if (!pick) {
+  const { policy, rows, hopCount, counts } = await servableRows(rotator, agent.slug);
+  const ref = typeof opts.ref === "string" ? opts.ref.trim() : "";
+  let selected: (typeof rows)[number] | null = null;
+  if (ref && policy.pool === "MEMBERS") {
+    const referrer = await db.user.findFirst({ where: { refCode: ref }, select: { id: true } });
+    selected = referrerRow(rows, referrer?.id ?? null);
+  }
+  selected ??= pickRow(rows, policy.mode, hopCount, counts);
+  if (!selected) {
     return null;
   }
 
-  const selected = rows.find((link) => link.id === pick.linkId)!;
   await recordRotatorHop({
     surface: "AGENT",
     rotatorId: rotator.id,
@@ -523,46 +610,17 @@ export async function resolveAgentRotatorDestination(agentId: string) {
     return null;
   }
 
-  const today = etDateString();
-  const window = { gte: dayStart(today), lt: dayEnd(today) };
-  const [allRows, hopCount, hopRows] = await Promise.all([
-    db.agentRotatorLink.findMany({
-      where: {
-        rotatorId: rotator.id,
-        enabled: true,
-        engineLink: { userId: rotator.userId },
-      },
-      include: { engineLink: true },
-      orderBy: [{ position: "asc" }, { id: "asc" }],
-    }),
-    db.rotatorHop.count({
-      where: { rotatorId: rotator.id, counted: true, ts: window },
-    }),
-    db.rotatorHop.groupBy({
-      by: ["linkId"],
-      where: { rotatorId: rotator.id, counted: true, ts: window, linkId: { not: null } },
-      _count: { _all: true },
-    }),
-  ]);
-  const rows = filterBarryRideRows(agent.slug, allRows);
-  const counts = new Map(hopRows.map((hop) => [hop.linkId!, hop._count._all]));
-  const picks: PickableLink[] = rows.map((link) => ({
-    linkId: link.id,
-    weight: link.weight,
-    position: link.position,
-    hopsToday: counts.get(link.id) ?? 0,
-    dailyCap: link.dailyCap,
-  }));
-  const pick = rotator.mode === "SEQUENTIAL" ? pickSequential(picks, hopCount) : pickWeighted(picks, Math.random());
-  if (!pick) {
+  const { policy, rows, hopCount, counts } = await servableRows(rotator, agent.slug);
+  const selected = pickRow(rows, policy.mode, hopCount, counts);
+  if (!selected) {
     return null;
   }
-
-  const selected = rows.find((link) => link.id === pick.linkId)!;
   return {
     url: appendSubParam(selected.engineLink.url, agentId),
     partner: selected.engineLink.partner,
-    userId: rotator.userId,
+    // The member whose link is served: in a MEMBERS pool that is not
+    // the agent's owner.
+    userId: selected.engineLink.userId,
     rotatorId: rotator.id,
     linkId: selected.id,
   };

@@ -32,8 +32,8 @@ export function RotatorSummaryCard() {
         .map(([state, n]) => `${state} ${n}`)
         .join(" · ") || "—",
     ],
-    ["Bids", `${summary.totalBids} (${summary.gensBidVolume} gens bid)`],
-    ["Confirmed winners", `${summary.confirmedWinners} (${summary.gensDeducted} gens deducted)`],
+    ["Bids", `${summary.totalBids} (${summary.gensBidVolume} points bid)`],
+    ["Confirmed winners", `${summary.confirmedWinners} (${summary.gensDeducted} stakes taken)`],
     ["Counted impressions (marketplace)", String(summary.countedImpressions)],
     ["Counted launches (marketplace)", String(summary.countedLaunches)],
     ["Active free placements today", String(summary.activeFreePlacements)],
@@ -45,7 +45,7 @@ export function RotatorSummaryCard() {
       <CardHeader>
         <CardTitle>Rotator marketplace</CardTitle>
         <p className="text-sm text-muted-foreground">
-          The public /rotator surface over the existing daily auction. Currency is free generations; traffic numbers
+          The public /rotator surface over the existing daily auction. Currency is Bid Points (days confirmed before 2026-11-22 took free generations); traffic numbers
           are counted hops only.
         </p>
       </CardHeader>

@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 /**
  * OPERATOR ONLY — the rotator marketplace summary (Whop Army 2.0,
  * Slice 5): today + the last 7 days of derived inventory states, bid
- * volume in free generations, confirmed winners and gens deducted,
+ * volume in Bid Points, confirmed winners and stakes taken,
  * counted marketplace impressions/launches, and today's active free
  * placements. The financials block is explicitly SIMULATED: paid
  * placements are not live and no money moves in this slice —

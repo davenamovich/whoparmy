@@ -89,6 +89,9 @@ const ADDITIVE_COLUMNS: Array<{ table: string; column: string; ddl: string }> = 
   { table: "PickaphoneSession", column: "pendingOfferSweat", ddl: 'ALTER TABLE "PickaphoneSession" ADD COLUMN "pendingOfferSweat" BOOLEAN NOT NULL DEFAULT false' },
   { table: "EngineLink", column: "source", ddl: 'ALTER TABLE "EngineLink" ADD COLUMN "source" TEXT NOT NULL DEFAULT \'manual\'' },
   { table: "EngineLink", column: "externalRef", ddl: 'ALTER TABLE "EngineLink" ADD COLUMN "externalRef" TEXT' },
+  // Agent rotator offer policy (2026-11-22): owner-picked offers + pool.
+  { table: "AgentRotator", column: "offersJson", ddl: 'ALTER TABLE "AgentRotator" ADD COLUMN "offersJson" TEXT' },
+  { table: "AgentRotator", column: "pool", ddl: 'ALTER TABLE "AgentRotator" ADD COLUMN "pool" TEXT NOT NULL DEFAULT \'OWNER\'' },
 ];
 for (const { table, column, ddl } of ADDITIVE_COLUMNS) {
   const cols = db.query(`PRAGMA table_info("${table}")`).all() as Array<{ name: string }>;

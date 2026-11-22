@@ -18,8 +18,9 @@ export const dynamic = "force-dynamic";
  * the destination server-side. On a day with no live placement, the
  * house card is The BTC Experiment (Dave, 2026-11-21).
  *
- * The auction currency is FREE GENERATIONS, exactly as the member
- * rotator has always worked. Paid placements are not live yet and
+ * The auction currency is BID POINTS (Dave, 2026-11-22: the auctions
+ * are not won with free generations — those are prizes). Bid Points
+ * come only from referrals (lib/doors/points.ts). Paid placements are not live yet and
  * no money moves here — settlement is a later, separately gated
  * slice, and every money figure anywhere stays SIMULATED until then.
  */
@@ -82,7 +83,7 @@ export default async function RotatorMarketplacePage() {
           <p className={label}>The Daily Rotator</p>
           <h1 className="text-4xl font-black leading-tight tracking-tight sm:text-5xl">Today&apos;s featured destinations.</h1>
           <p className="max-w-md leading-relaxed text-muted-foreground">
-            One auction a day, won with free generations. The winner and the day&apos;s free placements rotate here
+            One auction a day, won with Bid Points. The winner and the day&apos;s free placements rotate here
             until midnight ET.
           </p>
           <p className="text-sm font-semibold text-primary">
@@ -138,14 +139,14 @@ export default async function RotatorMarketplacePage() {
                 <span className="block text-xs text-muted-foreground">{day.date}</span>
                 <span className="mt-2 block text-sm font-semibold">{STATE_LABEL[day.state] ?? day.state}</span>
                 <span className="block text-xs text-muted-foreground">
-                  {day.bidCount} {day.bidCount === 1 ? "bid" : "bids"} in free generations
+                  {day.bidCount} {day.bidCount === 1 ? "bid" : "bids"} in Bid Points
                 </span>
               </li>
             ))}
           </ul>
           <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
-            Want in? Members bid <strong className="text-foreground">free generations</strong> to feature one of their
-            saved links for a day — bidding is in free generations, not money, and paid placements are not live yet.{" "}
+            Want in? Members bid <strong className="text-foreground">Bid Points</strong> to feature one of their
+            saved links for a day — Bid Points come only from referrals, never money, and paid placements are not live yet.{" "}
             <a className="text-primary underline underline-offset-2" href="/build">
               Bid on the bridge
             </a>

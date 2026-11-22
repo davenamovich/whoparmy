@@ -56,7 +56,7 @@ export async function getMemberDashboard(userId: string) {
       inTodayPool: rotator.today.pool.some((e) => e.userId === userId),
       todayPartnerName: rotator.today.partnerName,
       todayPoolSize: rotator.today.poolSize,
-      myFreeGenBalance: rotator.myFreeGenBalance,
+      myBidPoints: rotator.myBidPoints,
       myBids: rotator.days
         .filter((d) => d.myBid)
         .map((d) => ({ date: d.date, amount: d.myBid!.amount, partner: d.myBid!.partner, isWinner: d.isWinner })),
