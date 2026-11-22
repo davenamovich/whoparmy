@@ -1200,6 +1200,8 @@ CREATE TABLE "AgentRotator" (
     "userId" TEXT NOT NULL,
     "mode" TEXT NOT NULL DEFAULT 'WEIGHTED',
     "enabled" BOOLEAN NOT NULL DEFAULT true,
+    "offersJson" TEXT,
+    "pool" TEXT NOT NULL DEFAULT 'OWNER',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "AgentRotator_agentId_fkey" FOREIGN KEY ("agentId") REFERENCES "HiredAgent" ("id") ON DELETE CASCADE ON UPDATE CASCADE,

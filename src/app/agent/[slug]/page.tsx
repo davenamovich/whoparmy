@@ -24,8 +24,19 @@ export const dynamic = "force-dynamic";
 
 const label = "font-mono text-[11px] font-semibold tracking-[0.18em] text-primary uppercase";
 
-export default async function AgentProfilePage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function AgentProfilePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ ref?: string | string[] }>;
+}) {
   const { slug } = await params;
+  // A visitor who arrived with a referral rides to the referrer's own
+  // link for this agent's offers; without one, the round robin
+  // (lib/agent-rotator-policy-core.ts).
+  const rawRef = (await searchParams).ref;
+  const ref = typeof rawRef === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(rawRef) ? rawRef : null;
   const agent = await db.hiredAgent.findFirst({
     where: { slug, publicProfile: true },
     include: { user: { select: { name: true, whopUsername: true, refCode: true } } },
@@ -40,6 +51,11 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ s
   const bundle = (await getPublicAgentBundles([agent.id])).get(agent.id);
   const stats = bundle?.stats;
   const access = bundle?.access;
+  const rideUrl = access?.rotator.serveUrl
+    ? ref
+      ? `${access.rotator.serveUrl}?ref=${encodeURIComponent(ref)}`
+      : access.rotator.serveUrl
+    : null;
 
   // House CTA (Dave, 2026-11-21): the strip routes offsite to
   // Plunder & Riffle — resolved owner-first in the access block
@@ -163,8 +179,8 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ s
             <h2 className={label}>Ride the rotator</h2>
             <ul className="space-y-3">
               <li className="rounded-2xl border border-border p-5">
-                {access.rotator.serveUrl ? (
-                  <a href={access.rotator.serveUrl} className="block space-y-1">
+                {rideUrl ? (
+                  <a href={rideUrl} className="block space-y-1">
                     <span className="block font-black">Ride {profile.name}&rsquo;s rotator →</span>
                     <span className="block text-sm text-muted-foreground">
                       One click sends you to one of this agent&apos;s destinations, rotating on every visit.
@@ -187,7 +203,7 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ s
                 <a href={access.dailyRotatorUrl} className="block space-y-1">
                   <span className="block font-black">Enter the daily rotator →</span>
                   <span className="block text-sm text-muted-foreground">
-                    Today&apos;s featured destinations from every agent — one auction, won with free generations.
+                    Today&apos;s featured destinations from every agent — one auction, won with Bid Points.
                   </span>
                 </a>
               </li>
@@ -202,7 +218,7 @@ export default async function AgentProfilePage({ params }: { params: Promise<{ s
             </ul>
             <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
               How spots work: spots open at <strong className="text-foreground">11:50 PM ET</strong> for the next 24
-              hours, sized by demand. Members bid free generations for the featured spot in the daily rotator.
+              hours, sized by demand. Members bid Bid Points — earned only from referrals — for the featured spot in the daily rotator.
             </p>
           </section>
         ) : null}

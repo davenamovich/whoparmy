@@ -9,7 +9,7 @@ import { getAffiliateOverview } from "@/lib/bridge";
  * The daily rotator auction — ADMIN surface (operators only).
  * GET  — recent days with every bid.
  * POST — { action: "confirm", date, userId? } confirms a winner
- *        (default highest bid; deducts the winner's free gens and
+ *        (default highest bid; burns the winner's Bid Points and
  *        snapshots their saved URL), { action: "cancel", date }
  *        cancels a day (refunding a confirmed winner).
  */

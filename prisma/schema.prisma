@@ -607,6 +607,8 @@ model AgentRotator {
   userId    String
   mode      String   @default("WEIGHTED")
   enabled   Boolean  @default(true)
+  offersJson String? // owner-picked partner keys (JSON array) this agent promotes; null = not configured (lib/agent-rotator-policy-core.ts)
+  pool       String  @default("OWNER") // OWNER = only the owner's saved links | MEMBERS = every member's saved link for those offers, round robin
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

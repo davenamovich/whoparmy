@@ -5,6 +5,8 @@ import { rotatorV2Enabled } from "@/lib/rotator-v2-core";
 /**
  * Serves an agent's signed rotator link.
  * GET — pick an eligible saved EngineLink and redirect to its URL.
+ * ?ref=<refCode> sends the visitor to that member's own link for the
+ * agent's offers (a MEMBERS pool); without it, the round robin.
  */
 
 export async function GET(req: NextRequest, context: { params: Promise<{ code: string }> }) {
@@ -19,7 +21,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ code: s
     ip,
     ua: req.headers.get("user-agent"),
     referer: req.headers.get("referer"),
-  });
+  }, { ref: req.nextUrl.searchParams.get("ref") });
 
   return result
     ? NextResponse.redirect(result.url, 302)
