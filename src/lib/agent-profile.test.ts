@@ -7,6 +7,7 @@ import {
   isAgentCategory,
   isHttpUrl,
   isValidSlug,
+  ownerProfileView,
   serializePublicProfile,
   slugify,
   uniqueSlug,
@@ -147,5 +148,33 @@ describe("serializePublicProfile", () => {
     assert.equal(profile.agent37Connected, false);
     assert.equal(profile.referralUrl, null);
     assert.equal(profile.owner.displayName, "Whop Army member");
+  });
+});
+
+describe("ownerProfileView — bridge-token reply allowlist", () => {
+  const fullRow = {
+    id: "a1", userId: "u1", name: "Tide Writer", status: "ACTIVE", slug: "tide-writer", publicProfile: true,
+    description: "Writes a newsletter.", category: "Content", capabilitiesJson: '["Newsletters"]',
+    avatarUrl: null, demoUrl: null, appUrl: null, gitUrl: null, buildPrompt: null, spaceUrl: null,
+    instructions: "SECRET standing instructions", toolsJson: '[{"id":"x"}]', role: "writer",
+    tokenBudget: 100000, tokensUsed: 5, agent37Ref: "a37_secret", source: "RENTAL", templateKey: "custom",
+    bankrTokenAddress: "0xabc", expiresAt: null, createdAt: new Date(), updatedAt: new Date(),
+  };
+
+  it("never carries private fields even when handed a full row", () => {
+    const view = ownerProfileView(fullRow) as unknown as Record<string, unknown>;
+    for (const key of ["userId", "instructions", "toolsJson", "role", "tokenBudget", "tokensUsed", "agent37Ref", "bankrTokenAddress", "capabilitiesJson"]) {
+      assert.equal(key in view, false, `${key} must not be in the owner view`);
+    }
+    assert.ok(!JSON.stringify(view).includes("SECRET"));
+  });
+
+  it("parses capabilities and derives listed + profileUrl", () => {
+    const view = ownerProfileView(fullRow);
+    assert.deepEqual(view.capabilities, ["Newsletters"]);
+    assert.equal(view.listed, true);
+    assert.equal(view.profileUrl, "https://whop.plunderandriffle.com/agent/tide-writer");
+    assert.equal(ownerProfileView({ ...fullRow, slug: null }).listed, false);
+    assert.equal(ownerProfileView({ ...fullRow, slug: null }).profileUrl, null);
   });
 });

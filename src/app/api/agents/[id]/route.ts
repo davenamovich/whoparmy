@@ -4,7 +4,7 @@ import { getWhopUser, isDesignatedOperator, UnauthorizedError } from "@/lib/auth
 import { verifyBridgeToken } from "@/lib/muse-bridge";
 import { isGrantExpired } from "@/lib/bot-grants";
 import { toolsFromJson, toolsToJson } from "@/lib/agent-architect-core";
-import { capabilitiesToJson, isAgentCategory, isHttpUrl, isValidSlug, slugify, uniqueSlug } from "@/lib/agent-profile";
+import { capabilitiesToJson, isAgentCategory, isHttpUrl, isValidSlug, ownerProfileView, slugify, uniqueSlug } from "@/lib/agent-profile";
 
 export const runtime = "nodejs";
 
@@ -192,7 +192,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
       }
       const updated = await db.hiredAgent.update({ where: { id }, data });
-      return NextResponse.json({ hire: updated });
+      // The member's own UI (session) gets the full row it renders;
+      // a bridge token gets the profile fields only — the same shape
+      // as GET /api/agents/mine, never instructions, tools or budgets.
+      return NextResponse.json(viaToken ? { agent: ownerProfileView(updated) } : { hire: updated });
     }
 
     if (body.status !== "ACTIVE" && body.status !== "PAUSED") {
