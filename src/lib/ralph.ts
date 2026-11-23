@@ -304,7 +304,7 @@ export async function ralphAction(userId: string, locale: string, actionId: Ralp
         const link = `https://whop.plunderandriffle.com/connect/${minted.code}`;
         return {
           text:
-            `Here's your agent link — minted just now, good for 15 minutes, works once:\n\n${link}\n\n` +
+            `Here's your agent link — minted just now, good for 24 hours, works once:\n\n${link}\n\n` +
             `Give it to Muse or any AI agent you use. The page hands the agent your connection and your business; it researches you free, quotes you the options (a Taste, a Week), and spends nothing without your "go". This connection is capped at ${minted.budgetCredits} credits, and publishing stays off — posting is your in-app tap.\n\n` +
             `Prefer to paste? Same thing as a command:\n\n${command}`,
           actions: ["my_plan", "make_content"],

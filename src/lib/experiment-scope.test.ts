@@ -9,13 +9,13 @@ import {
 } from "./experiment-scope.ts";
 
 describe("experiment scope", () => {
-  it("gives experiment codes 24 hours and every other scope 15 minutes", () => {
+  it("gives every scope 24 hours", () => {
     assert.equal(codeTtlMsForScope("experiment"), EXPERIMENT_CODE_TTL_MS);
     assert.equal(EXPERIMENT_CODE_TTL_MS, 24 * 60 * 60_000);
-    assert.equal(codeTtlMsForScope("week"), 15 * 60_000);
-    assert.equal(codeTtlMsForScope("clips"), 15 * 60_000);
+    assert.equal(codeTtlMsForScope("week"), 24 * 60 * 60_000);
+    assert.equal(codeTtlMsForScope("clips"), 24 * 60 * 60_000);
     assert.equal(codeTtlLabel("experiment"), "24 hours");
-    assert.equal(codeTtlLabel("week"), "15 minutes");
+    assert.equal(codeTtlLabel("week"), "24 hours");
   });
 
   it("allows the ad tools and never the clip, publish or MP4 tools", () => {

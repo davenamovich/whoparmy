@@ -287,7 +287,7 @@ export async function runAgentJob(jobId: string): Promise<void> {
       }
       const command =
         `You are my Assessor agent, connected to my Plunder & Riffle account through my bridge at whop.plunderandriffle.com. My credits are mine — never ask me for an API key; it stays on the engine side and I will never paste it anywhere. Work and answer in ${languageLabel(job.language)}.\n\n` +
-        `1. My bridge code is {BRIDGE_CODE} (one-time, expires in 15 minutes). Exchange it: POST https://whop.plunderandriffle.com/api/bridge/exchange with {"code": "{BRIDGE_CODE}"}. You get a bridge token (7 days) and the MCP URL. Use the token as the Bearer credential for every MCP call through https://whop.plunderandriffle.com/api/bridge/mcp. Never print the token back to me, and never store it past this run.\n` +
+        `1. My bridge code is {BRIDGE_CODE} (one-time, expires in 24 hours). Exchange it: POST https://whop.plunderandriffle.com/api/bridge/exchange with {"code": "{BRIDGE_CODE}"}. You get a bridge token (7 days) and the MCP URL. Use the token as the Bearer credential for every MCP call through https://whop.plunderandriffle.com/api/bridge/mcp. Never print the token back to me, and never store it past this run.\n` +
         `2. My business is ${input.slice(0, 1500)}.${product ? ` The product/service to feature is: ${product}.` : ""}${assessmentFit ? ` I already lean toward the ${assessmentFit} assessment — confirm or correct the fit from the evidence, do not just agree.` : ""} Research it first through the bridge MCP (research_brand, then create_campaign_from_research) — both are free. Work only from what the research actually found about my business; invent nothing.${priorResearch}\n` +
         `3. Quote me the Assessor run before you spend anything: one create_before_pitch for my business — a personalized /before pack (a 30–50 second audio monologue plus 5 memes about MY business). It reserves 50 credits of my bridge budget and settles at the actual charge. Tell me the expected cost and my remaining balance (get_account through the bridge), and wait for my "go". No go, no spend.\n` +
         `4. On my "go", run create_before_pitch through the bridge${product ? ` with the product pinned` : ""}, polling get_job_status (kind demo_pack) until it is done. Read the finished pack page and the research before writing anything.\n` +
@@ -297,7 +297,7 @@ export async function runAgentJob(jobId: string): Promise<void> {
         `THE ASSESSOR — BRIDGE HANDOFF\n` +
         `Whoparmy doesn't make this one. Your own Muse makes it, through your bridge, on your own Plunder & Riffle credits, and delivers it on your own pages. Nothing spends on the house key and nothing is generated inside Whoparmy.\n\n` +
         `1) Get your bridge code: open https://whop.plunderandriffle.com/muse-week and generate your command. It runs on your own credits and needs at least 50 credits for one /before pack.\n` +
-        `2) Paste the command below to your Muse, swapping {BRIDGE_CODE} for your fresh code (it expires in 15 minutes and works once).\n` +
+        `2) Paste the command below to your Muse, swapping {BRIDGE_CODE} for your fresh code (it expires in 24 hours and works once).\n` +
         `3) Your Muse quotes the run first and waits for your "go" before spending. The pack and the $999 offer come back from your Muse — approve them there.\n\n` +
         `── PASTE TO YOUR CLAUDE ──\n${command}\n── END ──`;
       await db.$transaction([

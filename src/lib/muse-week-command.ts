@@ -48,7 +48,7 @@ export function museWeekCommand(code: string, businessUrl: string, budget: numbe
       : "";
   const intro = `You are my content agent, connected to my Plunder & Riffle account through my bridge at whop.plunderandriffle.com. My credits are mine — never ask me for an API key; it stays on the engine side and I will never paste it anywhere.
 
-1. My bridge code is ${code} (one-time, expires in 15 minutes). Exchange it: POST https://whop.plunderandriffle.com/api/bridge/exchange with {"code": "${code}"}. You get a bridge token (7 days) and the MCP URL. Use the token as the Bearer credential for every MCP call. Never print the token back to me, and never store it past this week.
+1. My bridge code is ${code} (one-time, expires in 24 hours). Exchange it: POST https://whop.plunderandriffle.com/api/bridge/exchange with {"code": "${code}"}. You get a bridge token (7 days) and the MCP URL. Use the token as the Bearer credential for every MCP call. Never print the token back to me, and never store it past this week.
 2. My business is ${businessUrl}. Research it first through the bridge MCP (research_brand, then create_campaign_from_research) — both are free. Work only from what the research actually found about my business; invent nothing.${languageLine}`;
 
   if (offer === "taste") {

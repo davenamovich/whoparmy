@@ -44,7 +44,7 @@ const MUSE_WEEK_PROMPT = `**Make my week of content**
 
 You are my content agent, connected to my Plunder & Riffle account through my bridge at whop.plunderandriffle.com. My credits are mine — never ask me for an API key; it stays in my P&R hub and I will never paste it anywhere.
 
-1. My bridge code is **{BRIDGE_CODE}** (one-time, expires in 15 minutes). Exchange it at \`POST https://whop.plunderandriffle.com/api/bridge/exchange\` with \`{"code": "{BRIDGE_CODE}"}\` for my bridge token (7 days) and the MCP URL; use the token as the Bearer <redacted> for every MCP call. Never print the token back to me, and never store it past this week.
+1. My bridge code is **{BRIDGE_CODE}** (one-time, expires in 24 hours). Exchange it at \`POST https://whop.plunderandriffle.com/api/bridge/exchange\` with \`{"code": "{BRIDGE_CODE}"}\` for my bridge token (7 days) and the MCP URL; use the token as the Bearer <redacted> for every MCP call. Never print the token back to me, and never store it past this week.
 2. My business is **{BUSINESS_URL}**. Research it first (\`research_brand\`, then \`create_campaign_from_research\`) — both are free. Work only from what the research actually found about my business; invent nothing.
 3. **Quote me the week before you spend anything:** 7 day-packs (\`create_demo_pack\` — 5 memes, an iMessage, a Top 10 and a slideshow per day), one for each day, each on a different angle from the research: Day 1 my offer · Day 2 my customer's pain · Day 3 proof · Day 4 one product · Day 5 me vs. the alternative · Day 6 questions customers ask · Day 7 best-of + call to action. Tell me the exact credit cost and my remaining balance (check \`get_account\` through the bridge), and wait for my "go". No go, no spend.
 4. On my "go", make all 7 packs through the bridge (\`https://whop.plunderandriffle.com/api/bridge/mcp\`), polling \`get_job_status\` until each is done. A failed piece refunds — if a whole pack fails, tell me and retry it once.
@@ -55,7 +55,7 @@ const CLIP_FACTORY_PROMPT = `**Make my clips**
 
 You are my clipping agent, connected to my Plunder & Riffle account through my bridge at whop.plunderandriffle.com. My credits are mine — never ask me for an API key; it stays in my P&R hub and I will never paste it anywhere.
 
-1. My bridge code is **{BRIDGE_CODE}** (one-time, expires in 15 minutes). Exchange it at \`POST https://whop.plunderandriffle.com/api/bridge/exchange\` with \`{"code": "{BRIDGE_CODE}"}\` for my bridge token and the MCP URL; use the token as the Bearer <redacted> for every MCP call. Never print the token back to me, and never store it past this session.
+1. My bridge code is **{BRIDGE_CODE}** (one-time, expires in 24 hours). Exchange it at \`POST https://whop.plunderandriffle.com/api/bridge/exchange\` with \`{"code": "{BRIDGE_CODE}"}\` for my bridge token and the MCP URL; use the token as the Bearer <redacted> for every MCP call. Never print the token back to me, and never store it past this session.
 2. **Set me up first — ask me these, one at a time:**
    - The clip links. Only clips I own or have permission to clip — if I can't say whose clip it is and that I have the right to use it, stop and tell me why.
    - The creator credit line, exactly as it should appear in every post copy.

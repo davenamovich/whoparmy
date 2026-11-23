@@ -55,7 +55,7 @@ export function bridgeSharedKey(): string | null {
 export const BRIDGE_TOKEN_PREFIX = "prb_";
 export const UPDATE_TOKEN_PREFIX = "pru_";
 export const BRIDGE_TOKEN_TTL_MS = 7 * 24 * 60 * 60_000; // one pairing = one week
-export const BRIDGE_CODE_TTL_MS = 15 * 60_000; // copy → paste → Muse's first call
+export const BRIDGE_CODE_TTL_MS = 24 * 60 * 60_000; // 24 hours to paste (Dave, 2026-11-23; was 15 minutes)
 /** The week at list prices: 7 × create_demo_pack (115). The member sees
  *  this number and the bot-quoted balance before anything spends. */
 export const WEEK_BUDGET_CREDITS = 7 * 115;
@@ -456,7 +456,7 @@ export async function mintBridgeCode(
   const budget =
     Math.max(0, Math.min(MAX_BUDGET_CREDITS, Number.isFinite(truncated) ? truncated : 0));
   const code = newBridgeCode();
-  // 15 minutes, except experiment codes: 24 hours (Dave, 2026-11-20),
+  // 24 hours for every scope (Dave, 2026-11-23; experiment codes were already 24h, 2026-11-20),
   // so a code survives the member setting up their agent.
   const expiresAt = new Date(Date.now() + codeTtlMsForScope(scope));
   // A fresh code retires every unused one before it: only one live code
@@ -485,7 +485,7 @@ export async function exchangeBridgeCode(rawCode: string): Promise<{ token: stri
   // downgraded after minting holds a week code that no longer opens
   // the offer; a clips code re-checks the linked-account test instead
   // (plan never enters it). The code is NOT consumed by this refusal —
-  // it works again if eligibility returns inside its 15 minutes.
+  // it works again if eligibility returns inside its 24 hours.
   const owner = await db.user.findUnique({ where: { id: row.userId } });
   if (!owner) throw new BridgeError(400, "BAD_CODE", "That bridge code isn't valid.");
   if (scope === "clips") assertClipsEligible(owner);

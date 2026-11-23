@@ -22,8 +22,7 @@ Ask your human:
 > "Open https://whop.plunderandriffle.com/bridge, sign in with Whop, and paste me the
 > one-time bridge code it shows."
 
-The code works once and expires (within 15 minutes to 24 hours, depending on where it was
-made). Exchange it:
+The code works once and expires after 24 hours. Exchange it:
 
 ```http
 POST https://whop.plunderandriffle.com/api/bridge/exchange

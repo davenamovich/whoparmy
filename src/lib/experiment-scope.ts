@@ -20,7 +20,7 @@
  */
 
 export const EXPERIMENT_CODE_TTL_MS = 24 * 60 * 60_000;
-export const DEFAULT_CODE_TTL_MS = 15 * 60_000;
+export const DEFAULT_CODE_TTL_MS = 24 * 60 * 60_000; // every bridge code lasts 24 hours (Dave, 2026-11-23; was 15 minutes)
 
 /** List costs from the engine's own tool descriptions. */
 export const EXPERIMENT_GENERATING_COSTS: Record<string, number> = {
@@ -35,9 +35,9 @@ export function codeTtlMsForScope(scope: string): number {
   return scope === "experiment" ? EXPERIMENT_CODE_TTL_MS : DEFAULT_CODE_TTL_MS;
 }
 
-/** "24 hours" / "15 minutes" — for briefs and prompts that state the lifetime. */
+/** "24 hours" — for briefs and prompts that state the lifetime. */
 export function codeTtlLabel(scope: string): string {
-  return scope === "experiment" ? "24 hours" : "15 minutes";
+  return "24 hours";
 }
 
 /**
