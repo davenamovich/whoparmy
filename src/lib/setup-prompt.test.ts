@@ -44,8 +44,12 @@ describe("composeSetupPrompt — the one agent-creation prompt (2026-11-20)", ()
     assert.match(p, /## 4\. Build my home base and my starter apps/);
     assert.match(p, /Acme Roofing — Home Base/);
     for (const app of ["Mission Control", "Approvals Studio", "Daily Brief", "Content Engine", "My Links & Rotator", "business-specific app", "Settings"]) assert.ok(p.includes(app), app);
-    assert.match(p, /Color with meaning/);
     assert.match(p, /Self-QA gate/);
+    assert.match(p, /## Your only jobs — about seven taps in the whole setup, all of them yours alone/);
+    assert.match(p, /## Teach me as you build[\s\S]*2–3 short plain sentences[\s\S]*what this step sets up, why it matters, and what it will let me do[\s\S]*never “API key,” “endpoint,” or “token”[\s\S]*never a lecture up front and never repeat it later/);
+    for (const job of ["Sign in with Whop", "Paste your connect link", "Complete the DH Media payment", "send the USDT yourself", "BotFather bot token", "Approve the Vercel login", "Connect Upload-Post"]) assert.ok(p.includes(job), job);
+    assert.match(p, /Passwords are always yours, never Muse's/);
+    assert.match(p, /full design standard and layout spec live in the Super Muse Mission Control module and the space specs in app\/spaces\//);
     assert.doesNotMatch(p, /local web app/);
     assert.doesNotMatch(p, /agent management UI/i);
   });
@@ -93,7 +97,9 @@ describe("composeSetupPrompt — the one agent-creation prompt (2026-11-20)", ()
     const withWalkthrough = composeSetupPrompt({ ...base, link: null, walkthroughOffers: [offer] });
     assert.match(withWalkthrough, /## 0\. Set me up first — walk me through my offers/);
     assert.match(withWalkthrough, /DH Media: https:\/\/referrer\.example\/dh — this is my referrer's link/);
-    assert.match(withWalkthrough, /Logins and passwords are mine to enter/);
+    assert.match(withWalkthrough, /I enter passwords and verification codes myself/);
+    assert.doesNotMatch(withWalkthrough, /wait for me to finish signing up/i);
+    assert.match(withWalkthrough, /Muse opens and drives the signup in my browser\/session/);
     const withoutWalkthrough = composeSetupPrompt({ ...base, link: null });
     assert.doesNotMatch(withoutWalkthrough, /## 0\. Set me up first/);
   });
@@ -126,6 +132,10 @@ describe("composeSetupPrompt — the one agent-creation prompt (2026-11-20)", ()
     assert.ok(items.every((index) => index >= 0));
     assert.deepEqual(items, [...items].sort((a, b) => a - b));
     assert.match(p, /My links saved unlock my key at the \$0\.01 generation rate\. All five saves unlock full BYOK/);
+    assert.match(p, /everything your army makes carries YOUR links, and your key drops to the 1-cent generation rate/);
+    assert.match(p, /your agent thinks and writes on your own inference — you're not renting the house's brain/);
+    assert.match(p, /your videos render as MP4s on your own worker at 1 credit instead of the 25-credit house rate/);
+    assert.match(p, /your agent in your pocket — it answers and works while you sleep/);
     assert.match(p, /test render that bills 1 credit/);
     assert.match(p, /If it bills 25 credits, the worker is saved under a different record and this step is NOT done/);
     assert.match(p, /Skipping an unlock never blocks the build; the rest finishes later from Mission Control's Unlock panel/);
@@ -139,6 +149,17 @@ describe("composeSetupPrompt — the one agent-creation prompt (2026-11-20)", ()
     assert.match(p, /https:\/\/plati\.market\/itm\/api-claude-fable-5-2-5-1-opus-5-5-sonnet-5-5-auto-delivery-1m-1b\/6047499/);
     assert.match(p, /pay by sending USDT myself from my own wallet/);
     assert.match(p, /Auto-delivery delivers the API access\/key/);
+    const renderer = p.indexOf("My Agent37 renderer — save it as my worker");
+    const telegram = p.indexOf("My agent on Telegram");
+    const fish = p.indexOf("My Fish Audio key", renderer);
+    assert.ok(renderer >= 0);
+    assert.ok(telegram > renderer && telegram < fish);
+    assert.match(p, /BotFather in chat, one message at a time/);
+    assert.match(p, /stay awake \(auto-sleep off — a sleeping bot cannot answer\)/);
+    assert.match(p, /send \/start first to claim my bot/);
+    assert.match(p, /live round-trip: the bot answers me in my brand voice\. No reply = NOT done; name the one blocking step/);
+    assert.match(p, /token only in my own secure storage and the instance's environment — never a file, a log, or show it back in full/);
+    assert.match(p, /NOT a sixth unlock: the five saves stay five/);
   });
 
   it("renders goals, the Vercel Board deliverable, and the DH Media approval exception", () => {
@@ -151,12 +172,16 @@ describe("composeSetupPrompt — the one agent-creation prompt (2026-11-20)", ()
     assert.match(p, /Top opportunity: Storm season — Demand spikes after storms/);
     assert.match(p, /Everything you build must name which goal it serves/);
     assert.match(p, /## Vercel Board — after the five unlock saves verify/);
+    assert.match(p, /a team of experts your Muse can ask — different frontier models, one best answer back/);
+    assert.match(p, /your command room — your whole army, approvals, and results on one screen/);
     assert.match(p, /team of experts that helps me/);
     assert.match(p, /Muse posts a hard question, experts answer from different frontier models/);
     assert.match(p, /npm install --global vercel@latest/);
     assert.match(p, /own named --as profile/);
     assert.match(p, /one real test call through the board/);
     assert.match(p, /Vercel Board created and tested after all five unlock saves verify/);
-    assert.match(p, /EXCEPTION: for DH Media, run the signup WITH me and submit it only after my explicit yes/);
+    assert.match(p, /Muse opens and drives the signup in my browser\/session, pausing for my approval/);
+    assert.match(p, /I enter passwords and verification codes myself; I complete payment moments myself/);
+    assert.match(p, /This is the offer Barry promotes; your saved link is your rotator spot/);
   });
 });
