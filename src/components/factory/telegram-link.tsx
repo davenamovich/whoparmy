@@ -59,7 +59,7 @@ export function TelegramLinkCard() {
             <p className="text-sm flex-1">
               Your one-time code:{" "}
               <span className="font-mono font-bold tracking-widest">{pair.code}</span>{" "}
-              <span className="text-muted-foreground">(expires in 15 minutes)</span>
+              <span className="text-muted-foreground">(expires in 24 hours)</span>
             </p>
             <a
               href={pair.botLink}

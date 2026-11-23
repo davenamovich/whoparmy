@@ -12,13 +12,13 @@ import { db as prisma } from "@/lib/db";
  * both surfaces.
  *
  * Discipline mirrors BridgeCode: only the SHA-256 hash is stored,
- * the plaintext is shown exactly once, codes expire in 15 minutes,
+ * the plaintext is shown exactly once, codes expire in 24 hours,
  * and consumption is single-use (usedAt is the lock).
  */
 
 const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O/1/I/L
 const CODE_LENGTH = 8;
-const TTL_MS = 15 * 60 * 1000;
+const TTL_MS = 24 * 60 * 60 * 1000; // 24 hours, same as bridge codes (Dave, 2026-11-23; was 15 minutes)
 
 function hashCode(code: string): string {
   return createHash("sha256").update(code.trim().toUpperCase()).digest("hex");
