@@ -25,6 +25,20 @@ export function composeEnginePrompt(args: {
   const savedLinksBlock = args.savedLinks?.length
     ? `My saved offer links — when any workflow promotes one of these offers, use MY link exactly as written, never a house link:\n${args.savedLinks.map((l) => `- ${l.name}: ${l.url}`).join("\n")}`
     : `My saved offer links: none saved yet — before promoting a catalog offer, pull my list_my_offers on my P&R key and sync it to Whop Army. For a new catalog link, save it with save_my_offer first, then re-run list_my_offers and POST the result to /api/bridge/links/sync so promotions carry my link, not a house link. If save_my_offer fails, say so plainly and use the direct sync POST; non-catalog offers use the direct sync POST only.`;
+  const unlockSection = [
+    `## The Unlock — five saves that turn my key fully on`,
+    `Walk me through these five unlocks in order. Each save belongs on my own engine record, under the key it belongs to:`,
+    `1. My own links — I sign up under my referrer's link (the rotator or a direct referral), then save MY links engine-first with save_my_offer and verify them with list_my_offers.`,
+    `2. My LLM key — Starimg or any OpenAI-compatible inference key.`,
+    `3. My Giphy key — free to get.`,
+    `4. My Agent37 renderer — save it as my worker.`,
+    `5. My Fish Audio key.`,
+    `My links saved unlock my key at the $0.01 generation rate. All five saves unlock full BYOK: every generation and render runs at my own 1-credit rate on my own providers and record.`,
+    `Verify live, never assume: every save counts only when you read it back from my engine record. For links, use list_my_offers; for provider keys, read the saved-key state back after each save. Prove the renderer with a short test render that bills 1 credit. If it bills 25 credits, the worker is saved under a different record and this step is NOT done — re-save it under my connected record.`,
+    `At the end, show me the five states as Unlocked or Not yet, with the one finishing step for each missing item. Skipping an unlock never blocks the build; the rest finishes later from Mission Control's Unlock panel.`,
+    `I can disconnect each item at any time, on my tap only: remove links with delete_my_offer, and remove provider saves from my engine record. Re-run the live check after a disconnect.`,
+    `Keep the standing rules: my keys never go into Whop Army, a file, or a log, and never come back to me in full; logins and passwords are mine to enter; affiliate money is SIMULATED until actually paid; make no earnings promises.`,
+  ].join("\n");
   const connectBlock = link
     ? `Open this link and follow its brief to connect to my P&R account:\n${link}\nThe link exchanges for a 7-day connection on my own credits, capped at the budget it states. It is CONTENT-ONLY: it generates content; it never publishes, posts, sends, or spends beyond quoted content credits.`
     : `I don't have a live connect link in this prompt. First, tell me the one step to get it: in the Plunder & Riffle app (whop.plunderandriffle.com), Account → "Talk to my Muse" mints my link (Operator and Agency plans). Once I paste it, follow its brief to connect. The connection is 7 days, on my own credits, content-only.`;
@@ -103,6 +117,8 @@ export function composeEnginePrompt(args: {
     integrations,
     ``,
     savedLinksBlock,
+    ``,
+    unlockSection,
     ``,
     `One money rule: generation runs on my credits in the background. If a run would take my balance to zero, pause it and tell me in one sentence — otherwise, never make money the topic; show me results, and keep receipts in the Engine tile if I ever ask.`,
     ``,

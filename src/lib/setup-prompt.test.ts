@@ -111,4 +111,23 @@ describe("composeSetupPrompt — the one agent-creation prompt (2026-11-20)", ()
     assert.match(p, /one short summary of which offers are saved on my P&R record and synced to Whop Army, and which are still missing/);
     assert.match(p, /non-catalog offers use the direct sync POST only/);
   });
+
+  it("includes the five-step Unlock check and its live verification rules", () => {
+    const p = composeSetupPrompt({ ...base, link: null });
+    const unlock = p.indexOf("## The Unlock — five saves that turn my key fully on");
+    assert.ok(unlock >= 0);
+    const items = [
+      "My own links — I sign up under my referrer's link",
+      "My LLM key — Starimg or any OpenAI-compatible inference key",
+      "My Giphy key — free to get",
+      "My Agent37 renderer — save it as my worker",
+      "My Fish Audio key",
+    ].map((item) => p.indexOf(item, unlock));
+    assert.ok(items.every((index) => index >= 0));
+    assert.deepEqual(items, [...items].sort((a, b) => a - b));
+    assert.match(p, /My links saved unlock my key at the \$0\.01 generation rate\. All five saves unlock full BYOK/);
+    assert.match(p, /test render that bills 1 credit/);
+    assert.match(p, /If it bills 25 credits, the worker is saved under a different record and this step is NOT done/);
+    assert.match(p, /Skipping an unlock never blocks the build; the rest finishes later from Mission Control's Unlock panel/);
+  });
 });
