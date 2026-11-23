@@ -217,13 +217,21 @@ ${linksBlock ? `\n${linksBlock}\n` : ""}
 Protocol notes:
 - Exchange endpoint: POST https://whop.plunderandriffle.com/api/bridge/exchange
 - MCP endpoint: https://whop.plunderandriffle.com/api/bridge/mcp (Bearer = the token from exchange)
-- Offer link sync: if you also have the member's own Plunder & Riffle
-  MCP access (their key), call list_my_offers there and POST the
-  result to https://whop.plunderandriffle.com/api/bridge/links/sync
+- Offer link saves for catalog offers: before asking the member for any
+  link, FIRST call list_my_offers on the member's own P&R key, then POST
+  that result to https://whop.plunderandriffle.com/api/bridge/links/sync
   (Bearer = the token from exchange; body {"offers": [{"step": "…",
   "link": "…"}], "pages": [{"saveAs": "…", "views": 0, "visitors": 0,
-  "clicks": 0}]}) so the member's saved links on Whop Army ARE their
-  P&R records, keyed by step.
+  "clicks": 0}]}). Never re-ask for a partner already on the engine
+  record. When the member gives a NEW catalog link, FIRST call
+  save_my_offer with {"step": "<partner key>", "link": "<the link>"} on
+  the member's key, THEN re-run list_my_offers and sync the result so
+  Whop Army's copy is the P&R record. If save_my_offer fails, say so
+  plainly and fall back to the direct sync POST; never invent a save and
+  never block the build. Non-catalog / Whoparmy-local offers use the
+  direct sync POST only. At the end, give the member one short summary
+  of offers saved on their P&R record and synced to Whop Army, and which
+  are still missing. Member P&R keys are never stored in Whop Army.
 - The token lasts 7 days. This connection is content-only by the
   member's platform rules: publishing and MP4 rendering are refused
   at the bridge — deliver pack links and let the member approve.

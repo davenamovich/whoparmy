@@ -97,4 +97,18 @@ describe("composeSetupPrompt — the one agent-creation prompt (2026-11-20)", ()
     const withoutWalkthrough = composeSetupPrompt({ ...base, link: null });
     assert.doesNotMatch(withoutWalkthrough, /## 0\. Set me up first/);
   });
+
+  it("makes catalog link saves engine-first and confirms the final state", () => {
+    const offer = { step: "salarium", name: "DH Media", signupUrl: "https://referrer.example/dh", signupSource: "referrer" as const };
+    const p = composeSetupPrompt({ ...base, link: null, walkthroughOffers: [offer] });
+    const pull = p.indexOf("FIRST run list_my_offers");
+    const save = p.indexOf("FIRST call save_my_offer");
+    const sync = p.indexOf("THEN re-run list_my_offers and sync");
+    assert.ok(pull >= 0);
+    assert.ok(save > pull);
+    assert.ok(sync > save);
+    assert.match(p, /If save_my_offer fails, tell me plainly and fall back to the direct sync POST/);
+    assert.match(p, /one short summary of which offers are saved on my P&R record and synced to Whop Army, and which are still missing/);
+    assert.match(p, /non-catalog offers use the direct sync POST only/);
+  });
 });
