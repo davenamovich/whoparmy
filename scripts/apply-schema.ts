@@ -92,6 +92,12 @@ const ADDITIVE_COLUMNS: Array<{ table: string; column: string; ddl: string }> = 
   // Agent rotator offer policy (2026-11-22): owner-picked offers + pool.
   { table: "AgentRotator", column: "offersJson", ddl: 'ALTER TABLE "AgentRotator" ADD COLUMN "offersJson" TEXT' },
   { table: "AgentRotator", column: "pool", ddl: 'ALTER TABLE "AgentRotator" ADD COLUMN "pool" TEXT NOT NULL DEFAULT \'OWNER\'' },
+  // Pricing rebuild (2026-11-23): $20/mo marketplace listing entitlement
+  // persisted on the user. Missed in the first ship — the columns were in
+  // schema.sql's CREATE TABLE only, which never alters an existing table,
+  // and sign-in broke in production until they landed here.
+  { table: "User", column: "listingActive", ddl: 'ALTER TABLE "User" ADD COLUMN "listingActive" BOOLEAN NOT NULL DEFAULT false' },
+  { table: "User", column: "listingCheckedAt", ddl: 'ALTER TABLE "User" ADD COLUMN "listingCheckedAt" DATETIME' },
 ];
 for (const { table, column, ddl } of ADDITIVE_COLUMNS) {
   const cols = db.query(`PRAGMA table_info("${table}")`).all() as Array<{ name: string }>;
