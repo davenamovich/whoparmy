@@ -292,6 +292,59 @@ export async function whopListMemberships(): Promise<WhopMembershipLite[]> {
   throw new Error("Whop memberships list exceeded 10 pages");
 }
 
+export interface WhopWebhookLite { id: string; url: string; enabled: boolean }
+export interface WhopWebhookDeliveryLite { id: string; event: string; status: string; request_body: unknown }
+
+export async function whopListWebhooks(): Promise<WhopWebhookLite[]> {
+  const cfg = getWhopConfig();
+  if (!cfg.apiKey) throw new Error("WHOP_API_KEY is not configured");
+  if (!cfg.companyId) throw new Error("WHOP_COMPANY_ID is not configured");
+  const url = new URL("/api/v1/webhooks", cfg.apiBase);
+  url.searchParams.set("company_id", cfg.companyId);
+  url.searchParams.set("first", "100");
+  const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${cfg.apiKey}`, "Api-Version-Date": API_VERSION_DATE } });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Whop webhooks list failed (${res.status}): ${body.slice(0, 200)}`);
+  }
+  const body = (await res.json()) as { data?: unknown } | null;
+  if (!Array.isArray(body?.data)) throw new Error("Invalid Whop webhooks response");
+  return body.data.map((row: unknown) => {
+    const hook = row as Partial<WhopWebhookLite>;
+    if (typeof hook.id !== "string" || typeof hook.url !== "string" || typeof hook.enabled !== "boolean") throw new Error("Invalid Whop webhook");
+    return { id: hook.id, url: hook.url, enabled: hook.enabled };
+  });
+}
+
+export async function whopListWebhookDeliveries(hookId: string): Promise<WhopWebhookDeliveryLite[]> {
+  const cfg = getWhopConfig();
+  if (!cfg.apiKey) throw new Error("WHOP_API_KEY is not configured");
+  const url = new URL(`/api/v1/webhooks/${encodeURIComponent(hookId)}/deliveries`, cfg.apiBase);
+  url.searchParams.set("first", "100");
+  const deliveries: WhopWebhookDeliveryLite[] = [];
+  const cursors = new Set<string>();
+  for (let page = 0; page < 5; page++) {
+    const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${cfg.apiKey}`, "Api-Version-Date": API_VERSION_DATE } });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`Whop webhook deliveries list failed (${res.status}): ${body.slice(0, 200)}`);
+    }
+    const body = (await res.json()) as { data?: unknown; page_info?: { has_next_page?: boolean; end_cursor?: string | null } } | null;
+    if (!Array.isArray(body?.data) || typeof body.page_info?.has_next_page !== "boolean") throw new Error("Invalid Whop webhook deliveries page");
+    for (const row of body.data) {
+      const delivery = row as Partial<WhopWebhookDeliveryLite>;
+      if (typeof delivery.id !== "string" || typeof delivery.event !== "string" || typeof delivery.status !== "string" || !("request_body" in delivery)) throw new Error("Invalid Whop webhook delivery");
+      deliveries.push({ id: delivery.id, event: delivery.event, status: delivery.status, request_body: delivery.request_body });
+    }
+    if (!body.page_info.has_next_page) return deliveries;
+    const cursor = body.page_info.end_cursor;
+    if (typeof cursor !== "string" || !cursor || cursors.has(cursor)) throw new Error("Invalid Whop webhook deliveries cursor");
+    cursors.add(cursor);
+    url.searchParams.set("after", cursor);
+  }
+  return deliveries;
+}
+
 // ─── Webhook verification (Standard Webhooks spec via @whop/sdk) ─────
 
 export { WebhookVerificationError };

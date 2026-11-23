@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { Prisma } from "@prisma/client";
 import {
   getWhopConfig, getWhopTierIds, resolveTierFromMemberships, resolveListingActive, verifyWhopWebhook, whopListMemberships,
 } from "@/lib/whop";
-import { PACK_PLANS } from "@/lib/credit-packs";
+import { applyPayment, findUserByWhopId, type PaymentPayload } from "@/lib/whop-payments";
+import { Prisma } from "@prisma/client";
 
 export const runtime = "nodejs";
 
@@ -35,24 +35,7 @@ interface MembershipPayload {
   status?: string;
 }
 
-interface PaymentPayload {
-  id?: string;
-  user?: { id?: string } | null;
-  product_id?: string | null;
-  product?: { id?: string } | null;
-  variant_id?: string | null;
-  plan?: { id?: string } | null;
-  metadata?: Record<string, unknown> | null;
-}
-
 const CLOSED_STATUSES = new Set(["canceled", "expired", "unresolved", "drafted"]);
-
-const TIER_RANK: Record<string, number> = { FREE: 0, CREATOR: 1, PRO: 2, AGENCY: 3 };
-
-async function findUserByWhopId(whopUserId?: string | null) {
-  if (!whopUserId) return null;
-  return db.user.findUnique({ where: { whopId: whopUserId } });
-}
 
 async function applyMembership(membership: MembershipPayload, eventType: string): Promise<void> {
   const whopUserId = membership.user_id ?? membership.user?.id;
@@ -98,42 +81,6 @@ async function applyMembership(membership: MembershipPayload, eventType: string)
     where: { id: user.id },
     data: { plan, planSource: "whop_membership", planUpdatedAt: new Date() },
   });
-}
-
-async function applyPayment(payment: PaymentPayload): Promise<void> {
-  const user = await findUserByWhopId(payment.user?.id);
-  if (!user) return;
-  const packCredits = PACK_PLANS[payment.variant_id ?? payment.plan?.id ?? ""];
-  if (packCredits && payment.id) await grantPack(user.id, payment.id, packCredits);
-
-  const metaUserId = payment.metadata?.prUserId;
-  if (typeof metaUserId === "string" && metaUserId !== user.id && metaUserId !== user.whopId) {
-    console.warn("Whop payment prUserId does not match payer; ignoring metadata", { paymentId: payment.id });
-  }
-
-  const tier = resolveTierFromMemberships([{
-    status: "active",
-    productId: payment.product_id ?? payment.product?.id,
-    planId: payment.variant_id ?? payment.plan?.id,
-  }], getWhopTierIds());
-  if (tier && TIER_RANK[tier] > TIER_RANK[user.plan]) {
-    await db.user.update({
-      where: { id: user.id },
-      data: { plan: tier, planSource: "whop_membership", planUpdatedAt: new Date() },
-    });
-  }
-}
-
-async function grantPack(userId: string, externalId: string, amount: number): Promise<void> {
-  try {
-    await db.$transaction(async (tx) => {
-      await tx.creditGrant.create({ data: { userId, source: "pack", externalId, amount } });
-      await tx.user.update({ where: { id: userId }, data: { freeGenBalance: { increment: amount } } });
-    });
-  } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") return;
-    throw err;
-  }
 }
 
 export async function POST(req: NextRequest) {
