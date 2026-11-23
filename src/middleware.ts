@@ -28,6 +28,11 @@ const PUBLIC_API_PREFIXES = [
   "/api/analytics/view",
   "/api/whop/webhook",
   "/api/whop/status",
+  // Pack-grant reconciliation (2026-11-23): carries its own credential
+  // (x-reconcile-secret vs RECONCILE_SECRET), checked inside the
+  // handler — same class as the trends ingest door below; the session
+  // floor must not block the hourly cron first.
+  "/api/whop/reconcile",
   "/api/bridge/exchange",
   "/api/bridge/mcp",
   "/api/bridge/partners",
