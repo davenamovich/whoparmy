@@ -118,7 +118,7 @@ describe("composeSetupPrompt — the one agent-creation prompt (2026-11-20)", ()
     assert.ok(unlock >= 0);
     const items = [
       "My own links — I sign up under my referrer's link",
-      "My LLM key — Starimg or any OpenAI-compatible inference key",
+      "My LLM key — I choose the provider; Muse never picks silently",
       "My Giphy key — free to get",
       "My Agent37 renderer — save it as my worker",
       "My Fish Audio key",
@@ -129,5 +129,34 @@ describe("composeSetupPrompt — the one agent-creation prompt (2026-11-20)", ()
     assert.match(p, /test render that bills 1 credit/);
     assert.match(p, /If it bills 25 credits, the worker is saved under a different record and this step is NOT done/);
     assert.match(p, /Skipping an unlock never blocks the build; the rest finishes later from Mission Control's Unlock panel/);
+    assert.match(p, /developers\.giphy\.com/);
+    assert.match(p, /Create an App with type API/);
+    assert.match(p, /Fish Audio key[\s\S]*Get Started → Get your API key/);
+    assert.match(p, /shown only once[\s\S]*Never let the one-time display lapse unsaved/);
+    assert.match(p, /Cheaper Inference/);
+    assert.match(p, /Starimg \(ai\.starimg\.ru\)/);
+    assert.match(p, /browser's translate button/);
+    assert.match(p, /https:\/\/plati\.market\/itm\/api-claude-fable-5-2-5-1-opus-5-5-sonnet-5-5-auto-delivery-1m-1b\/6047499/);
+    assert.match(p, /pay by sending USDT myself from my own wallet/);
+    assert.match(p, /Auto-delivery delivers the API access\/key/);
+  });
+
+  it("renders goals, the Vercel Board deliverable, and the DH Media approval exception", () => {
+    const p = composeSetupPrompt({
+      ...base,
+      link: null,
+      walkthroughOffers: [{ step: "salarium", name: "DH Media", signupUrl: "https://dh.media/join", signupSource: "referrer" }],
+    });
+    assert.match(p, /## My goals[\s\S]*Objective: Book more roofing inspections/);
+    assert.match(p, /Top opportunity: Storm season — Demand spikes after storms/);
+    assert.match(p, /Everything you build must name which goal it serves/);
+    assert.match(p, /## Vercel Board — after the five unlock saves verify/);
+    assert.match(p, /team of experts that helps me/);
+    assert.match(p, /Muse posts a hard question, experts answer from different frontier models/);
+    assert.match(p, /npm install --global vercel@latest/);
+    assert.match(p, /own named --as profile/);
+    assert.match(p, /one real test call through the board/);
+    assert.match(p, /Vercel Board created and tested after all five unlock saves verify/);
+    assert.match(p, /EXCEPTION: for DH Media, run the signup WITH me and submit it only after my explicit yes/);
   });
 });

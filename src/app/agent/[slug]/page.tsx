@@ -45,7 +45,8 @@ export default async function AgentProfilePage({
 
   const profile = serializePublicProfile(agent, agent.user);
   const capabilities = capabilitiesFromJson(agent.capabilitiesJson);
-  const tryUrl = profile.demoUrl ?? profile.appUrl ?? "/build";
+  const isBarry = slug === "btc-barry";
+  const tryUrl = isBarry ? "/build" : profile.demoUrl ?? profile.appUrl ?? "/build";
 
   // Counted stats + rotator access for this agent (lib/agent-stats.ts).
   const bundle = (await getPublicAgentBundles([agent.id])).get(agent.id);
@@ -107,7 +108,7 @@ export default async function AgentProfilePage({
 
           <div className="flex flex-wrap gap-3">
             <Button asChild>
-              <a href={tryUrl}>TRY AGENT</a>
+              <a href={tryUrl}>{isBarry ? "GRAB A ROTATOR SPOT" : "TRY AGENT"}</a>
             </Button>
             <Button asChild variant="outline">
               <a href="/build">BUILD YOUR OWN</a>
@@ -161,16 +162,25 @@ export default async function AgentProfilePage({
         <section className="space-y-4 border-t border-border/60 py-10">
           <h2 className={label}>Get an agent like this</h2>
           <p className="max-w-md leading-relaxed text-muted-foreground">
-            An agent like this, working for your business — that&rsquo;s Muse, powered by Plunder &amp; Riffle,
-            running on Agent37.
+            {isBarry
+              ? "Set up your agent, have your Muse sign you up for DH Media with your approval, save your link, and you’re in Barry’s rotation."
+              : "An agent like this, working for your business — that’s Muse, powered by Plunder & Riffle, running on Agent37."}
           </p>
           <div className="flex flex-wrap gap-3">
-            <Button asChild>
-              <a href={ctaMuseUrl}>GET YOUR OWN MUSE</a>
-            </Button>
-            <Button asChild variant="outline">
-              <a href={ctaAgent37Url}>RUN IT ON AGENT37</a>
-            </Button>
+            {isBarry ? (
+              <Button asChild>
+                <a href="/build">GET YOUR SPOT — BUILD YOUR AGENT</a>
+              </Button>
+            ) : (
+              <>
+                <Button asChild>
+                  <a href={ctaMuseUrl}>GET YOUR OWN MUSE</a>
+                </Button>
+                <Button asChild variant="outline">
+                  <a href={ctaAgent37Url}>RUN IT ON AGENT37</a>
+                </Button>
+              </>
+            )}
           </div>
         </section>
 
@@ -183,7 +193,9 @@ export default async function AgentProfilePage({
                   <a href={rideUrl} className="block space-y-1">
                     <span className="block font-black">Ride {profile.name}&rsquo;s rotator →</span>
                     <span className="block text-sm text-muted-foreground">
-                      One click sends you to one of this agent&apos;s destinations, rotating on every visit.
+                      {isBarry
+                        ? "Visiting sends you to a member's DH Media page; this is not a signup."
+                        : "One click sends you to one of this agent's destinations, rotating on every visit."}
                     </span>
                   </a>
                 ) : (
@@ -208,10 +220,12 @@ export default async function AgentProfilePage({
                 </a>
               </li>
               <li className="rounded-2xl border border-border p-5">
-                <a href={access.ownRotatorUrl} className="block space-y-1">
+                <a href={isBarry ? "/build" : access.ownRotatorUrl} className="block space-y-1">
                   <span className="block font-black">Get your own rotator →</span>
                   <span className="block text-sm text-muted-foreground">
-                    Connect on the bridge, save your links, and your agent rotates them the same way.
+                    {isBarry
+                      ? "Grab a spot through your Muse’s DH Media signup, then save your link for Barry’s rotation."
+                      : "Connect on the bridge, save your links, and your agent rotates them the same way."}
                   </span>
                 </a>
               </li>
