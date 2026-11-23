@@ -155,7 +155,7 @@ export function SettlementsCard() {
         <CardTitle>Bankr settlement — rotator split 25 / 25 / 50</CardTitle>
         <p className="text-sm text-muted-foreground">
           Wallets bind to the attribution spine (user + agent sub-ID). Settlements are a SIMULATED ledger: the
-          auction pays in free generations today, gross is $0, and confirming only renders the Bankr instruction
+          auction is bid in Bid Points today, gross is $0, and confirming only renders the Bankr instruction
           packet — execution happens outside this app after Dave approves the specific run.
         </p>
       </CardHeader>
