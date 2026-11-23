@@ -8,6 +8,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { getGateState, getSessionOperator } from "@/lib/site-gate";
 import { isGateExempt } from "@/lib/gate-paths";
+import { PageViewBeacon } from "@/components/analytics/page-view-beacon";
 
 // Self-hosted Geist fonts (latin variable woff2, downloaded 2026-11-16 from
 // Google Fonts). next/font/google fetches at build time, which fails on
@@ -85,6 +86,7 @@ export default async function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground min-h-screen flex flex-col`}
       >
         <NextIntlClientProvider locale={locale} messages={messages}>
+          <PageViewBeacon />
           {children}
         </NextIntlClientProvider>
         <Toaster />

@@ -25,6 +25,7 @@ import { NextRequest, NextResponse } from "next/server";
  */
 const PUBLIC_API_PREFIXES = [
   "/api/auth/",
+  "/api/analytics/view",
   "/api/whop/webhook",
   "/api/whop/status",
   "/api/bridge/exchange",

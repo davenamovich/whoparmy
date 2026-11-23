@@ -89,6 +89,20 @@ model User {
   agentWallets AgentWallet[]
 }
 
+// First-party, coarse page analytics. Never store IPs or full referrers.
+model PageView {
+  id             String   @id @default(cuid())
+  createdAt      DateTime @default(now())
+  path           String
+  referrerHost   String?
+  userAgentClass String
+  memberId       String?
+
+  @@index([createdAt])
+  @@index([path, createdAt])
+  @@index([memberId, path, createdAt])
+}
+
 model CreditGrant {
   id String @id @default(cuid())
   userId String

@@ -1,4 +1,17 @@
 -- CreateTable
+CREATE TABLE "PageView" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "path" TEXT NOT NULL,
+    "referrerHost" TEXT,
+    "userAgentClass" TEXT NOT NULL,
+    "memberId" TEXT
+);
+CREATE INDEX "PageView_createdAt_idx" ON "PageView"("createdAt");
+CREATE INDEX "PageView_path_createdAt_idx" ON "PageView"("path", "createdAt");
+CREATE INDEX "PageView_memberId_path_createdAt_idx" ON "PageView"("memberId", "path", "createdAt");
+
+-- CreateTable
 CREATE TABLE "User" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "whopId" TEXT,

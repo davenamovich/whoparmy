@@ -86,6 +86,8 @@ export default async function AdminPage() {
         </p>
       </header>
 
+      <p className="mb-6 text-sm"><a className="underline" href="/admin/analytics">Open first-party analytics</a></p>
+
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((s) => (
           <Card key={s.label}>
