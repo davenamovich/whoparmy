@@ -1,4 +1,5 @@
 import "server-only";
+import { LISTING_PLAN_ID } from "./credit-packs.ts";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { unwrapWebhook, WebhookVerificationError } from "@whop/sdk/helpers";
 
@@ -224,6 +225,10 @@ export function resolveTierFromMemberships(
   return PAID_TIERS.find((tier) => planIds[tier] && eligible.some((row) => row.planId === planIds[tier]))
     ?? PAID_TIERS.find((tier) => productIds[tier] && eligible.some((row) => row.productId === productIds[tier]))
     ?? null;
+}
+
+export function resolveListingActive(memberships: readonly { status?: string; planId?: string | null; productId?: string | null }[]): boolean {
+  return memberships.some((m) => Boolean(m.status && ENTITLED_STATUSES.has(m.status) && (m.planId === LISTING_PLAN_ID || m.productId === LISTING_PLAN_ID)));
 }
 
 /**

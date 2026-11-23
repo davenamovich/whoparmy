@@ -195,7 +195,7 @@ export function AgentStart() {
             {phase.researched ? "Deep research is reading your site now." : "Saved."}
           </p>
           <p className="text-sm text-muted-foreground">
-            The one-link agent handoff unlocks on the Operator and Agency plans. Either way, your
+            Your Muse connects with no subscription. Either way, your
             agent is the generator — pick your door and give it your website:
           </p>
           <div className="flex flex-wrap gap-2">

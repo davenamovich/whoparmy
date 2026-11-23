@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getWhopUserWithMode, UnauthorizedError } from "@/lib/auth";
-import { getWhopConfig, getWhopTierIds, resolveTierFromMemberships, whopListMemberships } from "@/lib/whop";
+import { getWhopConfig, getWhopTierIds, resolveTierFromMemberships, resolveListingActive, whopListMemberships } from "@/lib/whop";
 import { getPlan } from "@/lib/plans";
 
 export const runtime = "nodejs";
@@ -40,9 +40,11 @@ export async function POST(_req: NextRequest) {
     }
 
     let plan: string;
+    let ownMemberships: Awaited<ReturnType<typeof whopListMemberships>>;
     try {
       const memberships = await whopListMemberships();
-      plan = resolveTierFromMemberships(memberships.filter((row) => row.userId === user.whopId), ids) ?? "FREE";
+      ownMemberships = memberships.filter((row) => row.userId === user.whopId);
+      plan = resolveTierFromMemberships(ownMemberships, ids) ?? "FREE";
     } catch (err) {
       const reason = err instanceof Error ? err.message : "membership lookup failed";
       return NextResponse.json(
@@ -57,10 +59,15 @@ export async function POST(_req: NextRequest) {
       );
     }
 
+    const listingActive = resolveListingActive(ownMemberships);
     await db.user.update({
       where: { id: user.id },
-      data: { plan, planSource: "whop_access", planUpdatedAt: new Date() },
+      data: { plan, planSource: "whop_access", planUpdatedAt: new Date(), listingActive, listingCheckedAt: new Date() },
     });
+    if (!listingActive) {
+      await db.hiredAgent.updateMany({ where: { userId: user.id }, data: { publicProfile: false } });
+      await db.agentRotatorLink.updateMany({ where: { rotator: { userId: user.id }, position: -1 }, data: { enabled: false } });
+    }
 
     return NextResponse.json({
       ok: true,

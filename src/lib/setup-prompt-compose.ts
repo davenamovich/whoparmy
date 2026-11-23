@@ -47,7 +47,7 @@ export function composeEnginePrompt(args: {
   ].join("\n");
   const connectBlock = link
     ? `Open this link and follow its brief to connect to my P&R account:\n${link}\nThe link exchanges for a 7-day connection on my own credits, capped at the budget it states. It is CONTENT-ONLY: it generates content; it never publishes, posts, sends, or spends beyond quoted content credits.`
-    : `I don't have a live connect link in this prompt. First, tell me the one step to get it: in the Plunder & Riffle app (whop.plunderandriffle.com), Account → "Talk to my Muse" mints my link (Operator and Agency plans). Once I paste it, follow its brief to connect. The connection is 7 days, on my own credits, content-only.`;
+    : `I don't have a live connect link in this prompt. In the Plunder & Riffle app (whop.plunderandriffle.com), Account → "Talk to my Muse" mints my link. Once I paste it, follow its brief to connect. The connection is 7 days, on my own credits, content-only.`;
 
   const agentLine = (a: Blueprint["workforce"][number]) =>
     `- ${a.name} (${a.role})\n  Mission: ${a.mission}\n  Schedule: ${a.schedule}\n  Approval rule: ${a.approval}\n  Success metric: ${a.metric}`;

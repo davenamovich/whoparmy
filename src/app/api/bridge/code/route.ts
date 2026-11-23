@@ -21,8 +21,8 @@ export const runtime = "nodejs";
  * their Muse. The code is shown once; only its hash is stored.
  *
  * Two scopes, two products:
- * - default ("week"): the /muse-week special offer — Operator +
- *   Agency only (assertBridgeEligible), budget from the named offer.
+ * - default ("week"): every signed-in member, budget from their
+ *   current engine credit balance snapshot.
  * - { scope: "clips" }: the Clip Factory — ANY member with a linked
  *   credit account, any plan (assertClipsEligible). The code's budget
  *   snapshots the member's own current credit balance: their credits
@@ -46,16 +46,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    assertBridgeEligible(user);
-    await getMemberEngineKey(user);
-    // A named offer sets the budget server-side — the client never
-    // names its own price for an offer. The bare budgetCredits path
-    // stays for compatibility and is clamped inside mintBridgeCode.
-    const offer = typeof body.offer === "string" ? bridgeOffer(body.offer) : null;
-    const budget = offer ? offer.budgetCredits : typeof body.budgetCredits === "number" ? body.budgetCredits : WEEK_BUDGET_CREDITS;
+    const member = await getMemberEngineKey(user);
+    // The current engine balance is the full budget; legacy offer
+    // request fields are ignored so clients cannot inflate it.
+    const offer = null;
+    const budget = member.credits < 0 ? MAX_BUDGET_CREDITS : member.credits;
     const minted = await mintBridgeCode(user.id, budget);
     return NextResponse.json(
-      { code: minted.code, expiresAt: minted.expiresAt, budgetCredits: minted.budgetCredits, offer: offer?.id ?? null, scope: "week" },
+      { code: minted.code, expiresAt: minted.expiresAt, budgetCredits: minted.budgetCredits, offer: null, scope: "week" },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (err) {

@@ -244,7 +244,7 @@ export function MySystemView() {
               </p>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Connect links mint on Operator and Agency plans — the prompt includes the one step to
+                Connect your Muse with no subscription; 100 free generations refresh monthly. The prompt includes the one step to
                 get yours. Everything else in it works today.
               </p>
             )}

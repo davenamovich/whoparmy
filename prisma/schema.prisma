@@ -72,6 +72,9 @@ model User {
   freeGenBalance Int     @default(0)
   freeGenMonth   String? // YYYY-MM the applied counter belongs to
   freeGenApplied Int     @default(0)
+  listingActive Boolean @default(false)
+  listingCheckedAt DateTime?
+  creditGrants CreditGrant[]
   referredBy   User?    @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
   referrals    User[]   @relation("Referrals")
   earnings     ReferralEarning[] @relation("Earner")
@@ -84,6 +87,17 @@ model User {
   identityLinks IdentityLink[]
   pendingReferralsMade PendingReferral[] @relation("PendingReferrer")
   agentWallets AgentWallet[]
+}
+
+model CreditGrant {
+  id String @id @default(cuid())
+  userId String
+  source String
+  externalId String @unique
+  amount Int
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
 }
 
 // ─── Brand profiles (multiple allowed for agencies) ─────────────────

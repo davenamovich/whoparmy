@@ -112,8 +112,8 @@ export async function assertMonthlyAllowance(
       plan,
       error:
         used >= limit
-          ? `Monthly limit reached on the ${plan.name} plan (${limit} items including free generations). Upgrade your plan to keep generating — failed generations are never charged.`
-          : `This would exceed the ${plan.name} plan's monthly limit (${limit} items including free generations; ${limit - used} left). Upgrade your plan or reduce the request.`,
+          ? `Monthly allowance reached (${limit} generations including credits). Buy a credit pack to keep generating — failed generations are never charged.`
+          : `This would exceed your monthly allowance (${limit} generations including credits; ${limit - used} left). Buy a credit pack or reduce the request.`,
     };
   }
   return { ok: true, used, limit };

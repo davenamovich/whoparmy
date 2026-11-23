@@ -64,7 +64,7 @@ export const MAX_BUDGET_CREDITS = 5000;
 export const RESERVATION_STALE_MS = 15 * 60_000;
 
 // ─── The offers (Dave, 2026-11-17: add both variants) ───────────────
-// Three sizes of the same special offer, all Operator + Agency. The
+// Three sizes of the same content offer, available to every member. The
 // token budget is the only enforcement difference between them; the
 // command text on /muse-week carries what the Muse makes. Budgets
 // are list-price reserves — calls settle at the actual charge.
@@ -102,26 +102,13 @@ export function botPlanFor(user: Pick<User, "plan">): BotPlan {
   return "free";
 }
 
-// ─── Eligibility — a special offer, not for everyone ────────────────
-// Dave, 2026-11-17: the bridge is an Operator + Agency offer (local
-// plan PRO is the Operator tier). Trial and Starter members can see
-// the offer but cannot mint codes, exchange them, or spend through a
-// token. Designated operators (the owner's own Whop accounts) always
-// pass so the owner can run acceptance on the live offer.
+// The bridge is available to every signed-in member. Kept as a helper
+// for callers that display eligibility; plan does not affect access.
 
-export function bridgeEligible(user: Pick<User, "plan" | "whopId" | "whopUsername">): boolean {
-  if (user.plan === "PRO" || user.plan === "AGENCY") return true;
-  return isDesignatedOperator(user);
-}
+export function bridgeEligible(_user: Pick<User, "plan" | "whopId" | "whopUsername">): boolean { return true; }
 
 export function assertBridgeEligible(user: Pick<User, "plan" | "whopId" | "whopUsername">): void {
-  if (!bridgeEligible(user)) {
-    throw new BridgeError(
-      403,
-      "NOT_ELIGIBLE",
-      "The Muse bridge is a special offer for Operator and Agency members. Your current plan doesn't include it — upgrade to Operator or Agency in Whop to unlock your week of content.",
-    );
-  }
+  void user; // compatibility no-op; all signed-in members may connect.
 }
 
 // ─── Bridge scopes ──────────────────────────────────────────────────
@@ -230,7 +217,7 @@ export const BRIDGE_GENERATING_COSTS: Record<string, number> = {
  * Clips-scope generating tools — deliberately a SEPARATE table, never
  * merged into the week's. A clips token must not be able to call the
  * week offer's generating tools, or any plan could walk around the
- * Operator + Agency gate through the clips lane; and a week token
+ * bridge token through the clips lane; and a week token
  * must not gain create_sitdown, which belongs to the Clip Factory.
  * create_sitdown list cost is 25 (the engine's own tool table).
  */
@@ -462,17 +449,12 @@ export async function mintBridgeCode(
   budgetCredits: number,
   scope: BridgeScope = "week",
 ): Promise<{ code: string; expiresAt: Date; budgetCredits: number; scope: BridgeScope }> {
-  // Week codes fall back to the standing offer budget; clips codes
-  // snapshot the member's own balance, where ZERO is a real value
-  // (an empty account gets a zero-budget connection, not the week's
-  // 805-credit default smuggled in by a falsy check).
+  // All codes snapshot the member's own balance; zero is a real value.
   const truncated = Math.trunc(budgetCredits);
   // Experiment codes budget like clips: the member's own balance,
   // where zero is real.
   const budget =
-    scope === "clips" || scope === "experiment"
-      ? Math.max(0, Math.min(MAX_BUDGET_CREDITS, Number.isFinite(truncated) ? truncated : 0))
-      : Math.max(1, Math.min(MAX_BUDGET_CREDITS, truncated || WEEK_BUDGET_CREDITS));
+    Math.max(0, Math.min(MAX_BUDGET_CREDITS, Number.isFinite(truncated) ? truncated : 0));
   const code = newBridgeCode();
   // 15 minutes, except experiment codes: 24 hours (Dave, 2026-11-20),
   // so a code survives the member setting up their agent.
@@ -669,10 +651,6 @@ export async function proxyToolCall(session: BridgeSession, name: string, args: 
         "This clips connection's account is no longer linked to a Plunder & Riffle credit account. Nothing was charged. The member can re-link by signing in with Whop.",
       );
     }
-  } else if (!bridgeEligible(session.user)) {
-    return toolError(
-      "The Muse bridge is a special offer for Operator and Agency members, and this connection's plan no longer includes it. Nothing was charged. The member can re-open the offer by upgrading in Whop.",
-    );
   }
 
   const member = await getMemberEngineKey(session.user);
@@ -821,7 +799,7 @@ export async function proxyToolsList(session: BridgeSession): Promise<unknown> {
 
 export interface BridgeAccountView {
   connected: boolean;
-  /** Operator + Agency only (Dave, 2026-11-17) — see bridgeEligible. */
+  /** All signed-in members may connect; see bridgeEligible. */
   eligible: boolean;
   /** Clip Factory: any member with a linked credit account, any plan. */
   clipsEligible: boolean;
@@ -871,13 +849,6 @@ export async function getBridgeAccountView(user: User): Promise<BridgeAccountVie
     error: null,
     errorCode: null,
   };
-  if (!view.eligible) {
-    // The offer gate sits in front of the engine: a non-eligible
-    // member's visit never fetches a key and never triggers a grant.
-    view.error = "The Muse bridge is a special offer for Operator and Agency members.";
-    view.errorCode = "NOT_ELIGIBLE";
-    return view;
-  }
   try {
     const member = await getMemberEngineKey(user);
     view.connected = true;

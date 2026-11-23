@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import {
-  getWhopConfig, getWhopTierIds, resolveTierFromMemberships, verifyWhopWebhook, whopListMemberships,
+  getWhopConfig, getWhopTierIds, resolveTierFromMemberships, resolveListingActive, verifyWhopWebhook, whopListMemberships,
 } from "@/lib/whop";
+import { PACK_PLANS } from "@/lib/credit-packs";
 
 export const runtime = "nodejs";
 
@@ -24,6 +25,7 @@ export const runtime = "nodejs";
  */
 
 interface MembershipPayload {
+  id?: string;
   user_id?: string | null;
   user?: { id?: string } | null;
   product_id?: string | null;
@@ -64,6 +66,22 @@ async function applyMembership(membership: MembershipPayload, eventType: string)
     planId: membership.variant_id ?? membership.plan?.id,
     status: membership.status,
   };
+  let currentMemberships: Awaited<ReturnType<typeof whopListMemberships>> | null = null;
+  if (eventType === "membership.deactivated" || CLOSED_STATUSES.has(evidence.status ?? "")) {
+    try { currentMemberships = (await whopListMemberships()).filter((row) => row.userId === whopUserId); } catch { currentMemberships = null; }
+  }
+  if (currentMemberships || (eventType !== "membership.deactivated" && !CLOSED_STATUSES.has(evidence.status ?? ""))) {
+    const listingActive = resolveListingActive(currentMemberships ?? [evidence]);
+    await db.user.update({ where: { id: user.id }, data: { listingActive, listingCheckedAt: new Date() } });
+    if (!listingActive) {
+      await db.hiredAgent.updateMany({ where: { userId: user.id }, data: { publicProfile: false } });
+      await db.agentRotatorLink.updateMany({ where: { rotator: { userId: user.id }, position: -1 }, data: { enabled: false } });
+    }
+  }
+  const packCredits = PACK_PLANS[evidence.planId ?? ""];
+  if (packCredits && membership.id && evidence.status && !CLOSED_STATUSES.has(evidence.status)) {
+    await grantPack(user.id, membership.id, packCredits);
+  }
   let plan: string | null;
 
   if (eventType === "membership.deactivated" || CLOSED_STATUSES.has(evidence.status ?? "")) {
@@ -85,6 +103,8 @@ async function applyMembership(membership: MembershipPayload, eventType: string)
 async function applyPayment(payment: PaymentPayload): Promise<void> {
   const user = await findUserByWhopId(payment.user?.id);
   if (!user) return;
+  const packCredits = PACK_PLANS[payment.variant_id ?? payment.plan?.id ?? ""];
+  if (packCredits && payment.id) await grantPack(user.id, payment.id, packCredits);
 
   const metaUserId = payment.metadata?.prUserId;
   if (typeof metaUserId === "string" && metaUserId !== user.id && metaUserId !== user.whopId) {
@@ -101,6 +121,18 @@ async function applyPayment(payment: PaymentPayload): Promise<void> {
       where: { id: user.id },
       data: { plan: tier, planSource: "whop_membership", planUpdatedAt: new Date() },
     });
+  }
+}
+
+async function grantPack(userId: string, externalId: string, amount: number): Promise<void> {
+  try {
+    await db.$transaction(async (tx) => {
+      await tx.creditGrant.create({ data: { userId, source: "pack", externalId, amount } });
+      await tx.user.update({ where: { id: userId }, data: { freeGenBalance: { increment: amount } } });
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") return;
+    throw err;
   }
 }
 

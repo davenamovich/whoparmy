@@ -369,8 +369,7 @@ export default function BuildPage() {
                           </p>
                         ) : (
                           <p className="text-muted-foreground">
-                            The bridge is an Operator + Agency offer, so no code was minted on your current plan —
-                            the prompt itself tells your Muse the one step to get your link when you're ready.
+                            No connect code was minted. Save an engine link, then rebuild your prompt to connect on your own credits.
                           </p>
                         )
                       ) : (

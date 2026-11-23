@@ -71,7 +71,7 @@ describe("composeSetupPrompt — the one agent-creation prompt (2026-11-20)", ()
   it("without a link, the prompt carries the get-your-link step instead", () => {
     const p = composeSetupPrompt({ ...base, link: null });
     assert.match(p, /I don't have a live connect link in this prompt/);
-    assert.match(p, /Operator and Agency plans/);
+    assert.doesNotMatch(p, /Operator and Agency plans/);
     // The engine build + autopilot sections are present either way.
     assert.match(p, /## 5\. Turn on autopilot generation/);
   });

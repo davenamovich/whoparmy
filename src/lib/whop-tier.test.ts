@@ -9,7 +9,7 @@ const hooks = registerHooks({
       : context);
   },
 });
-const { resolveTierFromMemberships } = await import("./whop.ts").finally(() => hooks.deregister());
+const { resolveTierFromMemberships, resolveListingActive } = await import("./whop.ts").finally(() => hooks.deregister());
 
 const ids = {
   planIds: { AGENCY: "plan_agency", PRO: "plan_pro", CREATOR: "plan_creator" },
@@ -26,6 +26,12 @@ test("Whop tier resolution prefers the highest tier regardless of membership ord
     { status: "active", productId: "prod_creator" },
     { status: "past_due", productId: "prod_pro" },
   ], ids), "PRO");
+});
+
+test("listing entitlement follows the active $20 marketplace membership", () => {
+  assert.equal(resolveListingActive([{ status: "active", planId: "plan_lA71fPlm1B3Tb" }]), true);
+  assert.equal(resolveListingActive([{ status: "canceled", planId: "plan_lA71fPlm1B3Tb" }]), false);
+  assert.equal(resolveListingActive([{ status: "active", planId: "plan_pro" }]), false);
 });
 
 test("a canceling Whop membership retains access until deactivation", () => {

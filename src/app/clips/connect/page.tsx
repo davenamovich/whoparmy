@@ -65,8 +65,7 @@ export default function ConnectPage() {
             connection fails here instead of inside your agent.
           </p>
           <p className="text-xs text-muted-foreground">
-            The bridge is for Operator and Agency members. It runs on your own derived engine key, inside a
-            weekly credit budget you approve.
+            No subscription is needed to connect your Muse. The code runs on your own engine credits, capped at your current balance.
           </p>
           <Button size="sm" variant="outline" asChild>
             <a href="/muse-week">Open /muse-week</a>

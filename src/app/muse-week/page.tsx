@@ -134,7 +134,7 @@ export default function MuseWeekPage() {
           Create a Muse, paste one command from this page, and your agent makes 7 days of content for your business —
           on your own Plunder &amp; Riffle credits, through this bridge. Connect with Whop to see your command.
         </p>
-        <p className="text-sm font-medium">A special offer for Operator and Agency members — not a public offer.</p>
+        <p className="text-sm font-medium">No subscription is needed to connect your Muse. You get 100 free credits every month; packs cost one penny per credit.</p>
         <Button asChild>
           <a href="/api/auth/whop">Connect with Whop</a>
         </Button>
@@ -154,7 +154,7 @@ export default function MuseWeekPage() {
         <p className="mt-2 text-muted-foreground">
           One command. Seven days of content. Your credits, your agent, your approval before anything publishes.
         </p>
-        <p className="mt-1 text-sm font-medium">A special offer for Operator and Agency members — not a public offer.</p>
+        <p className="mt-1 text-sm font-medium">No subscription is needed to connect your Muse. You get 100 free credits every month; packs cost one penny per credit.</p>
       </div>
 
       <Card>
@@ -237,17 +237,6 @@ export default function MuseWeekPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
-          {account && !account.eligible ? (
-            <p className="flex items-start gap-2">
-              <Lock className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>
-                This one&apos;s not on your plan. The Muse bridge is a special offer for{" "}
-                <strong>Operator and Agency</strong> members — one command, and your own Muse makes your week on
-                your own credits. Upgrade in Whop and this page unlocks.
-              </span>
-            </p>
-          ) : (
-            <>
           {!account?.brand?.website && account?.connected && (
             <p className="text-amber-500">
               Add a brand with your business website first (Brands, above) — the command below carries a placeholder
@@ -308,8 +297,6 @@ export default function MuseWeekPage() {
                 one run. Your agent researches first (free), quotes the exact cost, and waits for your
                 &ldquo;go&rdquo; before spending anything.
               </p>
-            </>
-          )}
             </>
           )}
         </CardContent>

@@ -490,6 +490,13 @@ async function syncMemberPool(rotatorId: string, offers: string[] | null): Promi
 
 /** Rows this rotator may serve right now, under its offer policy. */
 async function servableRows(rotator: RotatorRow, agentSlug: string | null) {
+  // Member agents serve through the rotator only while their $20/mo
+  // marketplace listing is active (Dave, 2026-11-23). The house stack
+  // agent (Barry) is exempt: it is the front door, not a member listing.
+  if (agentSlug !== BARRY_SLUG) {
+    const listing = await db.user.findUnique({ where: { id: rotator.userId }, select: { listingActive: true } });
+    if (!listing?.listingActive) return { policy: effectivePolicy(rotator, agentSlug), rows: [], hopCount: 0, counts: new Map<string, number>() };
+  }
   const policy = effectivePolicy(rotator, agentSlug);
   if (policy.pool === "MEMBERS") await syncMemberPool(rotator.id, policy.offers);
   const today = etDateString();

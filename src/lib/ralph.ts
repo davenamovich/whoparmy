@@ -277,7 +277,7 @@ export async function ralphAction(userId: string, locale: string, actionId: Ralp
       // Mint on the spot (Dave, 2026-11-18): Ralph generates the
       // bridge code right here and hands over the paste — no trip to
       // the Account page. Same machinery as /api/bridge/code (the
-      // week offer), same gate: Operator + Agency only, and the
+      // default scope), all signed-in members may connect, and the
       // member's engine link is proven before a code exists. The
       // token the code issues is content-only (Dave's decision):
       // publishing stays behind the in-app approve tap.
@@ -291,8 +291,8 @@ export async function ralphAction(userId: string, locale: string, actionId: Ralp
       try {
         assertBridgeEligible(user);
         await getMemberEngineKey(user);
-        const offer = bridgeOffer("week");
-        const minted = await mintBridgeCode(user.id, offer.budgetCredits);
+        const member = await getMemberEngineKey(user);
+        const minted = await mintBridgeCode(user.id, member.credits < 0 ? 5000 : member.credits);
         const brand = await db.brandProfile.findFirst({
           where: { userId, website: { not: null } },
           orderBy: { createdAt: "asc" },
@@ -312,7 +312,7 @@ export async function ralphAction(userId: string, locale: string, actionId: Ralp
       } catch (err) {
         if (err instanceof BridgeError && err.code === "NOT_ELIGIBLE") {
           return {
-            text: "That one's not on your plan yet. The Muse bridge is a special offer for Operator and Agency members: one link, and your own Muse makes your content on your own credits. Upgrade in Whop and I'll mint your link on the spot.",
+            text: "Save an engine link to connect your Muse on your own credits, with no subscription needed.",
             actions: ["my_plan", "make_content"],
           };
         }
@@ -392,7 +392,7 @@ export async function ralphAction(userId: string, locale: string, actionId: Ralp
       if (s.link) {
         lines.push(`Your fresh connect link (also inside the prompt): ${s.link}`);
       } else {
-        lines.push("Connect links mint on Operator and Agency — the prompt includes the one step to get yours; everything else in it works today.");
+        lines.push("Connect links are available to every member with a saved engine link; no subscription is needed.");
       }
       return { text: lines.join("\n\n"), actions: ["build_system", "daily_brief"], nav: { view: "system" } };
     }

@@ -69,9 +69,8 @@ export async function POST(req: NextRequest) {
       minted = await mintBridgeCode(operator.id, ownBalanceBudget(member.credits, MAX_BUDGET_CREDITS), stack.bridgeScope);
     } else {
       assertBridgeEligible(operator);
-      await getMemberEngineKey(operator);
-      const offer = bridgeOffer("week");
-      minted = await mintBridgeCode(operator.id, offer.budgetCredits, "week");
+      const member = await getMemberEngineKey(operator);
+      minted = await mintBridgeCode(operator.id, ownBalanceBudget(member.credits, MAX_BUDGET_CREDITS), "week");
     }
     // BTC Barry's agent record (Dave, 2026-11-19): a successful
     // launch is what puts Barry on the member's roster — one

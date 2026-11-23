@@ -275,7 +275,7 @@ export function AgentsView() {
                 </p>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  Connect links mint on Operator and Agency plans — the prompt includes the one step to get yours.
+                  Connect your Muse with no subscription; generations include 100 free credits each month.
                   Everything else in it works today.
                 </p>
               )}

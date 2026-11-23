@@ -133,7 +133,7 @@ export const STACKS: Stack[] = [
     id: "muse-week",
     name: "Muse Week",
     blurb:
-      "One command from /muse-week and the member's Muse makes a week of content (7 day-packs) on the member's own credits. Operator + Agency special offer.",
+      "One command from /muse-week and the member's Muse makes a week of content (7 day-packs) on the member's own credits. No subscription needed to connect.",
     status: "live",
     bridgeScope: "week",
     promptTemplate: MUSE_WEEK_PROMPT,

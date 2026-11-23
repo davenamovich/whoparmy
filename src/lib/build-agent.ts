@@ -379,7 +379,7 @@ export function composeBuildAgentAddendum(args: {
     .join("\n");
   const connectBlock = args.connectLink
     ? `Connect link: ${args.connectLink}\nBridge code: ${args.bridgeCode ?? "(in the link)"}\nThe link exchanges for a 7-day connection on my own credits, capped at the budget it states. It is CONTENT-ONLY: it generates content; it never publishes, posts, sends, or spends beyond quoted content credits.`
-    : `I don't have a live connect link in this prompt (my plan may not include the bridge yet). Tell me the one step to get it: in Whop Army (whop.plunderandriffle.com), mint my link, then follow its brief to connect. The connection is 7 days, on my own credits, content-only.`;
+    : `I don't have a live connect link in this prompt. In Whop Army (whop.plunderandriffle.com), mint my link, then follow its brief to connect. The connection is 7 days, on my own credits, content-only.`;
   return [
     `---`,
     ``,

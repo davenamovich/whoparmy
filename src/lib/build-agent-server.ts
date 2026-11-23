@@ -372,9 +372,8 @@ export async function createBuildAgent(user: User, options: { walkthrough?: bool
   let eligible = false;
   try {
     assertBridgeEligible(user);
-    await getMemberEngineKey(user); // prove the engine link before minting
-    const offer = bridgeOffer("week");
-    const minted = await mintBridgeCode(user.id, offer.budgetCredits);
+    const member = await getMemberEngineKey(user); // prove the engine link before minting
+    const minted = await mintBridgeCode(user.id, member.credits < 0 ? 1_000_000 : member.credits);
     code = minted.code;
     link = `https://whop.plunderandriffle.com/connect/${code}`;
     eligible = true;

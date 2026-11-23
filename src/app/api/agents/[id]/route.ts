@@ -132,6 +132,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         }
       }
       if (typeof body.publicProfile === "boolean") {
+        if (body.publicProfile) {
+          const owner = await db.user.findUnique({ where: { id: hire.userId }, select: { listingActive: true } });
+          if (!owner?.listingActive) return NextResponse.json({ error: "Marketplace listing is $20/month and unlocks the rotator." }, { status: 403 });
+        }
         const effectiveSlug = data.slug !== undefined ? data.slug : hire.slug;
         if (body.publicProfile && !effectiveSlug) {
           // No slug yet: derive a free one from the agent's name. The
@@ -144,6 +148,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           );
         }
         data.publicProfile = body.publicProfile;
+      if (!body.publicProfile) {
+        const rotator = await db.agentRotator.findUnique({ where: { agentId: id } });
+        if (rotator) await db.agentRotatorLink.updateMany({ where: { rotatorId: rotator.id, position: -1 }, data: { enabled: false } });
+      }
       }
       const urlField = (value: string | undefined, key: "avatarUrl" | "demoUrl" | "appUrl" | "gitUrl" | "spaceUrl", label: string) => {
         if (value === undefined) return null;
@@ -192,6 +200,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
       }
       const updated = await db.hiredAgent.update({ where: { id }, data });
+      if (data.publicProfile === true) {
+        const [rotator, link] = await Promise.all([
+          db.agentRotator.upsert({ where: { agentId: id }, create: { agentId: id, userId: hire.userId }, update: { enabled: true } }),
+          db.engineLink.findFirst({ where: { userId: hire.userId }, orderBy: { createdAt: "asc" } }),
+        ]);
+        if (link) await db.agentRotatorLink.upsert({ where: { rotatorId_engineLinkId: { rotatorId: rotator.id, engineLinkId: link.id } }, create: { rotatorId: rotator.id, engineLinkId: link.id, position: -1, enabled: true }, update: { position: -1, enabled: true } });
+      }
       // The member's own UI (session) gets the full row it renders;
       // a bridge token gets the profile fields only — the same shape
       // as GET /api/agents/mine, never instructions, tools or budgets.

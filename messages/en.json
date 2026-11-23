@@ -203,7 +203,7 @@
     "entitlementsNote": "Plan entitlements are configurable — actual subscriptions and billing are managed by Whop. Do not treat this as payment.",
     "fullCatalog": "Full format catalog",
     "getOnWhop": "Get {name} on Whop",
-    "itemsPerMonth": "{count} items / month",
+    "itemsPerMonth": "100 free generations every month",
     "marketplacePostClaim": "Campaign marketplace — post and claim",
     "marketplacePriority": "Campaign marketplace priority",
     "memesPerMonth": "{count} memes / month",

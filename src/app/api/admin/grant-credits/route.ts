@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionOperator } from "@/lib/site-gate";
+import { randomUUID } from "node:crypto";
 
 export const runtime = "nodejs";
 
@@ -45,10 +46,9 @@ export async function POST(req: NextRequest) {
         : null;
   if (!target) return NextResponse.json({ error: "User not found — pass a userId or an exact account email." }, { status: 404 });
 
-  const updated = await db.user.update({
-    where: { id: target.id },
-    data: { freeGenBalance: { increment: amount } },
-    select: { freeGenBalance: true },
+  const updated = await db.$transaction(async (tx) => {
+    await tx.creditGrant.create({ data: { userId: target.id, source: "admin", externalId: `admin:${randomUUID()}`, amount } });
+    return tx.user.update({ where: { id: target.id }, data: { freeGenBalance: { increment: amount } }, select: { freeGenBalance: true } });
   });
   return NextResponse.json(
     { ok: true, granted: amount, user: target, balance: updated.freeGenBalance, grantedBy: operator.id },
