@@ -34,18 +34,43 @@ export async function reconcileWhopPayments(deps: WhopReconcileDependencies = de
       const planId = payment.variant_id ?? payment.plan?.id ?? "";
       const amount = PACK_PLANS[planId];
       if (amount) summary.packPayments++;
-      try {
-        const existing = await deps.findGrant(payment.id);
-        if (existing) summary.alreadyGranted++;
-        await deps.applyPayment(payment);
-        const after = await deps.findGrant(payment.id);
-        if (!existing && after) summary.granted.push({ paymentId: payment.id, amount: after.amount });
-        if (amount && !after) {
-          const user = await deps.findUserByWhopId(payment.user?.id);
-          if (!user) summary.unknownUser++;
-        }
-      } catch (err) { summary.errors.push({ paymentId: payment.id, message: err instanceof Error ? err.message : String(err) }); }
+      await settlePayment(payment, amount, summary, deps);
     }
+  }
+  return summary;
+}
+
+type ReconcileSummary = Awaited<ReturnType<typeof reconcileWhopPayments>>;
+
+async function settlePayment(payment: PaymentPayload & { id: string }, amount: number | undefined, summary: ReconcileSummary, deps: WhopReconcileDependencies): Promise<void> {
+  try {
+    const existing = await deps.findGrant(payment.id);
+    if (existing) summary.alreadyGranted++;
+    await deps.applyPayment(payment);
+    const after = await deps.findGrant(payment.id);
+    if (!existing && after) summary.granted.push({ paymentId: payment.id, amount: after.amount });
+    if (amount && !after) {
+      const user = await deps.findUserByWhopId(payment.user?.id);
+      if (!user) summary.unknownUser++;
+    }
+  } catch (err) { summary.errors.push({ paymentId: payment.id, message: err instanceof Error ? err.message : String(err) }); }
+}
+
+/**
+ * Settle payment payloads supplied by the caller (the hourly Muse cron
+ * fetches delivery records with the owner's account key, whose scopes
+ * the app's own API key lacks — developer:manage_webhook). Same grant
+ * logic, same idempotency; only the fetching moves outside the app.
+ */
+export async function reconcilePaymentPayloads(payments: Array<PaymentPayload | null | undefined>, deps: WhopReconcileDependencies = defaultDependencies) {
+  const summary: ReconcileSummary = { hooks: 0, deliveries: 0, paidPayments: 0, packPayments: 0, granted: [], alreadyGranted: 0, skippedNotPaid: 0, unknownUser: 0, errors: [] };
+  for (const payment of payments) {
+    if (!payment || payment.status !== "paid" || !payment.id) { summary.skippedNotPaid++; continue; }
+    summary.paidPayments++;
+    const planId = payment.variant_id ?? payment.plan?.id ?? "";
+    const amount = PACK_PLANS[planId];
+    if (amount) summary.packPayments++;
+    await settlePayment(payment as PaymentPayload & { id: string }, amount, summary, deps);
   }
   return summary;
 }

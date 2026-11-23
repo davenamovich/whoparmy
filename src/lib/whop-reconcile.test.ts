@@ -11,7 +11,7 @@ const hooks = registerHooks({
       : context);
   },
 });
-const { reconcileWhopPayments } = await import("./whop-reconcile.ts").finally(() => hooks.deregister());
+const { reconcileWhopPayments, reconcilePaymentPayloads } = await import("./whop-reconcile.ts").finally(() => hooks.deregister());
 
 const target = { id: "hook-1", url: "https://whop.plunderandriffle.com/api/whop/webhook", enabled: true };
 const payment = (id: string, status = "paid", userId = "user-1", planId = "plan_ro5V6OiZJrHid") => ({ id, status, user: { id: userId }, plan: { id: planId } });
@@ -51,4 +51,24 @@ test("unknown pack payer is counted without a grant", async () => {
     applyPayment: async () => {},
   });
   assert.equal(summary.unknownUser, 1);
+});
+
+test("supplied payloads settle without any webhook fetching", async () => {
+  const grants = new Map<string, { amount: number }>();
+  const deps = {
+    listWebhooks: async () => { throw new Error("must not fetch webhooks"); },
+    listDeliveries: async () => { throw new Error("must not fetch deliveries"); },
+    findGrant: async (id: string) => grants.get(id) ?? null,
+    findUserByWhopId: async () => ({ id: "user-1" }),
+    applyPayment: async (p: { id?: string; plan?: { id?: string } }) => {
+      if (p.id && !grants.has(p.id) && p.plan?.id === "plan_ro5V6OiZJrHid") grants.set(p.id, { amount: 1000 });
+    },
+  };
+  const summary = await reconcilePaymentPayloads([payment("x1"), payment("x2", "pending"), null], deps as never);
+  assert.deepEqual(summary.granted, [{ paymentId: "x1", amount: 1000 }]);
+  assert.equal(summary.packPayments, 1);
+  assert.equal(summary.skippedNotPaid, 2);
+  const again = await reconcilePaymentPayloads([payment("x1")], deps as never);
+  assert.equal(again.alreadyGranted, 1);
+  assert.equal(again.granted.length, 0);
 });
