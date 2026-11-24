@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Bot, CheckCircle2, Coins, Copy, Download, KeyRound, Loader2, Lock, RefreshCw, ShieldOff } from "lucide-react";
 import { museWeekCommand } from "@/lib/muse-week-command";
+import { TelegramLinkCard } from "@/components/factory/telegram-link";
 import { deriveWhopConnection, type WhopConnectionTone } from "@/lib/whop-connection";
 
 /**
@@ -369,6 +370,15 @@ export default function MuseWeekPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Step 5 · Pair Telegram (Dave, 2026-11-24): the pairing card
+          lived only inside the unrouted AccountView, leaving the live
+          site with no Telegram door anywhere. It renders only in this
+          open gate state — pairing mints a code against the member's
+          real Whop session, so the teaser never shows it. The card is
+          the existing TelegramLinkCard, reused as-is; its own mb-6 is
+          harmless inside this space-y-6 stack. */}
+      <TelegramLinkCard />
     </main>
   );
 }
