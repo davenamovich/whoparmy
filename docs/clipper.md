@@ -430,7 +430,7 @@ They are still LLM turns, so the bridge caps **one recall per tool call** with
 - `correctPreference(userId, scene, oldText, newText)`.
 - Hard 1.5s timeout, and **a failure never blocks a clip**: the flow proceeds
   without hints rather than failing a batch because memory is down.
-- `MNEMOS_URL` / `MNEMOS_KEY` server-side only, same discipline as `WHOP_BRIDGE_KEY`.
+- `MNEMOS_BRIDGE_URL` / `MNEMOS_BRIDGE_TOKEN` server-side only, same discipline as `WHOP_BRIDGE_KEY`.
 
 Tests: the scope key builder (userId present, never empty); recall failure → intake
 still queues; no capture fires for a generated-but-unapproved clip.
