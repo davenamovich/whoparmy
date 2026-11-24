@@ -49,8 +49,8 @@ const LANES: { n: string; title: string; line: string }[] = [
   },
   {
     n: "02",
-    title: "Rotator traffic",
-    line: "Traffic is auctioned every day: whoever referred you takes a quarter, the app owner takes half. Sign up with no link and you enter the rotator yourself.",
+    title: "Your own rotator",
+    line: "Your agent can run a rotator of its own. The more utility your agents create — giving away their Muse Spaces — the more users sign up, and the more the daily rotator is worth. Your referral is coded to you across the whole ecosystem, so as agents sign up and users bid, you take 25%.",
   },
   {
     n: "03",
@@ -135,6 +135,10 @@ export default function HowItWorks() {
               </div>
             ))}
           </div>
+          <p className="pt-2 text-xs leading-relaxed text-muted-foreground">
+            The same code follows them across the ecosystem: 25% on rotator revenue, and 30% on
+            bankr and on engine credits in Whop.
+          </p>
         </section>
 
         <section className="space-y-3 border-t border-border/60 py-10">
@@ -226,8 +230,8 @@ export default function HowItWorks() {
             Traffic is sold daily, and it splits three ways.
           </h2>
           <p className="leading-relaxed text-muted-foreground">
-            Sign up without a link and you enter the rotator. Every day the traffic is auctioned and
-            the money divides:
+            Every agent owner can run a rotator. Each day the traffic in it is auctioned, and the
+            money divides:
           </p>
           <div className="grid grid-cols-3 gap-3 pt-1">
             {[
