@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { grantReferralBot } from "@/lib/bot-grants";
-import { resolveSignup, type SignupSource } from "@/lib/bridge-signup";
+import { resolveMuseInviteCode, resolveSignup, type SignupSource } from "@/lib/bridge-signup";
 import {
   SEED_CATALOG,
   extractAffiliateRef,
@@ -78,6 +78,16 @@ export interface BridgePartnerState extends BridgePartner {
   signupSource: SignupSource | null;
   /** Whose link signupUrl is, when the source is the referrer. */
   signupOwnerId: string | null;
+  /**
+   * The bare Muse invite CODE for the "muse" partner only (Dave,
+   * 2026-11-24): the referrer's saved muse value normalized to its
+   * code, house example as fallback — the /build Step-0 card shows it
+   * click-to-copy, because the engine now stores codes, not links,
+   * and signupUrl (URL-only) can carry neither form. Null for every
+   * other partner, and null when neither side's value carries a code.
+   */
+  inviteCode: string | null;
+  inviteCodeSource: SignupSource | null;
 }
 
 export interface BridgeState {
@@ -116,12 +126,15 @@ export async function getBridgeState(userId: string): Promise<BridgeState> {
   return {
     partners: catalog.map((p) => {
       const signup = resolveSignup(p.example, referrerByPartner.get(p.key));
+      const invite = p.key === "muse" ? resolveMuseInviteCode(p.example, referrerByPartner.get(p.key)) : null;
       return {
         ...p,
         url: byPartner.get(p.key) ?? "",
         signupUrl: signup.signupUrl,
         signupSource: signup.signupSource,
         signupOwnerId: signup.signupSource === "referrer" ? (user?.referredById ?? null) : null,
+        inviteCode: invite?.code ?? null,
+        inviteCodeSource: invite?.source ?? null,
       };
     }),
     linksSavedAt: user?.linksSavedAt?.toISOString() ?? null,
@@ -129,6 +142,34 @@ export async function getBridgeState(userId: string): Promise<BridgeState> {
     referrerLabel,
     freeGensPerLinkSave: LINK_SAVE_FREE_GENS,
   };
+}
+
+/**
+ * The Muse invite code for a visitor who has no member record yet
+ * (Dave, 2026-11-24): the /build Step-0 card is shown before sign-in,
+ * so the referrer is identified by the ?ref= attribution code (the
+ * referrer's User.refCode) instead of a referredById row. Referrer's
+ * saved muse value first, house example as fallback — the same
+ * resolution a signed-in member gets from getBridgeState above.
+ */
+export async function getMuseInviteForRef(
+  refCode?: string | null,
+): Promise<{ code: string | null; source: SignupSource | null }> {
+  const catalog = await getOfferCatalog();
+  const muse = catalog.find((p) => p.key === "muse");
+  let referrerValue: string | null = null;
+  const code = refCode?.trim();
+  if (code) {
+    const referrer = await db.user.findUnique({ where: { refCode: code }, select: { id: true } });
+    if (referrer) {
+      const link = await db.engineLink.findUnique({
+        where: { userId_partner: { userId: referrer.id, partner: "muse" } },
+        select: { url: true },
+      });
+      referrerValue = link?.url ?? null;
+    }
+  }
+  return resolveMuseInviteCode(muse?.example ?? "", referrerValue);
 }
 
 // ─── Affiliate Manager: free rotator placements ─────────────────────

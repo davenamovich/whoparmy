@@ -35,6 +35,13 @@ const PUBLIC_API_PREFIXES = [
   "/api/whop/reconcile",
   "/api/bridge/exchange",
   "/api/bridge/mcp",
+  // /build Step-0 Muse invite (2026-11-24): read-only public teaser
+  // in the same class as /api/showcase — it returns only the Muse
+  // invite code that applies to the visitor (the house code is printed
+  // on the public /muse-invite page; a referrer's code is what they
+  // hand out). The handler resolves the signed-in member's referrer
+  // itself when a session exists; no member data is served.
+  "/api/build-agent/muse-invite",
   "/api/bridge/partners",
   "/api/bridge/rotator/go",
   "/api/clips/worker/",

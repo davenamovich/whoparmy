@@ -80,6 +80,112 @@ function CopyButton({ text, children }: { text: string; children: React.ReactNod
   );
 }
 
+/**
+ * Step 0 — the path to Muse (Dave, 2026-11-24): a visitor who does
+ * not have Muse yet had no way forward on /build — the whole flow is
+ * built by their own Muse. This card shows the invite code that
+ * applies to THIS visitor (their referrer's saved code, house code as
+ * fallback — resolved server-side by /api/build-agent/muse-invite,
+ * the bridge's own resolution) as a click-to-copy chip, then walks
+ * them out to create the account and back to redeem it. It is a card,
+ * not a gate: anyone who already has Muse skips straight past it.
+ */
+function MuseStartCard() {
+  const [invite, setInvite] = useState<{ code: string | null; source: string | null } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const ref = new URLSearchParams(window.location.search).get("ref") ?? readStashedRef();
+    const qs = ref ? `?ref=${encodeURIComponent(ref)}` : "";
+    void fetch(`/api/build-agent/muse-invite${qs}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d: { code?: string | null; source?: string | null }) =>
+        setInvite({ code: d.code ?? null, source: d.source ?? null }),
+      )
+      .catch(() => setInvite({ code: null, source: null }));
+  }, []);
+
+  function copyCode() {
+    if (!invite?.code) return;
+    void navigator.clipboard
+      .writeText(invite.code)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1600);
+      })
+      .catch(() => undefined);
+  }
+
+  return (
+    <section className={step} aria-label="Step 0: start with Muse">
+      <p className={label}>0 · Start with Muse</p>
+      <h2 className="text-2xl font-black tracking-tight">New to Muse? Start here.</h2>
+      <p className="text-sm text-muted-foreground leading-relaxed">
+        Everything on this page is built with your own Muse — your agent lives there. If you don&apos;t have a
+        Muse account yet, copy the invite code first, then create your account and redeem it.
+      </p>
+      {invite === null ? (
+        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading your invite code…
+        </p>
+      ) : invite.code ? (
+        <div className="space-y-1.5">
+          <p className="text-sm font-semibold">
+            Your invite code{invite.source === "referrer" ? " — from the member who sent you" : ""}
+          </p>
+          <button
+            type="button"
+            onClick={copyCode}
+            aria-label="Copy your Muse invite code"
+            className="flex items-center gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3 font-mono text-xl font-bold tracking-widest transition-colors hover:border-primary/60"
+          >
+            {invite.code}
+            {copied ? <Check className="h-5 w-5 shrink-0 text-primary" /> : <Copy className="h-5 w-5 shrink-0 text-muted-foreground" />}
+            <span className="font-sans text-xs font-semibold tracking-normal text-muted-foreground">
+              {copied ? "Copied" : "Click to copy"}
+            </span>
+          </button>
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Ask the member who sent you for their Muse invite code — or get the current code on the{" "}
+          <a className="underline" href="https://www.plunderandriffle.com/muse-invite" target="_blank" rel="noreferrer">
+            Muse invite page
+          </a>
+          .
+        </p>
+      )}
+      <ol className="list-decimal space-y-1.5 pl-5 text-sm leading-relaxed">
+        <li>Copy the code above.</li>
+        <li>Create your Muse account — you can sign up with any email account you already have.</li>
+        <li>
+          Redeem the code within 48 hours of joining: on mobile, Settings &gt; Redeem token; on the web, Settings
+          &gt; General &gt; Usage &gt; Redeem invite code. You each get 1 billion Muse tokens.
+        </li>
+        <li>Open Muse and continue the build below — your build prompt gets pasted into Muse.</li>
+      </ol>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button asChild>
+          <a href="https://muse.ai" target="_blank" rel="noreferrer">
+            Create your Muse account <ArrowRight className="h-4 w-4 ml-1.5" />
+          </a>
+        </Button>
+        <Button asChild variant="outline">
+          <a href="https://muse.ai" target="_blank" rel="noreferrer">
+            Open Muse <ArrowRight className="h-4 w-4 ml-1.5" />
+          </a>
+        </Button>
+        <p className="text-xs text-muted-foreground">
+          Muse is available in the United States, Canada, Japan, and Singapore.
+        </p>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Already have Muse? Tap Open Muse — or skip this and start at step 1 below.
+      </p>
+    </section>
+  );
+}
+
 export default function BuildPage() {
   const [session, setSession] = useState<Session | null>(null);
   const [state, setState] = useState<FlowState | null>(null);
@@ -198,6 +304,8 @@ export default function BuildPage() {
             <Loader2 className="h-4 w-4 animate-spin" />
           </p>
         ) : !session.connected ? (
+          <>
+          <MuseStartCard />
           <section className={step}>
             <p className={label}>Build an agent</p>
             <h1 className="text-3xl font-black tracking-tight">First, sign in.</h1>
@@ -211,6 +319,7 @@ export default function BuildPage() {
               </a>
             </Button>
           </section>
+          </>
         ) : (
           <>
             <section className="space-y-3">
@@ -227,6 +336,8 @@ export default function BuildPage() {
                 {error}
               </p>
             ) : null}
+
+            <MuseStartCard />
 
             <UpdateTokenCard />
 
