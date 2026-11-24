@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Bot, CheckCircle2, Coins, Copy, Download, KeyRound, Loader2, Lock, RefreshCw, ShieldOff } from "lucide-react";
 import { museWeekCommand } from "@/lib/muse-week-command";
+import { deriveWhopConnection, type WhopConnectionTone } from "@/lib/whop-connection";
 
 /**
  * ─── MUSE WEEK ───────────────────────────────────────────────────────
@@ -32,6 +33,41 @@ interface BridgeAccount {
   errorCode: string | null;
 }
 
+/** The slice of GET /api/auth/session the connection indicator reads. */
+interface SessionState {
+  connected: boolean;
+  mode?: string;
+  user: { name?: string | null; whopUsername?: string | null; planName?: string | null; plan?: string | null } | null;
+}
+
+const WHOP_DOT_CLASS: Record<WhopConnectionTone, string> = {
+  checking: "bg-muted-foreground",
+  disconnected: "bg-red-500",
+  connected: "bg-emerald-500",
+  unlinked: "bg-amber-500",
+};
+
+/**
+ * Persistent Whop connection indicator (Dave, 2026-11-24) — visible in
+ * every gate state, derived only from the session + bridge account
+ * responses this page already fetches (see lib/whop-connection.ts).
+ * The connect action reuses the teaser's own /api/auth/whop URL.
+ */
+function WhopConnectionPill({ session, account }: { session: SessionState | null; account: BridgeAccount | null }) {
+  const state = deriveWhopConnection(session, account);
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${WHOP_DOT_CLASS[state.tone]}`} aria-hidden />
+      <span className="font-medium">{state.text}</span>
+      {state.tone === "disconnected" && (
+        <Button size="sm" variant="outline" asChild>
+          <a href="/api/auth/whop">Connect with Whop</a>
+        </Button>
+      )}
+    </div>
+  );
+}
+
 type OfferId = "taste" | "week" | "opener";
 
 interface Offer {
@@ -50,6 +86,7 @@ const FALLBACK_OFFERS: Offer[] = [
 export default function MuseWeekPage() {
   const { toast } = useToast();
   const [gate, setGate] = useState<"loading" | "teaser" | "open">("loading");
+  const [session, setSession] = useState<SessionState | null>(null);
   const [account, setAccount] = useState<BridgeAccount | null>(null);
   const [code, setCode] = useState<string | null>(null);
   const [offerId, setOfferId] = useState<OfferId>("week");
@@ -79,7 +116,8 @@ export default function MuseWeekPage() {
     (async () => {
       try {
         const res = await fetch("/api/auth/session");
-        const json = (await res.json()) as { connected?: boolean };
+        const json = (await res.json()) as SessionState & { connected?: boolean };
+        setSession({ connected: Boolean(json.connected), mode: json.mode, user: json.user ?? null });
         if (!json.connected) {
           setGate("teaser");
           return;
@@ -87,6 +125,7 @@ export default function MuseWeekPage() {
         setGate("open");
         await loadAccount();
       } catch {
+        setSession({ connected: false, user: null });
         setGate("teaser");
       }
     })();
@@ -100,6 +139,9 @@ export default function MuseWeekPage() {
       if (!res.ok || !json.code) throw new Error(json.error || "Could not generate a code");
       setCode(json.code);
       setCopied(false);
+      // Refresh the account so the connection indicator (and the token
+      // list) reflect the token this code will issue, not first load.
+      await loadAccount();
     } catch (err) {
       toast({ title: "Bridge code failed", description: err instanceof Error ? err.message : "Try again", variant: "destructive" });
     } finally {
@@ -118,7 +160,8 @@ export default function MuseWeekPage() {
 
   if (gate === "loading") {
     return (
-      <main className="mx-auto max-w-3xl px-4 py-12">
+      <main className="mx-auto max-w-3xl px-4 py-12 space-y-6">
+        <WhopConnectionPill session={session} account={account} />
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" /> Checking your connection…
         </p>
@@ -129,6 +172,7 @@ export default function MuseWeekPage() {
   if (gate === "teaser") {
     return (
       <main className="mx-auto max-w-3xl px-4 py-12 space-y-6">
+        <WhopConnectionPill session={session} account={account} />
         <h1 className="text-3xl font-bold">Your Muse makes your week</h1>
         <p className="text-muted-foreground">
           Create a Muse, paste one command from this page, and your agent makes 7 days of content for your business —
@@ -149,6 +193,7 @@ export default function MuseWeekPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-12 space-y-6">
+      <WhopConnectionPill session={session} account={account} />
       <div>
         <h1 className="text-3xl font-bold">Your Muse makes your week</h1>
         <p className="mt-2 text-muted-foreground">
