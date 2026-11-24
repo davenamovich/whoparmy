@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { runBattery, scanForSecrets, validateBundle, type BatteryInput, type Bundle } from "./marketplace.ts";
+import { runBattery, scanForSecrets, validateBundle, publishGate, isTrustedSeller, type BatteryInput, type Bundle } from "./marketplace.ts";
 
 const goodBundle: Bundle = { files: [{ path: "BUILD-PROMPT.md", text: "Build the app" }, { path: "keys.md", text: "No keys committed" }] };
 const base: BatteryInput = { bundle: goodBundle, manifest: { skills: ["known"], keys: ["Weather API"] }, listing: { name: "Demo", priceCents: 0, demoKind: null, videoUrl: null }, demoProbe: null, skillExists: (s) => s === "known", oneInput: "A topic" };
@@ -35,4 +35,20 @@ test("sabotage fixture: paid listing with unreachable demo fails", () => {
 test("sabotage fixture: free listing without video passes demo", () => {
   assert.equal(check(base, "demo").pass, true);
   assert.equal(runBattery(base).status, "READY");
+});
+
+test("publish gate matrix names each failing gate", () => {
+  const ready = { batteryReady: true, feeStatus: "PAID" as const, reviewRequired: true, reviewApproved: true, isOperator: false };
+  assert.deepEqual(publishGate({ ...ready, batteryReady: false }), { ok: false, reasons: ["Battery is not ready."] });
+  assert.deepEqual(publishGate({ ...ready, feeStatus: "UNPAID" }), { ok: false, reasons: ["Listing fee is not paid."] });
+  assert.deepEqual(publishGate({ ...ready, reviewApproved: false }), { ok: false, reasons: ["Operator review is not approved."] });
+  assert.deepEqual(publishGate({ ...ready, feeStatus: "PENDING" }), { ok: false, reasons: ["Listing fee is not paid."] });
+  assert.deepEqual(publishGate({ ...ready, batteryReady: false, feeStatus: "PENDING", reviewApproved: false }), { ok: false, reasons: ["Battery is not ready.", "Listing fee is not paid.", "Operator review is not approved."] });
+});
+test("operator bypasses publish gates and trusted seller count starts at three", () => {
+  assert.deepEqual(publishGate({ batteryReady: true, feeStatus: "UNPAID", reviewRequired: true, reviewApproved: false, isOperator: true }), { ok: true, reasons: [] });
+  assert.deepEqual(publishGate({ batteryReady: false, feeStatus: "UNPAID", reviewRequired: true, reviewApproved: false, isOperator: true }), { ok: false, reasons: ["Battery is not ready."] });
+  assert.equal(isTrustedSeller(2), false);
+  assert.equal(isTrustedSeller(3), true);
+  assert.deepEqual(publishGate({ batteryReady: true, feeStatus: "WAIVED", reviewRequired: !isTrustedSeller(3), reviewApproved: false, isOperator: false }), { ok: true, reasons: [] });
 });

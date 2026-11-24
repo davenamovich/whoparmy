@@ -10,6 +10,17 @@ export interface BatteryInput {
 }
 export interface BatteryCheck { id: string; label: string; pass: boolean; reason: string }
 
+export const LISTING_FEE_CENTS = 2000;
+export type ListingFeeStatus = "UNPAID" | "PENDING" | "PAID" | "WAIVED";
+export function publishGate(input: { batteryReady: boolean; feeStatus: ListingFeeStatus; reviewRequired: boolean; reviewApproved: boolean; isOperator: boolean }): { ok: boolean; reasons: string[] } {
+  const reasons: string[] = [];
+  if (!input.batteryReady) reasons.push("Battery is not ready.");
+  if (!input.isOperator && input.feeStatus !== "PAID" && input.feeStatus !== "WAIVED") reasons.push("Listing fee is not paid.");
+  if (!input.isOperator && input.reviewRequired && !input.reviewApproved) reasons.push("Operator review is not approved.");
+  return { ok: reasons.length === 0, reasons };
+}
+export function isTrustedSeller(publishedCount: number): boolean { return publishedCount >= 3; }
+
 export function validateBundle(input: unknown): { ok: true; bundle: Bundle } | { ok: false; error: string } {
   if (!input || typeof input !== "object" || !Array.isArray((input as Bundle).files)) return { ok: false, error: "Bundle files must be an array." };
   const files = (input as Bundle).files;

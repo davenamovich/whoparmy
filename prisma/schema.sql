@@ -35,6 +35,8 @@ CREATE TABLE "User" (
     "freeGenApplied" INTEGER NOT NULL DEFAULT 0,
     "listingActive" BOOLEAN NOT NULL DEFAULT false,
     "listingCheckedAt" DATETIME,
+    "marketplaceBundleAt" DATETIME,
+    "freeAgentListingUsed" BOOLEAN NOT NULL DEFAULT false,
     CONSTRAINT "User_referredById_fkey" FOREIGN KEY ("referredById") REFERENCES "User" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
@@ -253,6 +255,7 @@ CREATE TABLE "Application" (
     "buyUrl" TEXT,
     "replicationManifest" TEXT,
     "listingStatus" TEXT NOT NULL DEFAULT 'DRAFT',
+    "feeStatus" TEXT NOT NULL DEFAULT 'UNPAID',
     "public" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
@@ -710,6 +713,8 @@ CREATE TABLE "MarketplaceSubmission" (
     "kind" TEXT NOT NULL,
     "refId" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'PENDING_BATTERY',
+    "reviewApproved" BOOLEAN NOT NULL DEFAULT false,
+    "publishedAt" DATETIME,
     "kitJson" TEXT,
     "batteryJson" TEXT,
     "batteryAt" DATETIME,
@@ -719,6 +724,23 @@ CREATE TABLE "MarketplaceSubmission" (
 );
 CREATE INDEX "MarketplaceSubmission_userId_idx" ON "MarketplaceSubmission"("userId");
 CREATE INDEX "MarketplaceSubmission_status_idx" ON "MarketplaceSubmission"("status");
+
+-- CreateTable
+CREATE TABLE "ListingFeeIntent" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "applicationId" TEXT NOT NULL,
+    "kind" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'PENDING',
+    "feeCents" INTEGER NOT NULL DEFAULT 2000,
+    "whopMembershipId" TEXT,
+    "referrerUserId" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "paidAt" DATETIME,
+    CONSTRAINT "ListingFeeIntent_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+CREATE UNIQUE INDEX "ListingFeeIntent_whopMembershipId_key" ON "ListingFeeIntent"("whopMembershipId");
+CREATE INDEX "ListingFeeIntent_userId_status_idx" ON "ListingFeeIntent"("userId", "status");
 
 -- CreateIndex
 CREATE INDEX "CampaignListing_posterId_idx" ON "CampaignListing"("posterId");

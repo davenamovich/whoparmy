@@ -59,6 +59,7 @@ model User {
   agentJobs    AgentJob[]
   applications Application[]
   marketplaceSubmissions MarketplaceSubmission[]
+  listingFeeIntents ListingFeeIntent[]
   listings     CampaignListing[]
   doorsSessions DoorsSession[]
   bidPointEvents BidPointEvent[]
@@ -77,6 +78,8 @@ model User {
   freeGenApplied Int     @default(0)
   listingActive Boolean @default(false)
   listingCheckedAt DateTime?
+  marketplaceBundleAt DateTime?
+  freeAgentListingUsed Boolean @default(false)
   creditGrants CreditGrant[]
   referredBy   User?    @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
   referrals    User[]   @relation("Referrals")
@@ -359,6 +362,7 @@ model Application {
   buyUrl         String?
   replicationManifest String?
   listingStatus   String   @default("DRAFT") // DRAFT | IN_REVIEW | READY | PUBLISHED | REJECTED
+  feeStatus       String   @default("UNPAID") // UNPAID | PENDING | PAID | WAIVED
   public         Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -377,6 +381,8 @@ model MarketplaceSubmission {
   kind      String // SPACE | AGENT
   refId     String
   status    String   @default("PENDING_BATTERY") // PENDING_BATTERY | READY | NEEDS_WORK | REJECTED
+  reviewApproved Boolean @default(false)
+  publishedAt DateTime?
   kitJson   String?
   batteryJson String?
   batteryAt DateTime?
@@ -387,6 +393,21 @@ model MarketplaceSubmission {
 
   @@index([userId])
   @@index([status])
+}
+
+model ListingFeeIntent {
+  id String @id @default(cuid())
+  userId String
+  applicationId String
+  kind String // SPACE | AGENT
+  status String @default("PENDING") // PENDING | PAID | WAIVED
+  feeCents Int @default(2000)
+  whopMembershipId String? @unique
+  referrerUserId String?
+  createdAt DateTime @default(now())
+  paidAt DateTime?
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, status])
 }
 
 model AgentJob {

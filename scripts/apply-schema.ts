@@ -46,6 +46,7 @@ const ADDITIVE_COLUMNS: Array<{ table: string; column: string; ddl: string }> = 
   { table: "Application", column: "buyUrl", ddl: 'ALTER TABLE "Application" ADD COLUMN "buyUrl" TEXT' },
   { table: "Application", column: "replicationManifest", ddl: 'ALTER TABLE "Application" ADD COLUMN "replicationManifest" TEXT' },
   { table: "Application", column: "listingStatus", ddl: 'ALTER TABLE "Application" ADD COLUMN "listingStatus" TEXT NOT NULL DEFAULT \'DRAFT\'' },
+  { table: "Application", column: "feeStatus", ddl: 'ALTER TABLE "Application" ADD COLUMN "feeStatus" TEXT NOT NULL DEFAULT \'UNPAID\'' },
   { table: "Asset", column: "pageUrl", ddl: 'ALTER TABLE "Asset" ADD COLUMN "pageUrl" TEXT' },
   { table: "Asset", column: "engineRef", ddl: 'ALTER TABLE "Asset" ADD COLUMN "engineRef" TEXT' },
   { table: "BrandProfile", column: "researchJson", ddl: 'ALTER TABLE "BrandProfile" ADD COLUMN "researchJson" TEXT' },
@@ -106,6 +107,10 @@ const ADDITIVE_COLUMNS: Array<{ table: string; column: string; ddl: string }> = 
   // and sign-in broke in production until they landed here.
   { table: "User", column: "listingActive", ddl: 'ALTER TABLE "User" ADD COLUMN "listingActive" BOOLEAN NOT NULL DEFAULT false' },
   { table: "User", column: "listingCheckedAt", ddl: 'ALTER TABLE "User" ADD COLUMN "listingCheckedAt" DATETIME' },
+  { table: "User", column: "marketplaceBundleAt", ddl: 'ALTER TABLE "User" ADD COLUMN "marketplaceBundleAt" DATETIME' },
+  { table: "User", column: "freeAgentListingUsed", ddl: 'ALTER TABLE "User" ADD COLUMN "freeAgentListingUsed" BOOLEAN NOT NULL DEFAULT false' },
+  { table: "MarketplaceSubmission", column: "reviewApproved", ddl: 'ALTER TABLE "MarketplaceSubmission" ADD COLUMN "reviewApproved" BOOLEAN NOT NULL DEFAULT false' },
+  { table: "MarketplaceSubmission", column: "publishedAt", ddl: 'ALTER TABLE "MarketplaceSubmission" ADD COLUMN "publishedAt" DATETIME' },
 ];
 for (const { table, column, ddl } of ADDITIVE_COLUMNS) {
   const cols = db.query(`PRAGMA table_info("${table}")`).all() as Array<{ name: string }>;
