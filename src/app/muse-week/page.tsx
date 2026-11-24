@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Bot, CheckCircle2, Coins, Copy, KeyRound, Loader2, Lock, RefreshCw, ShieldOff } from "lucide-react";
+import { Bot, CheckCircle2, Coins, Copy, Download, KeyRound, Loader2, Lock, RefreshCw, ShieldOff } from "lucide-react";
 import { museWeekCommand } from "@/lib/muse-week-command";
 
 /**
@@ -233,7 +233,30 @@ export default function MuseWeekPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
-            <KeyRound className="h-5 w-5" /> 3 · Your one command
+            <Download className="h-5 w-5" /> 3 · One-click install
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <p>
+            Install the Plunder &amp; Riffle skill into your Muse or ChatGPT in one click — no repo, no
+            copy-paste prompts, and every update lands on your end automatically.
+          </p>
+          <Button variant="outline" asChild>
+            <a href="https://app.skillsync.com/iammagicdave/plunder-and-riffle" target="_blank" rel="noreferrer">
+              Install Plunder &amp; Riffle in one click
+            </a>
+          </Button>
+          <p className="text-muted-foreground">
+            The skill is free and Whop stays your home for credits, community and kits — the install just puts
+            the engine one tap away inside your own agent, next to the bridge command below.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <KeyRound className="h-5 w-5" /> 4 · Your one command
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">

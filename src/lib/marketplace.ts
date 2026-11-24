@@ -1,5 +1,6 @@
 export interface Bundle { files: Array<{ path: string; text: string }> }
 export interface Manifest { skills: string[]; keys: unknown[] }
+export type SkillsyncProbeOutcome = "OK" | "NOT_FOUND" | "UNVERIFIED";
 export interface BatteryInput {
   bundle: unknown;
   manifest: Manifest | null;
@@ -7,6 +8,33 @@ export interface BatteryInput {
   demoProbe: { reachable: boolean; contentType: string | null } | null;
   skillExists: (name: string) => boolean;
   oneInput: unknown;
+  /** Skillsync install lane (Lane A, 2026-11-24). Optional: absent/null = listing carries no Skillsync link and both Skillsync checks pass as not-applicable. */
+  skillsyncUrl?: string | null;
+  /** Server probe of the Skillsync link. UNVERIFIED (auth/login wall, network error) is a named result, never a pass. */
+  skillsyncProbe?: { outcome: SkillsyncProbeOutcome } | null;
+}
+
+/**
+ * Parse a Skillsync skill link: https://app.skillsync.com/<owner>/<skill-slug>.
+ * Mirrored in lib/application.ts (isSkillsyncUrl) — keep the two in step.
+ */
+const SKILLSYNC_URL_RE = /^https:\/\/app\.skillsync\.com\/([A-Za-z0-9][A-Za-z0-9_-]*)\/([a-z0-9]+(?:-[a-z0-9]+)*)\/?$/;
+export function parseSkillsyncUrl(value: unknown): { owner: string; slug: string } | null {
+  if (typeof value !== "string") return null;
+  const match = SKILLSYNC_URL_RE.exec(value.trim());
+  return match ? { owner: match[1], slug: match[2] } : null;
+}
+
+/** The `name:` declared in a bundle's SKILL.md frontmatter, or null when the bundle has no SKILL.md or no name. */
+export function bundleSkillName(bundle: unknown): string | null {
+  const valid = validateBundle(bundle);
+  if (!valid.ok) return null;
+  const skillMd = valid.bundle.files.find((f) => /(^|\/)SKILL\.md$/i.test(f.path));
+  if (!skillMd) return null;
+  const frontmatter = /^---\s*\n([\s\S]*?)\n---/.exec(skillMd.text);
+  const scope = frontmatter ? frontmatter[1] : skillMd.text.slice(0, 2000);
+  const name = /^\s*name\s*:\s*["']?([A-Za-z0-9][A-Za-z0-9_-]*)["']?\s*$/m.exec(scope);
+  return name ? name[1] : null;
 }
 export interface BatteryCheck { id: string; label: string; pass: boolean; reason: string }
 
@@ -71,6 +99,46 @@ export function scanForSecrets(bundle: unknown): Array<{ path: string; kind: str
   return findings;
 }
 
+/**
+ * Skillsync install-lane checks (Lane A S3, 2026-11-24). Only listings
+ * that carry a skillsyncUrl are checked; the rest pass as not-applicable.
+ * Failure reasons carry a machine-readable class prefix so the member's
+ * Muse can fix the named class and resubmit:
+ * SKILLSYNC_URL_INVALID, SKILLSYNC_LINK_UNRESOLVED, SKILLSYNC_LINK_UNVERIFIED,
+ * SKILLSYNC_SKILL_MD_MISSING, SKILLSYNC_NAME_MISSING, SKILLSYNC_NAME_MISMATCH.
+ */
+function skillsyncChecks(input: BatteryInput, files: Bundle["files"]): BatteryCheck[] {
+  const url = typeof input.skillsyncUrl === "string" && input.skillsyncUrl.trim() ? input.skillsyncUrl.trim() : null;
+  if (!url) {
+    return [
+      { id: "skillsync-link", label: "Skillsync install link resolves", pass: true, reason: "No Skillsync link submitted; install lane is optional and the Whop kit file remains the delivery rail." },
+      { id: "skillsync-name", label: "Skillsync skill matches the bundle SKILL.md", pass: true, reason: "No Skillsync link submitted; nothing to match." },
+    ];
+  }
+  const parsed = parseSkillsyncUrl(url);
+  const linkCheck: BatteryCheck = !parsed
+    ? { id: "skillsync-link", label: "Skillsync install link resolves", pass: false, reason: "SKILLSYNC_URL_INVALID: skillsyncUrl must be https://app.skillsync.com/<owner>/<skill>." }
+    : !input.skillsyncProbe
+      ? { id: "skillsync-link", label: "Skillsync install link resolves", pass: false, reason: "SKILLSYNC_LINK_UNVERIFIED: the Skillsync link could not be probed; resubmit so the battery can verify it." }
+      : input.skillsyncProbe.outcome === "OK"
+        ? { id: "skillsync-link", label: "Skillsync install link resolves", pass: true, reason: "Skillsync link resolved publicly." }
+        : input.skillsyncProbe.outcome === "NOT_FOUND"
+          ? { id: "skillsync-link", label: "Skillsync install link resolves", pass: false, reason: "SKILLSYNC_LINK_UNRESOLVED: the Skillsync link returned 404. Check the owner and skill slug, or publish the skill, then resubmit." }
+          : { id: "skillsync-link", label: "Skillsync install link resolves", pass: false, reason: "SKILLSYNC_LINK_UNVERIFIED: the Skillsync link sits behind a login or could not be reached, so the battery cannot verify it. Make the skill public on Skillsync, then resubmit." };
+  const skillMd = files.find((f) => /(^|\/)SKILL\.md$/i.test(f.path));
+  const declared = bundleSkillName(input.bundle);
+  const nameCheck: BatteryCheck = !parsed
+    ? { id: "skillsync-name", label: "Skillsync skill matches the bundle SKILL.md", pass: false, reason: "SKILLSYNC_URL_INVALID: cannot read a skill slug from the submitted skillsyncUrl." }
+    : !skillMd
+      ? { id: "skillsync-name", label: "Skillsync skill matches the bundle SKILL.md", pass: false, reason: "SKILLSYNC_SKILL_MD_MISSING: the bundle carries a Skillsync link but no SKILL.md. Add the skill's SKILL.md to the bundle, then resubmit." }
+      : !declared
+        ? { id: "skillsync-name", label: "Skillsync skill matches the bundle SKILL.md", pass: false, reason: "SKILLSYNC_NAME_MISSING: SKILL.md declares no name in its frontmatter. Add a name field, then resubmit." }
+        : declared.toLowerCase().replace(/_/g, "-") === parsed.slug
+          ? { id: "skillsync-name", label: "Skillsync skill matches the bundle SKILL.md", pass: true, reason: `SKILL.md name "${declared}" matches the Skillsync slug "${parsed.slug}".` }
+          : { id: "skillsync-name", label: "Skillsync skill matches the bundle SKILL.md", pass: false, reason: `SKILLSYNC_NAME_MISMATCH: SKILL.md name "${declared}" does not match the Skillsync slug "${parsed.slug}". Rename one to match, then resubmit.` };
+  return [linkCheck, nameCheck];
+}
+
 export function runBattery(input: BatteryInput): { status: "READY" | "NEEDS_WORK"; checks: BatteryCheck[] } {
   const valid = validateBundle(input.bundle);
   const files = valid.ok ? valid.bundle.files : [];
@@ -90,6 +158,7 @@ export function runBattery(input: BatteryInput): { status: "READY" | "NEEDS_WORK
     ...(() => { const required = input.listing.priceCents > 0 || Boolean(input.listing.videoUrl); const pass = !required || Boolean(input.demoProbe?.reachable && input.demoProbe.contentType && (/^video\//i.test(input.demoProbe.contentType) || input.demoProbe.contentType.toLowerCase() === "application/octet-stream")); return [{ id: "demo", label: "Demo is reachable", pass, reason: !required ? "No demo required for this free listing." : !input.demoProbe ? "demo could not be probed" : pass ? "Demo probe passed." : "Video URL must respond with video/* or application/octet-stream." }]; })(),
     { id: "one-input", label: "One input is declared", pass: typeof input.oneInput === "string" && Boolean(input.oneInput.trim()) && input.oneInput.length <= 140, reason: typeof input.oneInput === "string" && input.oneInput.trim() && input.oneInput.length <= 140 ? "One input declaration is valid." : "oneInput must be a non-empty string of at most 140 characters." },
     { id: "price", label: "Price is within the allowed range", pass: Number.isInteger(input.listing.priceCents) && input.listing.priceCents >= 0 && input.listing.priceCents <= 1_000_000, reason: "Price must be an integer from 0 to 1,000,000 cents." },
+    ...skillsyncChecks(input, files),
   ];
   return { status: checks.every((c) => c.pass) ? "READY" : "NEEDS_WORK", checks };
 }

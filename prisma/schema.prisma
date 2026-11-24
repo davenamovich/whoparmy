@@ -361,6 +361,7 @@ model Application {
   category            String?
   demoKind            String?
   buyUrl              String?
+  skillsyncUrl        String? // Skillsync install-lane link (Lane A, 2026-11-24): one-click install copy of the kit; Whop file stays the fallback
   replicationManifest String?
   listingStatus       String   @default("DRAFT") // DRAFT | IN_REVIEW | READY | PUBLISHED | REJECTED
   feeStatus           String   @default("UNPAID") // UNPAID | PENDING | PAID | WAIVED

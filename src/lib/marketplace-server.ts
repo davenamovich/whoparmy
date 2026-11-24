@@ -2,7 +2,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { cleanAppFields, slugify, uniqueSlug, type AppFieldInput } from "@/lib/application";
 import { capabilitiesFromJson } from "@/lib/agent-profile";
-import { runBattery, validateBundle, splitSale, canDownloadKit, type Bundle, type Manifest } from "@/lib/marketplace";
+import { runBattery, validateBundle, splitSale, canDownloadKit, parseSkillsyncUrl, type Bundle, type Manifest, type SkillsyncProbeOutcome } from "@/lib/marketplace";
 import { LISTING_FEE_CENTS, isTrustedSeller, publishGate } from "@/lib/marketplace";
 import { LISTING_PLAN_ID } from "@/lib/credit-packs";
 import { whopListMemberships } from "@/lib/whop";
@@ -32,6 +32,24 @@ const probe = async (url: string | null | undefined) => {
   try { const response = await fetch(url, { method: "HEAD", signal: controller.signal, redirect: "follow" }); return { reachable: response.ok, contentType: response.headers.get("content-type") }; }
   catch { return null; } finally { clearTimeout(timer); }
 };
+/**
+ * Skillsync install-lane probe (Lane A S3, 2026-11-24). A public skill
+ * page answers 200; a missing or still-private skill answers 404 to an
+ * anonymous fetch (verified 2026-11-24 against the house skill). A
+ * login wall, an auth status, or any network failure is UNVERIFIED —
+ * a named result the battery reports, never a pass.
+ */
+const probeSkillsync = async (url: string): Promise<{ outcome: SkillsyncProbeOutcome }> => {
+  if (!parseSkillsyncUrl(url)) return { outcome: "UNVERIFIED" };
+  const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 5000);
+  try {
+    const response = await fetch(url, { method: "GET", signal: controller.signal, redirect: "follow" });
+    if (response.status === 404) return { outcome: "NOT_FOUND" };
+    if (response.status === 401 || response.status === 403) return { outcome: "UNVERIFIED" };
+    if (/\/(login|sign-in|signin|auth)(\/|\?|$)/i.test(new URL(response.url).pathname)) return { outcome: "UNVERIFIED" };
+    return { outcome: response.ok ? "OK" : "UNVERIFIED" };
+  } catch { return { outcome: "UNVERIFIED" }; } finally { clearTimeout(timer); }
+};
 const parseManifest = (raw: unknown): Manifest | null => {
   try {
     const value = typeof raw === "string" ? JSON.parse(raw) : raw;
@@ -46,10 +64,11 @@ const storedBattery = async (submissionId: string, battery: ReturnType<typeof ru
   if (applicationId) await db.application.update({ where: { id: applicationId }, data: { listingStatus } });
   return submission;
 };
-async function executeBattery(bundle: unknown, manifestRaw: unknown, listing: { name: string; priceCents: number; demoKind: string | null; videoUrl: string | null }, oneInput: unknown) {
+async function executeBattery(bundle: unknown, manifestRaw: unknown, listing: { name: string; priceCents: number; demoKind: string | null; videoUrl: string | null }, oneInput: unknown, skillsyncUrl?: string | null) {
   const validated = validateBundle(bundle);
   const demoProbe = listing.videoUrl ? await probe(listing.videoUrl) : null;
-  return runBattery({ bundle: validated.ok ? validated.bundle : bundle, manifest: parseManifest(manifestRaw), listing, demoProbe, skillExists, oneInput });
+  const skillsyncProbe = skillsyncUrl ? await probeSkillsync(skillsyncUrl) : null;
+  return runBattery({ bundle: validated.ok ? validated.bundle : bundle, manifest: parseManifest(manifestRaw), listing, demoProbe, skillExists, oneInput, skillsyncUrl: skillsyncUrl ?? null, skillsyncProbe });
 }
 
 export async function submitSpace(userId: string, body: AppFieldInput & { agentSlug?: unknown; bundle?: unknown; oneInput?: unknown }) {
@@ -67,10 +86,10 @@ export async function submitSpace(userId: string, body: AppFieldInput & { agentS
   });
   const same = owned;
   const application = same
-    ? await db.application.update({ where: { id: same.id }, data: { agentId: agent.id, name: data.name!, description: data.description ?? null, liveUrl: data.liveUrl ?? null, screenshotUrl: data.screenshotUrl ?? null, repoUrl: data.repoUrl ?? null, buildPrompt: data.buildPrompt ?? null, videoUrl: data.videoUrl ?? null, priceCents: data.priceCents ?? 0, currency: data.currency ?? "USD", category: data.category ?? null, demoKind: data.demoKind ?? null, buyUrl: data.buyUrl ?? null, replicationManifest: data.replicationManifest ?? null, public: false, listingStatus: "IN_REVIEW" } })
-    : await db.application.create({ data: { agentId: agent.id, userId, slug: candidate, name: data.name!, description: data.description ?? null, liveUrl: data.liveUrl ?? null, screenshotUrl: data.screenshotUrl ?? null, repoUrl: data.repoUrl ?? null, buildPrompt: data.buildPrompt ?? null, videoUrl: data.videoUrl ?? null, priceCents: data.priceCents ?? 0, currency: data.currency ?? "USD", category: data.category ?? null, demoKind: data.demoKind ?? null, buyUrl: data.buyUrl ?? null, replicationManifest: data.replicationManifest ?? null, public: false, listingStatus: "IN_REVIEW" } });
+    ? await db.application.update({ where: { id: same.id }, data: { agentId: agent.id, name: data.name!, description: data.description ?? null, liveUrl: data.liveUrl ?? null, screenshotUrl: data.screenshotUrl ?? null, repoUrl: data.repoUrl ?? null, buildPrompt: data.buildPrompt ?? null, videoUrl: data.videoUrl ?? null, priceCents: data.priceCents ?? 0, currency: data.currency ?? "USD", category: data.category ?? null, demoKind: data.demoKind ?? null, buyUrl: data.buyUrl ?? null, skillsyncUrl: data.skillsyncUrl ?? null, replicationManifest: data.replicationManifest ?? null, public: false, listingStatus: "IN_REVIEW" } })
+    : await db.application.create({ data: { agentId: agent.id, userId, slug: candidate, name: data.name!, description: data.description ?? null, liveUrl: data.liveUrl ?? null, screenshotUrl: data.screenshotUrl ?? null, repoUrl: data.repoUrl ?? null, buildPrompt: data.buildPrompt ?? null, videoUrl: data.videoUrl ?? null, priceCents: data.priceCents ?? 0, currency: data.currency ?? "USD", category: data.category ?? null, demoKind: data.demoKind ?? null, buyUrl: data.buyUrl ?? null, skillsyncUrl: data.skillsyncUrl ?? null, replicationManifest: data.replicationManifest ?? null, public: false, listingStatus: "IN_REVIEW" } });
   const submission = await db.marketplaceSubmission.create({ data: { userId, kind: "SPACE", refId: application.id, kitJson: JSON.stringify(bundle.bundle) } });
-  const battery = await executeBattery(bundle.bundle, data.replicationManifest, { name: data.name!, priceCents: data.priceCents ?? 0, demoKind: data.demoKind ?? null, videoUrl: data.videoUrl ?? null }, body.oneInput);
+  const battery = await executeBattery(bundle.bundle, data.replicationManifest, { name: data.name!, priceCents: data.priceCents ?? 0, demoKind: data.demoKind ?? null, videoUrl: data.videoUrl ?? null }, body.oneInput, data.skillsyncUrl ?? null);
   const saved = await storedBattery(submission.id, battery, battery.status === "READY" ? "READY" : "IN_REVIEW", application.id);
   return { submission: saved, application: { ...application, listingStatus: battery.status === "READY" ? "READY" : "IN_REVIEW", public: false }, battery };
 }
@@ -87,7 +106,7 @@ export async function submitAgent(userId: string, body: { agentSlug?: unknown; b
     ? await db.application.update({ where: { id: existingApp.id }, data: { slug: agent.slug ?? existingApp.slug, name: agent.name, description: agent.description, liveUrl: agent.spaceUrl ?? agent.appUrl, videoUrl: agent.demoUrl, category: agent.category, buildPrompt: agent.buildPrompt, public: false, listingStatus: "IN_REVIEW" } })
     : await db.application.create({ data: { agentId: agent.id, userId, slug: agent.slug ?? `agent-${agent.id}`, name: agent.name, description: agent.description, liveUrl: agent.spaceUrl ?? agent.appUrl, videoUrl: agent.demoUrl, category: agent.category, buildPrompt: agent.buildPrompt, public: false, listingStatus: "IN_REVIEW" } });
   const submission = await db.marketplaceSubmission.create({ data: { userId, kind: "AGENT", refId: agent.id, kitJson: JSON.stringify(bundle.bundle) } });
-  const battery = await executeBattery(bundle.bundle, { skills: capabilitiesFromJson(agent.capabilitiesJson), keys: capabilityKeys }, { name: agent.name, priceCents: 0, demoKind: null, videoUrl: agent.demoUrl }, body.oneInput);
+  const battery = await executeBattery(bundle.bundle, { skills: capabilitiesFromJson(agent.capabilitiesJson), keys: capabilityKeys }, { name: agent.name, priceCents: 0, demoKind: null, videoUrl: agent.demoUrl }, body.oneInput, app.skillsyncUrl ?? null);
   const saved = await storedBattery(submission.id, battery, battery.status === "READY" ? "READY" : "IN_REVIEW", app.id);
   return { submission: saved, agent, application: { ...app, listingStatus: battery.status === "READY" ? "READY" : "IN_REVIEW" }, battery };
 }
@@ -96,10 +115,10 @@ export async function listMySubmissions(userId: string) {
   const rows = await db.marketplaceSubmission.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 20 });
   const publishedCount = await db.application.count({ where: { userId, listingStatus: "PUBLISHED", public: true } });
   return Promise.all(rows.map(async (row) => {
-    const application = row.kind === "SPACE" ? await db.application.findUnique({ where: { id: row.refId }, select: { feeStatus: true } }) : await db.application.findFirst({ where: { userId, agentId: row.refId }, select: { feeStatus: true } });
+    const application = row.kind === "SPACE" ? await db.application.findUnique({ where: { id: row.refId }, select: { feeStatus: true, skillsyncUrl: true } }) : await db.application.findFirst({ where: { userId, agentId: row.refId }, select: { feeStatus: true, skillsyncUrl: true } });
     const battery = row.batteryJson ? (() => { try { return JSON.parse(row.batteryJson!); } catch { return null; } })() : null;
     const reasons = row.status === "PUBLISHED" ? [] : [...(row.status === "READY" ? [] : ["Battery is not ready."]), ...(application?.feeStatus === "PAID" || application?.feeStatus === "WAIVED" ? [] : ["Listing fee is not paid."]), ...(!isTrustedSeller(publishedCount) && !row.reviewApproved ? ["Operator review is not approved."] : [])];
-    return { ...row, feeStatus: application?.feeStatus ?? "UNPAID", publishReasons: reasons, battery };
+    return { ...row, feeStatus: application?.feeStatus ?? "UNPAID", skillsyncUrl: application?.skillsyncUrl ?? null, publishReasons: reasons, battery };
   }));
 }
 
@@ -228,7 +247,7 @@ export async function getKitForBuyer(userId: string, slug: string) {
   ]);
   if (!canDownloadKit({ isOwner: listing.userId === userId, priceCents: listing.priceCents, hasActiveSale: Boolean(sale) })) return { error: "not_purchased", buyInfo: await getBuyInfo(userId, slug) };
   let kit: unknown; try { kit = JSON.parse(submission?.kitJson ?? "null"); } catch { kit = null; }
-  return { kit, manifest: parseManifest(listing.replicationManifest) };
+  return { kit, manifest: parseManifest(listing.replicationManifest), skillsyncUrl: listing.skillsyncUrl ?? null };
 }
 
 export async function createKitIntent(userId: string, slug: string) {
@@ -302,10 +321,10 @@ export async function drainBattery(limit: number) {
   const results = [];
   for (const row of rows) {
     let bundle: unknown; try { bundle = JSON.parse(row.kitJson ?? "null"); } catch { bundle = null; }
-    let manifest: unknown = null; let listing = { name: "Agent", priceCents: 0, demoKind: null as string | null, videoUrl: null as string | null }; let appId: string | undefined;
-    if (row.kind === "SPACE") { const app = await db.application.findUnique({ where: { id: row.refId } }); appId = app?.id; if (app) { manifest = app.replicationManifest; listing = { name: app.name, priceCents: app.priceCents, demoKind: app.demoKind, videoUrl: app.videoUrl }; } }
+    let manifest: unknown = null; let listing = { name: "Agent", priceCents: 0, demoKind: null as string | null, videoUrl: null as string | null }; let appId: string | undefined; let skillsyncUrl: string | null = null;
+    if (row.kind === "SPACE") { const app = await db.application.findUnique({ where: { id: row.refId } }); appId = app?.id; if (app) { manifest = app.replicationManifest; listing = { name: app.name, priceCents: app.priceCents, demoKind: app.demoKind, videoUrl: app.videoUrl }; skillsyncUrl = app.skillsyncUrl ?? null; } }
     else { const agent = await db.hiredAgent.findUnique({ where: { id: row.refId } }); if (agent) { manifest = { skills: capabilitiesFromJson(agent.capabilitiesJson), keys: capabilitiesFromJson(agent.capabilitiesJson) }; listing = { name: agent.name, priceCents: 0, demoKind: null, videoUrl: agent.demoUrl }; } }
-    const battery = await executeBattery(bundle, manifest, listing, "Muse input");
+    const battery = await executeBattery(bundle, manifest, listing, "Muse input", skillsyncUrl);
     await storedBattery(row.id, battery, battery.status === "READY" ? "READY" : "IN_REVIEW", appId);
     results.push({ id: row.id, status: battery.status, checks: battery.checks });
   }

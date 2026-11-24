@@ -253,6 +253,7 @@ CREATE TABLE "Application" (
     "category" TEXT,
     "demoKind" TEXT,
     "buyUrl" TEXT,
+    "skillsyncUrl" TEXT,
     "replicationManifest" TEXT,
     "listingStatus" TEXT NOT NULL DEFAULT 'DRAFT',
     "feeStatus" TEXT NOT NULL DEFAULT 'UNPAID',

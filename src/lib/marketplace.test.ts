@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { runBattery, scanForSecrets, validateBundle, publishGate, isTrustedSeller, splitSale, canDownloadKit, type BatteryInput, type Bundle } from "./marketplace.ts";
+import { runBattery, scanForSecrets, validateBundle, publishGate, isTrustedSeller, splitSale, canDownloadKit, parseSkillsyncUrl, bundleSkillName, type BatteryInput, type Bundle } from "./marketplace.ts";
 
 test("70/15/15 sale split preserves the gross, with referrer absorbing rounding", () => {
   assert.deepEqual(splitSale(2500), { sellerCents: 1750, platformCents: 375, referrerCents: 375 });
@@ -63,4 +63,68 @@ test("operator bypasses publish gates and trusted seller count starts at three",
   assert.equal(isTrustedSeller(2), false);
   assert.equal(isTrustedSeller(3), true);
   assert.deepEqual(publishGate({ batteryReady: true, feeStatus: "WAIVED", reviewRequired: !isTrustedSeller(3), reviewApproved: false, isOperator: false }), { ok: true, reasons: [] });
+});
+
+// ─── Skillsync install lane (Lane A S3, 2026-11-24) ───────────────
+const skillBundle: Bundle = { files: [...goodBundle.files, { path: "SKILL.md", text: "---\nname: my-skill\ndescription: A skill\n---\n# My Skill\n" }] };
+const ssBase: BatteryInput = { ...base, bundle: skillBundle, skillsyncUrl: "https://app.skillsync.com/someowner/my-skill", skillsyncProbe: { outcome: "OK" } };
+
+test("skillsync URL parser accepts owner/slug links and refuses everything else", () => {
+  assert.deepEqual(parseSkillsyncUrl("https://app.skillsync.com/iammagicdave/plunder-and-riffle"), { owner: "iammagicdave", slug: "plunder-and-riffle" });
+  assert.deepEqual(parseSkillsyncUrl("https://app.skillsync.com/someowner/my-skill/"), { owner: "someowner", slug: "my-skill" });
+  assert.equal(parseSkillsyncUrl("https://example.com/someowner/my-skill"), null);
+  assert.equal(parseSkillsyncUrl("https://app.skillsync.com/onlyowner"), null);
+  assert.equal(parseSkillsyncUrl("http://app.skillsync.com/someowner/my-skill"), null);
+  assert.equal(parseSkillsyncUrl(null), null);
+});
+test("bundle skill name comes from SKILL.md frontmatter", () => {
+  assert.equal(bundleSkillName(skillBundle), "my-skill");
+  assert.equal(bundleSkillName(goodBundle), null);
+  assert.equal(bundleSkillName({ files: [{ path: "skills/x/SKILL.md", text: "---\nname: 'quoted-name'\n---\n" }] }), "quoted-name");
+});
+test("listings without a skillsync link pass both skillsync checks as not-applicable", () => {
+  assert.equal(check(base, "skillsync-link").pass, true);
+  assert.equal(check(base, "skillsync-name").pass, true);
+  assert.equal(runBattery(base).status, "READY");
+});
+test("skillsync link that resolves publicly and matches SKILL.md passes and can be READY", () => {
+  assert.equal(check(ssBase, "skillsync-link").pass, true);
+  assert.equal(check(ssBase, "skillsync-name").pass, true);
+  assert.equal(runBattery(ssBase).status, "READY");
+});
+test("sabotage fixture: skillsync link returning 404 fails SKILLSYNC_LINK_UNRESOLVED", () => {
+  const c = check({ ...ssBase, skillsyncProbe: { outcome: "NOT_FOUND" } }, "skillsync-link");
+  assert.equal(c.pass, false);
+  assert.match(c.reason, /^SKILLSYNC_LINK_UNRESOLVED:/);
+  assert.equal(runBattery({ ...ssBase, skillsyncProbe: { outcome: "NOT_FOUND" } }).status, "NEEDS_WORK");
+});
+test("sabotage fixture: skillsync link behind a login is UNVERIFIED, never a pass", () => {
+  const c = check({ ...ssBase, skillsyncProbe: { outcome: "UNVERIFIED" } }, "skillsync-link");
+  assert.equal(c.pass, false);
+  assert.match(c.reason, /^SKILLSYNC_LINK_UNVERIFIED:/);
+  const noProbe = check({ ...ssBase, skillsyncProbe: null }, "skillsync-link");
+  assert.equal(noProbe.pass, false);
+  assert.match(noProbe.reason, /^SKILLSYNC_LINK_UNVERIFIED:/);
+});
+test("sabotage fixture: SKILL.md name that differs from the skillsync slug fails SKILLSYNC_NAME_MISMATCH", () => {
+  const bundle = { files: [...goodBundle.files, { path: "SKILL.md", text: "---\nname: other-skill\n---\n" }] };
+  const c = check({ ...ssBase, bundle }, "skillsync-name");
+  assert.equal(c.pass, false);
+  assert.match(c.reason, /^SKILLSYNC_NAME_MISMATCH:/);
+});
+test("skillsync name matching normalizes underscores like the skill registry", () => {
+  const bundle = { files: [...goodBundle.files, { path: "SKILL.md", text: "---\nname: my_skill\n---\n" }] };
+  assert.equal(check({ ...ssBase, bundle }, "skillsync-name").pass, true);
+});
+test("sabotage fixture: skillsync link without a SKILL.md in the bundle fails SKILLSYNC_SKILL_MD_MISSING", () => {
+  const c = check({ ...ssBase, bundle: goodBundle }, "skillsync-name");
+  assert.equal(c.pass, false);
+  assert.match(c.reason, /^SKILLSYNC_SKILL_MD_MISSING:/);
+});
+test("sabotage fixture: malformed skillsync URL fails SKILLSYNC_URL_INVALID on both checks", () => {
+  const bad = { ...ssBase, skillsyncUrl: "https://example.com/someowner/my-skill" };
+  assert.match(check(bad, "skillsync-link").reason, /^SKILLSYNC_URL_INVALID:/);
+  assert.equal(check(bad, "skillsync-link").pass, false);
+  assert.match(check(bad, "skillsync-name").reason, /^SKILLSYNC_URL_INVALID:/);
+  assert.equal(check(bad, "skillsync-name").pass, false);
 });

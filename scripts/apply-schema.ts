@@ -44,6 +44,7 @@ const ADDITIVE_COLUMNS: Array<{ table: string; column: string; ddl: string }> = 
   { table: "Application", column: "category", ddl: 'ALTER TABLE "Application" ADD COLUMN "category" TEXT' },
   { table: "Application", column: "demoKind", ddl: 'ALTER TABLE "Application" ADD COLUMN "demoKind" TEXT' },
   { table: "Application", column: "buyUrl", ddl: 'ALTER TABLE "Application" ADD COLUMN "buyUrl" TEXT' },
+  { table: "Application", column: "skillsyncUrl", ddl: 'ALTER TABLE "Application" ADD COLUMN "skillsyncUrl" TEXT' },
   { table: "Application", column: "replicationManifest", ddl: 'ALTER TABLE "Application" ADD COLUMN "replicationManifest" TEXT' },
   { table: "Application", column: "listingStatus", ddl: 'ALTER TABLE "Application" ADD COLUMN "listingStatus" TEXT NOT NULL DEFAULT \'DRAFT\'' },
   { table: "Application", column: "feeStatus", ddl: 'ALTER TABLE "Application" ADD COLUMN "feeStatus" TEXT NOT NULL DEFAULT \'UNPAID\'' },

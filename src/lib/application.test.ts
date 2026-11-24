@@ -137,6 +137,14 @@ describe("serializePublicApplication", () => {
     assert.equal(app.videoUrl, null); assert.equal(app.buyUrl, null);
     assert.deepEqual(app.replicationManifest, { skills: [], keys: [], crons: [] });
   });
+  it("passes a valid Skillsync install link through and nulls any other host", () => {
+    const good = serializePublicApplication({ ...appRow, skillsyncUrl: "https://app.skillsync.com/iammagicdave/plunder-and-riffle" }, agentRow, { name: "Dave", whopUsername: null });
+    assert.equal(good.skillsyncUrl, "https://app.skillsync.com/iammagicdave/plunder-and-riffle");
+    const wrongHost = serializePublicApplication({ ...appRow, skillsyncUrl: "https://example.com/iammagicdave/plunder-and-riffle" }, agentRow, { name: "Dave", whopUsername: null });
+    assert.equal(wrongHost.skillsyncUrl, null);
+    const absent = serializePublicApplication(appRow, agentRow, { name: "Dave", whopUsername: null });
+    assert.equal(absent.skillsyncUrl, null);
+  });
   it("unlinks the builder when the agent profile is not public", () => {
     const app = serializePublicApplication(
       appRow,
@@ -178,6 +186,19 @@ describe("cleanAppFields", () => {
     });
     const cleared = cleanAppFields({ name: "X", repoUrl: "  " }, false);
     assert.deepEqual(cleared, { data: { name: "X", repoUrl: null } });
+  });
+
+  it("accepts a Skillsync skill link, rejects other URLs in the skillsyncUrl field, and clears empty", () => {
+    assert.deepEqual(cleanAppFields({ name: "X", skillsyncUrl: "https://app.skillsync.com/someowner/my-skill" }, false), {
+      data: { name: "X", skillsyncUrl: "https://app.skillsync.com/someowner/my-skill" },
+    });
+    assert.deepEqual(cleanAppFields({ name: "X", skillsyncUrl: "https://example.com/someowner/my-skill" }, false), {
+      error: "Skillsync URL must be an app.skillsync.com skill link (https://app.skillsync.com/<owner>/<skill>).",
+    });
+    assert.deepEqual(cleanAppFields({ name: "X", skillsyncUrl: "https://app.skillsync.com/onlyowner" }, false), {
+      error: "Skillsync URL must be an app.skillsync.com skill link (https://app.skillsync.com/<owner>/<skill>).",
+    });
+    assert.deepEqual(cleanAppFields({ name: "X", skillsyncUrl: "  " }, false), { data: { name: "X", skillsyncUrl: null } });
   });
 
   it("is partial-aware for PATCH: no name needed, untouched fields skipped", () => {

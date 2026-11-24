@@ -65,6 +65,16 @@ export function isHttpUrl(value: unknown): value is string {
   }
 }
 
+/**
+ * Skillsync install-lane link (Lane A, 2026-11-24): exactly
+ * https://app.skillsync.com/<owner>/<skill-slug>. Mirrored in
+ * lib/marketplace.ts (parseSkillsyncUrl) — keep the two in step.
+ */
+const SKILLSYNC_URL_RE = /^https:\/\/app\.skillsync\.com\/[A-Za-z0-9][A-Za-z0-9_-]*\/[a-z0-9]+(?:-[a-z0-9]+)*\/?$/;
+export function isSkillsyncUrl(value: unknown): value is string {
+  return typeof value === "string" && SKILLSYNC_URL_RE.test(value.trim());
+}
+
 export interface PublicApplicationRow {
   slug: string;
   name: string;
@@ -81,6 +91,7 @@ export interface PublicApplicationRow {
   category?: string | null;
   demoKind?: string | null;
   buyUrl?: string | null;
+  skillsyncUrl?: string | null;
   replicationManifest?: string | null;
 }
 
@@ -121,6 +132,7 @@ export interface PublicApplication {
   category: string | null;
   demoKind: "video" | "live" | null;
   buyUrl: string | null;
+  skillsyncUrl: string | null;
   replicationManifest: { skills: string[]; keys: string[]; crons: string[] };
 }
 
@@ -165,6 +177,7 @@ export function serializePublicApplication(
     category: app.category ?? null,
     demoKind: app.demoKind === "video" || app.demoKind === "live" ? app.demoKind : null,
     buyUrl: isHttpUrl(app.buyUrl) ? app.buyUrl : null,
+    skillsyncUrl: isSkillsyncUrl(app.skillsyncUrl) ? app.skillsyncUrl!.trim() : null,
     replicationManifest: parseReplicationManifest(app.replicationManifest),
   };
 }
@@ -185,7 +198,7 @@ export interface AppFieldInput {
   repoUrl?: unknown;
   buildPrompt?: unknown;
   public?: unknown;
-  videoUrl?: unknown; priceCents?: unknown; currency?: unknown; category?: unknown; demoKind?: unknown; buyUrl?: unknown; replicationManifest?: unknown;
+  videoUrl?: unknown; priceCents?: unknown; currency?: unknown; category?: unknown; demoKind?: unknown; buyUrl?: unknown; skillsyncUrl?: unknown; replicationManifest?: unknown;
 }
 
 export interface CleanAppData {
@@ -196,7 +209,7 @@ export interface CleanAppData {
   repoUrl?: string | null;
   buildPrompt?: string | null;
   public?: boolean;
-  videoUrl?: string | null; priceCents?: number; currency?: string; category?: string | null; demoKind?: string | null; buyUrl?: string | null; replicationManifest?: string | null;
+  videoUrl?: string | null; priceCents?: number; currency?: string; category?: string | null; demoKind?: string | null; buyUrl?: string | null; skillsyncUrl?: string | null; replicationManifest?: string | null;
 }
 
 const URL_FIELD_LABELS = [
@@ -205,6 +218,7 @@ const URL_FIELD_LABELS = [
   ["repoUrl", "Repository URL"],
   ["videoUrl", "Video URL"],
   ["buyUrl", "Buy URL"],
+  ["skillsyncUrl", "Skillsync URL"],
 ] as const;
 
 /**
@@ -229,6 +243,7 @@ export function cleanAppFields(body: AppFieldInput, partial: boolean): { data: C
       continue;
     }
     if (!isHttpUrl(trimmed)) return { error: `${label} must be an http(s) URL.` };
+    if (key === "skillsyncUrl" && !isSkillsyncUrl(trimmed)) return { error: "Skillsync URL must be an app.skillsync.com skill link (https://app.skillsync.com/<owner>/<skill>)." };
     data[key] = trimmed.slice(0, 500);
   }
   if (body.description !== undefined) {
@@ -266,7 +281,7 @@ export const HOUSE_SPACE: PublicApplication = {
   slug: "plunder-riffle-content-engine", name: "P&R Content Engine",
   description: "Enter a business URL and get a real content pack back — all 27 Plunder & Riffle MCP tools behind one approval inbox, run by your own Muse.",
   category: "Content engine", priceCents: 0, currency: "USD", demoKind: "live", videoUrl: null, screenshotUrl: null,
-  liveUrl: null, buyUrl: null, repoUrl: null,
+  liveUrl: null, buyUrl: null, skillsyncUrl: "https://app.skillsync.com/iammagicdave/plunder-and-riffle", repoUrl: null,
   buildPrompt: "Build me a Space called \"P&R Content Engine\" — the SMB owner's front door to the Plunder & Riffle engine.\n\nArchitecture: queue + write-back. The Space holds no keys and runs no inference. Its UI queues jobs; the owner's own Muse (connected over the Plunder & Riffle bridge) claims them, runs the P&R MCP tools on the owner's own credits, and writes results back through the Space's record actions. Nothing publishes, sends, or spends without the owner's approval tap.\n\nFive tabs:\n1. HOME / APPROVAL INBOX — account, brand, and offer snapshots plus every finished preview waiting for the owner's approve/reject tap; approval renders the MP4.\n2. CREATE — eleven one-input tools over the P&R MCP (27 tools total): brand research, audits, memes, slideshows, hot takes, iMessage pieces, scroll and infomercial add-ons, follow-ups. Each tool takes ONE input; the engine populates everything else.\n3. BRAND — save a brand voice as the engine default (hand-written or from a research job), auto-condensed to the engine's 1000-character voice limit, verified by read-back proof.\n4. OFFERS — seed campaigns from finished research briefs; set the owner's call page (their video inside a phone frame, their button at the end).\n5. LIBRARY — every job, newest first, with status, retries, and follow-up creation.\n\nActions: createJob, recordJobUpdate, listJobs, retryJob, createFollowupJob, approveAndRender, refreshSnapshots, recordSnapshot, getDashboard, saveBrand, saveBrandFromJob, saveBrandProfile, condenseBrandProfile, recordBrandSaveResult, createCampaign, setCallPage, setLanguage, dailyEngineCheck.\n\nRecurring: a daily engine-check executor cron (07:15 ET) on the owner's Muse claims queued jobs, polls unfinished ones, and surfaces finished previews for approval.\n\nKeys (names only — the replicator creates their own accounts and their Muse saves their own keys during onboarding): a Plunder & Riffle API key via the bridge. The Space itself stores no secrets.",
   replicationManifest: { skills: ["Queue + write-back Space architecture (the Space holds no keys; the owner's Muse executes)", "Plunder & Riffle MCP bridge — all 27 engine tools, run in the owner's own Muse", "Approval-inbox pattern — previews wait for the owner's tap; approval renders the MP4", "Brand voice save with read-back verification"], keys: ["Plunder & Riffle API key — your own, saved by your Muse via the bridge during onboarding"], crons: ["Daily engine check, 07:15 ET (owner's Muse executor)"] },
   createdAt: "2026-11-24T00:00:00.000Z", updatedAt: "2026-11-24T00:00:00.000Z",
