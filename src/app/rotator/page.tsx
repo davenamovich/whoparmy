@@ -1,6 +1,8 @@
 import { headers } from "next/headers";
 import { loadMarketToday, recordMarketImpressions, MARKET_HOUSE_PARTNER } from "@/lib/rotator-market-server";
 import { RotatorCountdown } from "@/components/rotator-countdown";
+import { SiteHeader } from "@/components/shell/site-header";
+import { SiteFooter } from "@/components/shell/site-footer";
 
 export const dynamic = "force-dynamic";
 
@@ -68,20 +70,11 @@ export default async function RotatorMarketplacePage() {
   return (
     <main className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex min-h-screen max-w-2xl flex-col px-5 py-10">
-        <header className="flex items-center justify-between gap-3">
-          <p translate="no" className="text-xs font-black tracking-[0.14em]">
-            PLUNDER <span className="text-primary">&amp;</span> RIFFLE
-          </p>
-          <nav aria-label="Main" className="flex items-center gap-4 text-sm font-semibold">
-            <a className="text-primary underline underline-offset-2" href="/api/auth/whop">
-              Connect
-            </a>
-          </nav>
-        </header>
+        <SiteHeader />
 
         <section className="space-y-4 py-12">
           <p className={label}>The Daily Rotator</p>
-          <h1 className="text-4xl font-black leading-tight tracking-tight sm:text-5xl">Today&apos;s featured destinations.</h1>
+          <h1 className="font-display text-4xl font-black leading-tight tracking-tight sm:text-5xl">Today&apos;s featured destinations.</h1>
           <p className="max-w-md leading-relaxed text-muted-foreground">
             One auction a day, won with Bid Points. The winner and the day&apos;s free placements rotate here
             until midnight ET.
@@ -100,7 +93,7 @@ export default async function RotatorMarketplacePage() {
           {view.placements.map((placement) => (
             <li
               key={placement.partner}
-              className={`rounded-2xl border p-5 ${placement.source === "house" ? "border-primary/60 sm:col-span-2" : "border-border"}`}
+              className={`rounded-[10px] border p-5 ${placement.source === "house" ? "border-primary/60 sm:col-span-2" : "border-border"}`}
             >
               <div className="space-y-3">
                 <span className="flex items-start justify-between gap-3">
@@ -134,7 +127,7 @@ export default async function RotatorMarketplacePage() {
           <p className={label}>Inventory</p>
           <ul className="grid gap-3 sm:grid-cols-3">
             {view.inventory.map((day, i) => (
-              <li key={day.date} className="rounded-2xl border border-border p-4">
+              <li key={day.date} className="rounded-[10px] border border-border p-4">
                 <span className="block text-sm font-black">{dayNames[i] ?? day.date}</span>
                 <span className="block text-xs text-muted-foreground">{day.date}</span>
                 <span className="mt-2 block text-sm font-semibold">{STATE_LABEL[day.state] ?? day.state}</span>
@@ -154,10 +147,7 @@ export default async function RotatorMarketplacePage() {
           </p>
         </section>
 
-        <footer className="mt-auto border-t border-border/60 pt-6 text-xs text-muted-foreground">
-          Nothing publishes, sends or spends without your yes on that item. Affiliate and referral money shown anywhere
-          is simulated until it&apos;s actually paid. Nothing is guaranteed.
-        </footer>
+        <SiteFooter />
       </div>
     </main>
   );

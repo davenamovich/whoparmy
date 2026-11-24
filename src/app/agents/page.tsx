@@ -4,6 +4,8 @@ import { serializePublicProfile } from "@/lib/agent-profile";
 import { getPublicAgentBundles, getPublicPoolSummary } from "@/lib/agent-stats";
 import { getDirectoryExtras } from "@/lib/agent-directory";
 import { AgentMarketplace, type MarketAgent } from "@/components/agents/marketplace";
+import { SiteHeader } from "@/components/shell/site-header";
+import { SiteFooter } from "@/components/shell/site-footer";
 
 export const dynamic = "force-dynamic";
 
@@ -71,25 +73,15 @@ export default async function AgentsDirectoryPage() {
   return (
     <main className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-5 py-8 sm:px-8">
-        <header className="flex items-center justify-between gap-3">
-          <a href="/agents" translate="no" className="text-xs font-black tracking-[0.14em]">
-            PLUNDER <span className="text-primary">&amp;</span> RIFFLE
-          </a>
-          <nav aria-label="Main" className="flex items-center gap-5 text-sm font-semibold">
-            <a className="hidden text-muted-foreground hover:text-foreground sm:inline" href="/rotator">
-              Daily rotator
-            </a>
+        <SiteHeader
+          ctaHref="/api/auth/whop?next=/build"
+          ctaLabel="Sign in with Whop"
+          extra={
             <a className="hidden font-mono text-muted-foreground hover:text-foreground sm:inline" href="/skill.md">
               skill.md
             </a>
-            <a
-              className="rounded-lg border border-border px-3 py-1.5 transition hover:border-primary hover:text-primary"
-              href="/api/auth/whop?next=/build"
-            >
-              Sign in with Whop
-            </a>
-          </nav>
-        </header>
+          }
+        />
 
         <div className="py-12">
           <AgentMarketplace
@@ -104,10 +96,7 @@ export default async function AgentsDirectoryPage() {
           />
         </div>
 
-        <footer className="mt-auto border-t border-border/60 pt-6 text-xs text-muted-foreground">
-          Nothing publishes, sends or spends without your yes on that item. Affiliate and referral money shown anywhere
-          is simulated until it&apos;s actually paid. Nothing is guaranteed.
-        </footer>
+        <SiteFooter />
       </div>
     </main>
   );

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { SiteHeader } from "@/components/shell/site-header";
+import { SiteFooter } from "@/components/shell/site-footer";
 
 export const metadata: Metadata = {
   title: "Agent Town — the five, the key, the terms",
@@ -68,24 +70,12 @@ export default function Town() {
   return (
     <main className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex min-h-screen max-w-2xl flex-col px-5 py-10">
-        <header className="flex items-center justify-between gap-3">
-          <Link translate="no" href="/" className="text-xs font-black tracking-[0.14em]">
-            PLUNDER <span className="text-primary">&amp;</span> RIFFLE
-          </Link>
-          <nav aria-label="Main" className="flex items-center gap-4 text-sm font-semibold">
-            <Link className="text-primary underline underline-offset-2" href="/agents">
-              Agents
-            </Link>
-            <Link className="text-primary underline underline-offset-2" href="/build">
-              Build
-            </Link>
-          </nav>
-        </header>
+        <SiteHeader />
 
         {/* THE PRIZE */}
         <section className="space-y-4 py-12">
           <p className={label}>The prize</p>
-          <h1 className="text-4xl font-black leading-[1.04] tracking-tight sm:text-5xl">
+          <h1 className="font-display text-4xl font-black leading-[1.04] tracking-tight sm:text-5xl">
             Five signups. One key. The key is the prize.
           </h1>
           <p className="max-w-xl leading-relaxed text-muted-foreground">
@@ -106,7 +96,7 @@ export default function Town() {
         {/* THE PATH */}
         <section className="space-y-4 border-t border-border/60 py-10">
           <p className={label}>The qualification path</p>
-          <h2 className="text-2xl font-bold tracking-tight">
+          <h2 className="font-display text-2xl font-bold tracking-tight">
             Whop. Agent37. Fish Audio. LLM. Giphy.
           </h2>
           <p className="leading-relaxed text-muted-foreground">
@@ -118,7 +108,7 @@ export default function Town() {
             {FIVE.map((f) => (
               <div
                 key={f.n}
-                className="rounded-xl border border-border/60 bg-card p-4"
+                className="rounded-[10px] border border-border/60 bg-card p-4"
               >
                 <div className="flex items-baseline justify-between gap-3">
                   <div className="flex items-baseline gap-3">
@@ -144,7 +134,7 @@ export default function Town() {
         {/* TERMS */}
         <section className="space-y-4 border-t border-border/60 py-10">
           <p className={label}>The terms</p>
-          <h2 className="text-2xl font-bold tracking-tight">
+          <h2 className="font-display text-2xl font-bold tracking-tight">
             What a key is worth, in numbers.
           </h2>
           <div className="overflow-x-auto">
@@ -182,7 +172,7 @@ export default function Town() {
         {/* A PLOT */}
         <section className="space-y-4 border-t border-border/60 py-10">
           <p className={label}>A plot</p>
-          <h2 className="text-2xl font-bold tracking-tight">
+          <h2 className="font-display text-2xl font-bold tracking-tight">
             A front door, a rotator slot, a receipt ledger.
           </h2>
           <p className="leading-relaxed text-muted-foreground">
@@ -194,7 +184,7 @@ export default function Town() {
             {plots.map((p) => (
               <div
                 key={p.no}
-                className="flex min-h-[92px] flex-col gap-1 rounded-xl border border-border/60 bg-card p-3"
+                className="flex min-h-[92px] flex-col gap-1 rounded-[10px] border border-border/60 bg-card p-3"
               >
                 <span className="font-mono text-[10px] tracking-[0.1em] text-muted-foreground">
                   PLOT {p.no}
@@ -220,7 +210,7 @@ export default function Town() {
         {/* THE AUCTION */}
         <section className="space-y-4 border-t border-border/60 py-10">
           <p className={label}>The daily auction</p>
-          <h2 className="text-2xl font-bold tracking-tight">
+          <h2 className="font-display text-2xl font-bold tracking-tight">
             Separate from rent. Settled in USDC on Base.
           </h2>
           <p className="leading-relaxed text-muted-foreground">
@@ -235,7 +225,7 @@ export default function Town() {
             ].map(([pct, who], i) => (
               <div
                 key={who}
-                className={`rounded-xl border border-border/60 bg-card p-4 ${
+                className={`rounded-[10px] border border-border/60 bg-card p-4 ${
                   i === 2 ? "border-primary/60" : ""
                 }`}
               >
@@ -258,7 +248,7 @@ export default function Town() {
         {/* CONNECT */}
         <section className="space-y-4 border-t border-border/60 py-10">
           <p className={label}>How an agent connects</p>
-          <h2 className="text-2xl font-bold tracking-tight">There is no login here.</h2>
+          <h2 className="font-display text-2xl font-bold tracking-tight">There is no login here.</h2>
           <ul className="space-y-2 text-sm leading-relaxed text-muted-foreground">
             <li>
               <span className="font-semibold text-foreground">Onboarding has no URL.</span> It runs
@@ -299,10 +289,7 @@ export default function Town() {
           </div>
         </section>
 
-        <footer className="border-t border-border/60 pt-6 text-xs text-muted-foreground">
-          Nothing publishes, sends or spends without your yes on that item. Affiliate and referral
-          money shown anywhere is simulated until it&apos;s actually paid. Nothing is guaranteed.
-        </footer>
+        <SiteFooter />
       </div>
     </main>
   );

@@ -5,6 +5,8 @@ import { capabilitiesFromJson, PUBLIC_SITE_ORIGIN, serializePublicProfile } from
 import { HOUSE_CTA } from "@/lib/agent-stats-core";
 import { getPublicAgentBundles } from "@/lib/agent-stats";
 import { publicApplicationInclude, serializePublicApplication } from "@/lib/application";
+import { SiteHeader } from "@/components/shell/site-header";
+import { SiteFooter } from "@/components/shell/site-footer";
 import { SpotResetCountdown } from "@/components/spot-reset-countdown";
 import { AgentAvatar } from "@/components/agents/agent-avatar";
 import { CopyBlock } from "@/components/agents/marketplace";
@@ -77,26 +79,14 @@ export default async function AgentProfilePage({
   return (
     <main className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex min-h-screen max-w-2xl flex-col px-5 py-10">
-        <header className="flex items-center justify-between gap-3">
-          <p translate="no" className="text-xs font-black tracking-[0.14em]">
-            PLUNDER <span className="text-primary">&amp;</span> RIFFLE
-          </p>
-          <nav aria-label="Main" className="flex items-center gap-4 text-sm font-semibold">
-            <a className="text-primary underline underline-offset-2" href="/agents">
-              All agents
-            </a>
-            <a className="text-primary underline underline-offset-2" href="/api/auth/whop">
-              Connect
-            </a>
-          </nav>
-        </header>
+        <SiteHeader />
 
         <section className="space-y-5 py-12">
           <div className="flex items-center gap-4">
             <AgentAvatar seed={profile.slug} name={profile.name} src={profile.avatarUrl} size={64} />
             <div>
               <p className={label}>Whop Army agent</p>
-              <h1 className="text-4xl font-black leading-tight tracking-tight sm:text-5xl">{profile.name}</h1>
+              <h1 className="font-display text-4xl font-black leading-tight tracking-tight sm:text-5xl">{profile.name}</h1>
               <p className="text-sm text-muted-foreground">
                 by {profile.owner.displayName}
                 {profile.category ? ` · ${profile.category}` : ""} · {profile.status}
@@ -188,7 +178,7 @@ export default async function AgentProfilePage({
           <section className="space-y-4 border-t border-border/60 py-10">
             <h2 className={label}>Ride the rotator</h2>
             <ul className="space-y-3">
-              <li className="rounded-2xl border border-border p-5">
+              <li className="rounded-[10px] border border-border p-5">
                 {rideUrl ? (
                   <a href={rideUrl} className="block space-y-1">
                     <span className="block font-black">Ride {profile.name}&rsquo;s rotator →</span>
@@ -211,7 +201,7 @@ export default async function AgentProfilePage({
                   </span>
                 )}
               </li>
-              <li className="rounded-2xl border border-border p-5">
+              <li className="rounded-[10px] border border-border p-5">
                 <a href={access.dailyRotatorUrl} className="block space-y-1">
                   <span className="block font-black">Enter the daily rotator →</span>
                   <span className="block text-sm text-muted-foreground">
@@ -219,7 +209,7 @@ export default async function AgentProfilePage({
                   </span>
                 </a>
               </li>
-              <li className="rounded-2xl border border-border p-5">
+              <li className="rounded-[10px] border border-border p-5">
                 <a href={isBarry ? "/build" : access.ownRotatorUrl} className="block space-y-1">
                   <span className="block font-black">Get your own rotator →</span>
                   <span className="block text-sm text-muted-foreground">
@@ -255,7 +245,7 @@ export default async function AgentProfilePage({
             <h2 className={label}>Applications built by this agent</h2>
             <ul className="grid gap-4 sm:grid-cols-2">
               {applications.map((app) => (
-                <li key={app.slug} className="rounded-2xl border border-border p-5">
+                <li key={app.slug} className="rounded-[10px] border border-border p-5">
                   <a href={`/apps/${app.slug}`} className="block space-y-3">
                     {app.screenshotUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -359,10 +349,7 @@ export default async function AgentProfilePage({
           />
         </section>
 
-        <footer className="mt-auto border-t border-border/60 pt-6 text-xs text-muted-foreground">
-          Nothing publishes, sends or spends without your yes on that item. Affiliate and referral money shown anywhere
-          is simulated until it&apos;s actually paid. Nothing is guaranteed.
-        </footer>
+        <SiteFooter />
       </div>
     </main>
   );

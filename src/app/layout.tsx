@@ -25,6 +25,27 @@ const geistMono = localFont({
   weight: "400 700",
 });
 
+// Design Engine fonts (2026-11-24, self-hosted variable woff2 from
+// Fontsource — same build-anywhere pattern as Geist above):
+// Archivo = display, Inter = body, IBM Plex Mono = data labels only.
+const archivo = localFont({
+  src: "./fonts/archivo.woff2",
+  variable: "--font-archivo",
+  weight: "400 900",
+});
+
+const inter = localFont({
+  src: "./fonts/inter.woff2",
+  variable: "--font-inter",
+  weight: "100 900",
+});
+
+const plexMono = localFont({
+  src: "./fonts/ibm-plex-mono.woff2",
+  variable: "--font-plex-mono",
+  weight: "500",
+});
+
 export const metadata: Metadata = {
   // One-time-door overhaul (Dave, 2026-11-20): no hype ("endless",
   // unverified "23 languages") and no internal funnel words in public
@@ -40,7 +61,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0d0c0a",
+  themeColor: "#101418",
   width: "device-width",
   initialScale: 1,
 };
@@ -83,7 +104,7 @@ export default async function RootLayout({
   return (
     <html lang={locale} className="dark" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground min-h-screen flex flex-col`}
+        className={`${geistSans.variable} ${geistMono.variable} ${archivo.variable} ${inter.variable} ${plexMono.variable} antialiased bg-background text-foreground min-h-screen flex flex-col`}
       >
         <NextIntlClientProvider locale={locale} messages={messages}>
           <PageViewBeacon />

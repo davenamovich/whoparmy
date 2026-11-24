@@ -470,7 +470,7 @@ function SpotBoard({ agents, pool }: { agents: MarketAgent[]; pool: MarketPool }
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4 text-xs text-muted-foreground">
           <span className="flex items-center gap-4">
             <span className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded-sm bg-gradient-to-br from-orange-400 to-rose-500" /> Taken
+              <span className="h-3 w-3 rounded-sm bg-muted-foreground" /> Taken
             </span>
             <span className="flex items-center gap-1.5">
               <span className="h-3 w-3 rounded-sm border border-dashed border-primary/60" /> Open
@@ -491,7 +491,7 @@ function AgentCard({ agent }: { agent: MarketAgent }) {
   const { spots } = agent;
   const pct = spots.allotment > 0 ? Math.round((spots.used / spots.allotment) * 100) : 0;
   return (
-    <li className="group relative flex min-w-0 flex-col rounded-2xl border border-border bg-card p-5 transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-[0_12px_40px_-20px_var(--primary)]">
+    <li className="group relative flex min-w-0 flex-col rounded-[10px] border border-border bg-card p-5 transition hover:border-primary/50">
       <div className="flex items-start gap-3">
         <AgentAvatar seed={agent.slug} name={agent.name} src={agent.avatarUrl} size={48} />
         <div className="min-w-0 flex-1">

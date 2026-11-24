@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ArrowRight, Check, Copy, Loader2 } from "lucide-react";
+import { SiteHeader } from "@/components/shell/site-header";
+import { SiteFooter } from "@/components/shell/site-footer";
 import { BUILD_QUIZ, type BuildQuizAnswers } from "@/lib/build-agent";
 import { clearStashedRef, readStashedRef, stashRefFromUrl } from "@/lib/ref-stash";
 
@@ -55,7 +57,7 @@ interface CreateResult {
   bridgeEligible: boolean;
 }
 
-const step = "rounded-2xl border border-border bg-card p-5 sm:p-6 space-y-3";
+const step = "rounded-[10px] border border-border bg-card p-5 sm:p-6 space-y-3";
 const label = "font-mono text-[11px] font-semibold tracking-[0.18em] text-primary uppercase";
 
 function CopyButton({ text, children }: { text: string; children: React.ReactNode }) {
@@ -119,7 +121,7 @@ function MuseStartCard() {
   return (
     <section className={step} aria-label="Step 0: start with Muse">
       <p className={label}>0 · Start with Muse</p>
-      <h2 className="text-2xl font-black tracking-tight">New to Muse? Start here.</h2>
+      <h2 className="font-display text-2xl font-black tracking-tight">New to Muse? Start here.</h2>
       <p className="text-sm text-muted-foreground leading-relaxed">
         Everything on this page is built with your own Muse — your agent lives there. If you don&apos;t have a
         Muse account yet, copy the invite code first, then create your account and redeem it.
@@ -293,11 +295,7 @@ export default function BuildPage() {
   return (
     <main className="min-h-screen bg-background text-foreground">
       <div className="mx-auto max-w-2xl px-5 py-14 sm:py-20 space-y-10">
-        <header>
-          <p translate="no" className="text-xs font-black tracking-[0.14em]">
-            PLUNDER <span className="text-primary">&amp;</span> RIFFLE
-          </p>
-        </header>
+        <SiteHeader />
 
         {session === null ? (
           <p className="flex items-center gap-2 text-sm text-muted-foreground" aria-label="Loading">
@@ -308,7 +306,7 @@ export default function BuildPage() {
           <MuseStartCard />
           <section className={step}>
             <p className={label}>Build an agent</p>
-            <h1 className="text-3xl font-black tracking-tight">First, sign in.</h1>
+            <h1 className="font-display text-3xl font-black tracking-tight">First, sign in.</h1>
             <p className="text-muted-foreground leading-relaxed">
               The build starts from deep research on your business and a short quiz — both tied to your account, so
               sign in with Whop first. It takes one sitting.
@@ -324,7 +322,7 @@ export default function BuildPage() {
           <>
             <section className="space-y-3">
               <p className={label}>Whop Army · Build an agent</p>
-              <h1 className="text-4xl sm:text-5xl font-black leading-[1.02] tracking-tight">We research. You answer 7 questions. Your agent gets built.</h1>
+              <h1 className="font-display text-4xl sm:text-5xl font-black leading-[1.02] tracking-tight">We research. You answer 7 questions. Your agent gets built.</h1>
               <p className="text-muted-foreground leading-relaxed">
                 Deep research on your business, a short quiz, and an agent designed from both — then the prompt and
                 bridge code that let your own Muse build out your Spaces, so you hit the ground running.
@@ -513,10 +511,7 @@ export default function BuildPage() {
           </>
         )}
 
-        <footer className="border-t border-border/60 pt-6 text-xs text-muted-foreground">
-          Nothing publishes, sends or spends without your yes on that item. Affiliate and referral money shown anywhere
-          is simulated until it&apos;s actually paid. Nothing is guaranteed.
-        </footer>
+        <SiteFooter />
       </div>
     </main>
   );

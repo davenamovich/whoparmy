@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { SiteHeader } from "@/components/shell/site-header";
+import { SiteFooter } from "@/components/shell/site-footer";
 import { db } from "@/lib/db";
 import { publicApplicationInclude, serializePublicApplication } from "@/lib/application";
 
@@ -29,23 +31,11 @@ export default async function AppDetailPage({ params }: { params: Promise<{ slug
   return (
     <main className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex min-h-screen max-w-2xl flex-col px-5 py-10">
-        <header className="flex items-center justify-between gap-3">
-          <p translate="no" className="text-xs font-black tracking-[0.14em]">
-            PLUNDER <span className="text-primary">&amp;</span> RIFFLE
-          </p>
-          <nav aria-label="Main" className="flex items-center gap-4 text-sm font-semibold">
-            <a className="text-primary underline underline-offset-2" href="/apps">
-              All apps
-            </a>
-            <a className="text-primary underline underline-offset-2" href="/api/auth/whop">
-              Connect
-            </a>
-          </nav>
-        </header>
+        <SiteHeader />
 
         <section className="space-y-5 py-12">
           <p className={label}>Whop Army application</p>
-          <h1 className="text-4xl font-black leading-tight tracking-tight sm:text-5xl">{app.name}</h1>
+          <h1 className="font-display text-4xl font-black leading-tight tracking-tight sm:text-5xl">{app.name}</h1>
           {app.description ? <p className="leading-relaxed text-muted-foreground">{app.description}</p> : null}
           {app.screenshotUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -68,7 +58,7 @@ export default async function AppDetailPage({ params }: { params: Promise<{ slug
         <section className="space-y-3 border-t border-border/60 py-10">
           <h2 className={label}>Built by</h2>
           {app.builtBy.agentSlug ? (
-            <a href={`/agent/${app.builtBy.agentSlug}`} className="block rounded-2xl border border-border p-5">
+            <a href={`/agent/${app.builtBy.agentSlug}`} className="block rounded-[10px] border border-border p-5">
               <span className="flex items-center gap-3">
                 <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary text-lg font-black text-primary-foreground">
                   {app.builtBy.agentName.slice(0, 1).toUpperCase()}
@@ -118,10 +108,7 @@ export default async function AppDetailPage({ params }: { params: Promise<{ slug
           </section>
         ) : null}
 
-        <footer className="mt-auto border-t border-border/60 pt-6 text-xs text-muted-foreground">
-          Nothing publishes, sends or spends without your yes on that item. Affiliate and referral money shown anywhere
-          is simulated until it&apos;s actually paid. Nothing is guaranteed.
-        </footer>
+        <SiteFooter />
       </div>
     </main>
   );
