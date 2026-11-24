@@ -10,6 +10,9 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
+  async rewrites() {
+    return [{ source: "/play", destination: "/play/index.html" }];
+  },
 };
 
 export default withNextIntl(nextConfig);
