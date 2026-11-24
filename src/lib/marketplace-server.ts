@@ -161,7 +161,8 @@ export async function ensureWhopProduct(application: { id: string; name: string;
     const productRes = await fetch(`${cfg.apiBase}/api/v1/products`, { method: "POST", headers, body: JSON.stringify({ company_id: cfg.companyId, title: application.name, visibility: "visible" }) });
     const productBody = await productRes.json().catch(() => ({})) as Record<string, unknown>;
     if (!productRes.ok || typeof productBody.id !== "string") throw new Error(`Whop product creation failed (${productRes.status})`);
-    const planRes = await fetch(`${cfg.apiBase}/api/v1/plans`, { method: "POST", headers, body: JSON.stringify({ product_id: productBody.id, plan_type: "one_time", initial_price: application.priceCents / 100, currency: "usd", title: application.name }) });
+    // Whop caps plan titles at 30 chars (verified live 2026-11-24: longer titles 400 at plan create).
+    const planRes = await fetch(`${cfg.apiBase}/api/v1/plans`, { method: "POST", headers, body: JSON.stringify({ product_id: productBody.id, plan_type: "one_time", initial_price: application.priceCents / 100, currency: "usd", title: application.name.slice(0, 30) }) });
     const planBody = await planRes.json().catch(() => ({})) as Record<string, unknown>;
     if (!planRes.ok || typeof planBody.id !== "string") throw new Error(`Whop plan creation failed (${planRes.status})`);
     await db.application.update({ where: { id: application.id }, data: { whopProductId: productBody.id, whopPlanId: planBody.id, whopProductError: null } });
