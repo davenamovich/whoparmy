@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { etDateString, getRotatorPool, type RotatorPoolEntry } from "@/lib/rotator";
 import { recordRotatorHop } from "@/lib/rotator-v2";
 import { recordLinkClick } from "@/lib/link-clicks";
+import { getPaidSlotPrices, listPaidSlotsForDate } from "@/lib/paid-slots-server";
+import { partnerNameSync } from "@/lib/offer-catalog";
 import {
   addDaysToEtDate,
   etDayEndsAt,
@@ -83,14 +85,17 @@ async function inventoryFor(dates: string[], today: string): Promise<MarketDayIn
     where: { date: { in: dates } },
     include: { _count: { select: { bids: true } } },
   });
+  const [prices, paidCounts] = await Promise.all([getPaidSlotPrices(), Promise.all(dates.map(date => db.paidRotatorSlot.count({ where: { date } })))]);
   const byDate = new Map(days.map((d) => [d.date, d]));
-  return dates.map((date) => {
+  return dates.map((date, i) => {
     const day = byDate.get(date);
     const bidCount = day?._count.bids ?? 0;
     return {
       date,
       state: inventoryState({ status: day?.status ?? null, bidCount, date, today }),
       bidCount,
+      priceCents: prices.find(p => p.date === date)?.priceCents ?? 1000,
+      paid: paidCounts[i] > 0,
     };
   });
 }
@@ -150,6 +155,19 @@ export async function loadMarketToday(now = new Date()): Promise<{ view: MarketT
     ];
   }
 
+  const paidSlots = await listPaidSlotsForDate(today);
+  internal.push(...paidSlots.map((slot) => ({
+    partner: slot.partner,
+    partnerName: partnerNameSync(slot.partner),
+    host: hostOf(slot.url),
+    source: "paid" as const,
+    ownerName: displayName(slot.user),
+    lifecycle: placementLifecycle(today, today),
+    userId: slot.userId,
+    agentId: null,
+    url: slot.url,
+  })));
+
   const [inventory, countedImpressions, countedLaunches] = await Promise.all([
     inventoryFor(dates, today),
     countedMarketHops("imp", etWallTimeToUtc(today, 0, 0), etWallTimeToUtc(addDaysToEtDate(today, 1), 0, 0)),
@@ -206,9 +224,13 @@ export async function resolveMarketLaunch(
   if (partner === MARKET_HOUSE_PARTNER) {
     target = { url: MARKET_HOUSE_URL, userId: null, agentId: null };
   } else {
-    const pool = await getRotatorPool(today);
-    const entry = pool.find((e) => e.partner === partner);
-    if (entry) target = { url: entry.url, userId: entry.userId, agentId: entry.agentId ?? null };
+    const paid = await db.paidRotatorSlot.findFirst({ where: { date: today, partner } });
+    if (paid) target = { url: paid.url, userId: paid.userId, agentId: null };
+    else {
+      const pool = await getRotatorPool(today);
+      const entry = pool.find((e) => e.partner === partner);
+      if (entry) target = { url: entry.url, userId: entry.userId, agentId: entry.agentId ?? null };
+    }
   }
   if (!target) return null;
 

@@ -20,11 +20,14 @@ export const dynamic = "force-dynamic";
  * the destination server-side. On a day with no live placement, the
  * house card is The BTC Experiment (Dave, 2026-11-21).
  *
- * The auction currency is BID POINTS (Dave, 2026-11-22: the auctions
- * are not won with free generations — those are prizes). Bid Points
- * come only from referrals (lib/doors/points.ts). Paid placements are not live yet and
- * no money moves here — settlement is a later, separately gated
- * slice, and every money figure anywhere stays SIMULATED until then.
+ * Two lanes (Dave, 2026-11-24, Slices 1+2): the featured auction
+ * currency is BID POINTS (Dave, 2026-11-22: the auctions are not won
+ * with free generations — those are prizes; Bid Points come only
+ * from referrals, lib/doors/points.ts) — and PAID SLOTS, bought
+ * outright in USDC on Base through the bridge intents in
+ * lib/paid-slots-server.ts. A paid slot's settlement is born
+ * simulated until the buyer's on-chain tx verifies; only then does
+ * it carry a real gross at the 25/25/50 split.
  */
 
 const label = "font-mono text-[11px] font-semibold tracking-[0.18em] text-primary uppercase";
@@ -32,6 +35,7 @@ const label = "font-mono text-[11px] font-semibold tracking-[0.18em] text-primar
 const SOURCE_BADGE: Record<string, string> = {
   auction: "Auction winner",
   "free-placement": "Free placement",
+  paid: "Paid slot",
   house: "House rotation",
 };
 
@@ -76,8 +80,7 @@ export default async function RotatorMarketplacePage() {
           <p className={label}>The Daily Rotator</p>
           <h1 className="font-display text-4xl font-black leading-tight tracking-tight sm:text-5xl">Today&apos;s featured destinations.</h1>
           <p className="max-w-md leading-relaxed text-muted-foreground">
-            One auction a day, won with Bid Points. The winner and the day&apos;s free placements rotate here
-            until midnight ET.
+            One featured auction a day, won with Bid Points — plus paid slots you can buy outright for USDC on Base. Winners and paid placements rotate here until midnight ET.
           </p>
           <p className="text-sm font-semibold text-primary">
             <RotatorCountdown closesAt={view.closesAt} />
@@ -130,20 +133,18 @@ export default async function RotatorMarketplacePage() {
               <li key={day.date} className="rounded-[10px] border border-border p-4">
                 <span className="block text-sm font-black">{dayNames[i] ?? day.date}</span>
                 <span className="block text-xs text-muted-foreground">{day.date}</span>
-                <span className="mt-2 block text-sm font-semibold">{STATE_LABEL[day.state] ?? day.state}</span>
+                <span className="mt-2 block text-sm font-semibold">{day.paid ? "Paid slot sold" : STATE_LABEL[day.state] ?? day.state}</span>
                 <span className="block text-xs text-muted-foreground">
                   {day.bidCount} {day.bidCount === 1 ? "bid" : "bids"} in Bid Points
                 </span>
+                <span className="mt-2 block text-sm font-semibold">${(day.priceCents / 100).toFixed(2)} USDC</span>
+                <a className="mt-2 inline-flex text-sm text-primary underline" href={`/build?tab=rotator&date=${encodeURIComponent(day.date)}`}>Buy this slot</a>
               </li>
             ))}
           </ul>
           <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
-            Want in? Members bid <strong className="text-foreground">Bid Points</strong> to feature one of their
-            saved links for a day — Bid Points come only from referrals, never money, and paid placements are not live yet.{" "}
-            <a className="text-primary underline underline-offset-2" href="/build">
-              Bid on the bridge
-            </a>
-            .
+            Want in? <strong className="text-foreground">Buy a slot</strong> for a day and your saved link rotates here — paid in USDC on Base through Bankr, split 25% Plunder &amp; Riffle / 25% your referrer / 50% the agent owner. Or bid Bid Points (earned from referrals) for the one featured auction slot.{" "}
+            <a className="text-primary underline underline-offset-2" href="/build?tab=rotator">Buy a slot</a> · <a className="text-primary underline underline-offset-2" href="/build">Bid on the bridge</a>.
           </p>
         </section>
 

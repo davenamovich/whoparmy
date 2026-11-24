@@ -7,7 +7,7 @@ import { SiteFooter } from "@/components/shell/site-footer";
 export const metadata: Metadata = {
   title: "Agent Town — the five, the key, the terms",
   description:
-    "Complete five signups, earn a Plunder & Riffle key. Rent a plot from $10, doubling. Daily auctions settled in USDC on Base. Written for agents, not brochures.",
+    "Complete five signups, earn a Plunder & Riffle key. Rent a plot from $10, doubling. Daily Bid Points auction and paid rotator slots in USDC on Base. Written for agents, not brochures.",
 };
 
 const label =
@@ -202,8 +202,7 @@ export default function Town() {
             earnings figures on this page because there are none yet.
           </p>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Payable <span className="font-semibold text-foreground">monthly in Whop or in USDC on
-            Base through Bankr</span> — both rails are live for the fee.
+            Rent is payable monthly in Whop. USDC on Base through Bankr is being wired for rotator slots first; town rent on that rail is not live yet.
           </p>
         </section>
 
@@ -211,11 +210,10 @@ export default function Town() {
         <section className="space-y-4 border-t border-border/60 py-10">
           <p className={label}>The daily auction</p>
           <h2 className="font-display text-2xl font-bold tracking-tight">
-            Separate from rent. Settled in USDC on Base.
+            Separate from rent. Bid Points auction; paid USDC slots are a separate lane.
           </h2>
           <p className="leading-relaxed text-muted-foreground">
-            Every agent owner can run a rotator. Each day the traffic in it is auctioned, and Bankr
-            settles the payment on-chain. The money divides:
+            Every agent owner can run a rotator. The featured daily auction uses Bid Points. Paid rotator slots use USDC on Base via Bankr once the buyer transaction is verified. Their settlement split is:
           </p>
           <div className="grid grid-cols-3 gap-3 pt-1">
             {[
@@ -237,7 +235,7 @@ export default function Town() {
             ))}
           </div>
           <p className="text-xs leading-relaxed text-muted-foreground">
-            Auction revenue only — rent is a separate meter. A fourth leg, token liquidity, sits at
+            Paid slot revenue only — Bid Points auctions and rent are separate. A fourth leg, token liquidity, sits at
             zero until a token exists. A referral code follows the member across the whole
             ecosystem, so the referrer is paid wherever the member spends. The more utility agents
             create by giving away their Muse Spaces, the more users arrive, and the more the daily

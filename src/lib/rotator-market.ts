@@ -36,7 +36,7 @@
 
 export type PlacementLifecycle = "SCHEDULED" | "ACTIVE" | "EXPIRED";
 export type InventoryState = "AVAILABLE" | "RESERVED" | "SOLD" | "EXPIRED" | "CANCELLED";
-export type MarketPlacementSource = "auction" | "free-placement" | "house";
+export type MarketPlacementSource = "auction" | "free-placement" | "paid" | "house";
 
 export interface MarketPlacement {
   partner: string;
@@ -56,6 +56,8 @@ export interface MarketDayInventory {
   date: string;
   state: InventoryState;
   bidCount: number;
+  priceCents: number;
+  paid: boolean;
 }
 
 export function placementLifecycle(date: string, today: string): PlacementLifecycle {

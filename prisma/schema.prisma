@@ -40,6 +40,8 @@ model User {
   rotatorBids  RotatorBid[]
   rotatorWins  RotatorDay[] @relation("RotatorWins")
   rotatorPlacements RotatorPlacement[]
+  rotatorPurchaseIntents RotatorPurchaseIntent[]
+  paidRotatorSlots PaidRotatorSlot[]
   trafficDays  AgentTrafficDay[]
   linksSavedAt DateTime? // first bridge link save — pays the referrer's free generations (lib/bridge.ts)
   // BTC Experiment (Flow v2, 2026-11-19): PUBLIC receive addresses
@@ -859,6 +861,41 @@ model RotatorPlacement {
 
   @@unique([userId, partner])
   @@index([date])
+}
+
+
+model RotatorPurchaseIntent {
+  id        String   @id @default(cuid())
+  userId    String
+  partner   String
+  date      String
+  priceCents Int
+  status    String   @default("PENDING")
+  txHash    String?  @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+model PaidRotatorSlot {
+  id           String   @id @default(cuid())
+  intentId     String   @unique
+  userId       String
+  partner      String
+  date         String
+  url          String
+  priceCents   Int
+  txHash       String
+  settlementId String?
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([date])
+  @@index([userId])
 }
 
 // ─── Traffic pool (Dave, 2026-11-19) ────────────────────────────────
