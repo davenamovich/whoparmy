@@ -252,6 +252,7 @@ CREATE TABLE "Application" (
     "demoKind" TEXT,
     "buyUrl" TEXT,
     "replicationManifest" TEXT,
+    "listingStatus" TEXT NOT NULL DEFAULT 'DRAFT',
     "public" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
@@ -701,6 +702,23 @@ CREATE INDEX "Application_userId_idx" ON "Application"("userId");
 
 -- CreateIndex
 CREATE INDEX "Application_public_idx" ON "Application"("public");
+
+-- CreateTable
+CREATE TABLE "MarketplaceSubmission" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "kind" TEXT NOT NULL,
+    "refId" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'PENDING_BATTERY',
+    "kitJson" TEXT,
+    "batteryJson" TEXT,
+    "batteryAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "MarketplaceSubmission_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+CREATE INDEX "MarketplaceSubmission_userId_idx" ON "MarketplaceSubmission"("userId");
+CREATE INDEX "MarketplaceSubmission_status_idx" ON "MarketplaceSubmission"("status");
 
 -- CreateIndex
 CREATE INDEX "CampaignListing_posterId_idx" ON "CampaignListing"("posterId");

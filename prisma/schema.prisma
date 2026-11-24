@@ -58,6 +58,7 @@ model User {
   hiredAgents  HiredAgent[]
   agentJobs    AgentJob[]
   applications Application[]
+  marketplaceSubmissions MarketplaceSubmission[]
   listings     CampaignListing[]
   doorsSessions DoorsSession[]
   bidPointEvents BidPointEvent[]
@@ -357,6 +358,7 @@ model Application {
   demoKind       String?
   buyUrl         String?
   replicationManifest String?
+  listingStatus   String   @default("DRAFT") // DRAFT | IN_REVIEW | READY | PUBLISHED | REJECTED
   public         Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -367,6 +369,24 @@ model Application {
   @@index([agentId])
   @@index([userId])
   @@index([public])
+}
+
+model MarketplaceSubmission {
+  id        String   @id @default(cuid())
+  userId    String
+  kind      String // SPACE | AGENT
+  refId     String
+  status    String   @default("PENDING_BATTERY") // PENDING_BATTERY | READY | NEEDS_WORK | REJECTED
+  kitJson   String?
+  batteryJson String?
+  batteryAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
 }
 
 model AgentJob {

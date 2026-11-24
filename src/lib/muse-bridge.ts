@@ -180,9 +180,9 @@ export async function assertExperimentEligible(user: Pick<User, "id" | "whopId">
 // ─── Tool allowlist ─────────────────────────────────────────────────
 // Free tools never touch the budget. Generating tools reserve their
 // LIST cost (from the bot MCP's own tool descriptions) and settle at
-// the actual charge. Anything not listed here is refused — notably
-// member unlock/key tools. Publishing (publish_clip, post_to_socials) and
-// MP4 rendering (request_mp4) remain refused.
+// the actual charge. Free tools, including member unlock/key tools, are
+// allowed. Publishing (publish_clip, post_to_socials) and MP4 rendering
+// (request_mp4) remain refused.
 
 /** Week-scope generating tools (the /muse-week offer's allowlist). */
 export const BRIDGE_GENERATING_COSTS: Record<string, number> = {
