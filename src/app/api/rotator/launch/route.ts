@@ -9,8 +9,8 @@ export const runtime = "nodejs";
  * in the RotatorHop ledger (surface ROTATOR_PAGE) and 302s to the
  * placement's real destination, resolved SERVER-SIDE from today's
  * rotator pool — a destination URL is never accepted from the query
- * string. The house partner ("the-btc-experiment") resolves to
- * https://www.thebtcexperiment.com. Unknown partner → /rotator.
+ * string. The house partner ("the-btc-experiment") resolves to the
+ * on-site game at /play (Dave, 2026-11-24). Unknown partner → /rotator.
  */
 export async function GET(req: NextRequest) {
   const partner = req.nextUrl.searchParams.get("partner") ?? "";

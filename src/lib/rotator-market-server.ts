@@ -36,6 +36,13 @@ import {
  * other surfaces depend on) is deliberately untouched — only the
  * Slice 5 surfaces resolve house → the BTC Experiment.
  *
+ * ON-SITE (Dave, 2026-11-24, supersedes the off-site half of the
+ * above): the game now lives on-site at /play (site reorg R1 — "keep
+ * users on-site, not sent off-site to play the game"), and Dave
+ * ordered the rotator's remaining off-site pointer closed. The house
+ * destination is the on-site /play; thebtcexperiment.com stays live
+ * as a standalone site but nothing on this surface sends users there.
+ *
  * TRACKING — one ledger, RotatorHop (no parallel analytics):
  * marketplace rows use surface "ROTATOR_PAGE". Impression vs click
  * is carried by linkId, the hop's per-destination key:
@@ -54,7 +61,7 @@ import {
 export const MARKET_SURFACE = "ROTATOR_PAGE";
 export const MARKET_HOUSE_PARTNER = "the-btc-experiment";
 export const MARKET_HOUSE_NAME = "The BTC Experiment";
-export const MARKET_HOUSE_URL = "https://www.thebtcexperiment.com";
+export const MARKET_HOUSE_URL = "https://whop.plunderandriffle.com/play";
 
 const impLinkId = (partner: string) => `market-imp:${partner}`;
 const clickLinkId = (partner: string) => `market-click:${partner}`;
