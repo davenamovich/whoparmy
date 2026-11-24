@@ -350,6 +350,13 @@ model Application {
   screenshotUrl  String?
   repoUrl        String? // source repository
   buildPrompt    String?
+  videoUrl       String?
+  priceCents     Int      @default(0)
+  currency       String   @default("USD")
+  category       String?
+  demoKind       String?
+  buyUrl         String?
+  replicationManifest String?
   public         Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

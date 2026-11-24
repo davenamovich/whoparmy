@@ -7,7 +7,7 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
     title: "Explore",
     links: [
       { href: "/agents", label: "Agents" },
-      { href: "/apps", label: "Apps" },
+      { href: "/spaces", label: "Spaces" },
       { href: "/rotator", label: "Daily rotator" },
       { href: "/town", label: "Agent Town" },
     ],

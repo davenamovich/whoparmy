@@ -38,6 +38,13 @@ try {
 // each entry is applied only when the column is absent, so it is safe
 // on every boot and never touches existing data.
 const ADDITIVE_COLUMNS: Array<{ table: string; column: string; ddl: string }> = [
+  { table: "Application", column: "videoUrl", ddl: 'ALTER TABLE "Application" ADD COLUMN "videoUrl" TEXT' },
+  { table: "Application", column: "priceCents", ddl: 'ALTER TABLE "Application" ADD COLUMN "priceCents" INTEGER NOT NULL DEFAULT 0' },
+  { table: "Application", column: "currency", ddl: "ALTER TABLE \"Application\" ADD COLUMN \"currency\" TEXT NOT NULL DEFAULT 'USD'" },
+  { table: "Application", column: "category", ddl: 'ALTER TABLE "Application" ADD COLUMN "category" TEXT' },
+  { table: "Application", column: "demoKind", ddl: 'ALTER TABLE "Application" ADD COLUMN "demoKind" TEXT' },
+  { table: "Application", column: "buyUrl", ddl: 'ALTER TABLE "Application" ADD COLUMN "buyUrl" TEXT' },
+  { table: "Application", column: "replicationManifest", ddl: 'ALTER TABLE "Application" ADD COLUMN "replicationManifest" TEXT' },
   { table: "Asset", column: "pageUrl", ddl: 'ALTER TABLE "Asset" ADD COLUMN "pageUrl" TEXT' },
   { table: "Asset", column: "engineRef", ddl: 'ALTER TABLE "Asset" ADD COLUMN "engineRef" TEXT' },
   { table: "BrandProfile", column: "researchJson", ddl: 'ALTER TABLE "BrandProfile" ADD COLUMN "researchJson" TEXT' },

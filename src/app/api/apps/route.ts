@@ -73,6 +73,7 @@ export async function POST(req: NextRequest) {
         screenshotUrl: data.screenshotUrl ?? null,
         repoUrl: data.repoUrl ?? null,
         buildPrompt: data.buildPrompt ?? null,
+        videoUrl: data.videoUrl ?? null, priceCents: data.priceCents ?? 0, currency: data.currency ?? "USD", category: data.category ?? null, demoKind: data.demoKind ?? null, buyUrl: data.buyUrl ?? null, replicationManifest: data.replicationManifest ?? null,
         public: data.public ?? false,
       },
     });

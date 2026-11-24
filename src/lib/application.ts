@@ -3,7 +3,7 @@
  *
  * An Application is a public showcase entry for an app a HiredAgent
  * built. Everything testable lives here with no imports: the
- * serializer is the security boundary for /apps, /apps/{slug},
+ * serializer is the security boundary for /spaces, /spaces/{slug},
  * /api/apps/public/* and the applications section on /agent/{slug} —
  * it exposes ONLY the fields in PublicApplication. The owner's email,
  * the agent's instructions/budgets, the owner's user id and every
@@ -75,6 +75,13 @@ export interface PublicApplicationRow {
   buildPrompt: string | null;
   createdAt: Date;
   updatedAt: Date;
+  videoUrl?: string | null;
+  priceCents?: number;
+  currency?: string;
+  category?: string | null;
+  demoKind?: string | null;
+  buyUrl?: string | null;
+  replicationManifest?: string | null;
 }
 
 export interface PublicApplicationAgentRow {
@@ -108,6 +115,23 @@ export interface PublicApplication {
     displayName: string;
   };
   appUrl: string;
+  videoUrl: string | null;
+  priceCents: number;
+  currency: string;
+  category: string | null;
+  demoKind: "video" | "live" | null;
+  buyUrl: string | null;
+  replicationManifest: { skills: string[]; keys: string[]; crons: string[] };
+}
+
+export function parseReplicationManifest(value: unknown): { skills: string[]; keys: string[]; crons: string[] } {
+  const empty = { skills: [] as string[], keys: [] as string[], crons: [] as string[] };
+  if (typeof value !== "string") return empty;
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    const list = (v: unknown) => Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+    return { skills: list(parsed.skills), keys: list(parsed.keys), crons: list(parsed.crons) };
+  } catch { return empty; }
 }
 
 export function serializePublicApplication(
@@ -134,7 +158,14 @@ export function serializePublicApplication(
     owner: {
       displayName: owner.name?.trim() || owner.whopUsername?.trim() || "Whop Army member",
     },
-    appUrl: `${PUBLIC_SITE_ORIGIN}/apps/${app.slug}`,
+    appUrl: `${PUBLIC_SITE_ORIGIN}/spaces/${app.slug}`,
+    videoUrl: isHttpUrl(app.videoUrl) ? app.videoUrl : null,
+    priceCents: app.priceCents ?? 0,
+    currency: app.currency ?? "USD",
+    category: app.category ?? null,
+    demoKind: app.demoKind === "video" || app.demoKind === "live" ? app.demoKind : null,
+    buyUrl: isHttpUrl(app.buyUrl) ? app.buyUrl : null,
+    replicationManifest: parseReplicationManifest(app.replicationManifest),
   };
 }
 
@@ -154,6 +185,7 @@ export interface AppFieldInput {
   repoUrl?: unknown;
   buildPrompt?: unknown;
   public?: unknown;
+  videoUrl?: unknown; priceCents?: unknown; currency?: unknown; category?: unknown; demoKind?: unknown; buyUrl?: unknown; replicationManifest?: unknown;
 }
 
 export interface CleanAppData {
@@ -164,12 +196,15 @@ export interface CleanAppData {
   repoUrl?: string | null;
   buildPrompt?: string | null;
   public?: boolean;
+  videoUrl?: string | null; priceCents?: number; currency?: string; category?: string | null; demoKind?: string | null; buyUrl?: string | null; replicationManifest?: string | null;
 }
 
 const URL_FIELD_LABELS = [
   ["liveUrl", "Live URL"],
   ["screenshotUrl", "Screenshot URL"],
   ["repoUrl", "Repository URL"],
+  ["videoUrl", "Video URL"],
+  ["buyUrl", "Buy URL"],
 ] as const;
 
 /**
@@ -203,5 +238,37 @@ export function cleanAppFields(body: AppFieldInput, partial: boolean): { data: C
     data.buildPrompt = typeof body.buildPrompt === "string" ? body.buildPrompt.trim().slice(0, 8000) || null : null;
   }
   if (typeof body.public === "boolean") data.public = body.public;
+  for (const key of ["category", "currency"] as const) if (body[key] !== undefined) {
+    const value = typeof body[key] === "string" ? body[key].trim() : "";
+    if (key === "currency") { if (value && !/^[A-Za-z]{3}$/.test(value)) return { error: "Currency must be a 3-letter code." }; data.currency = (value || "USD").toUpperCase(); }
+    else data.category = value.slice(0, 80) || null;
+  }
+  if (body.priceCents !== undefined) { const n = Number(body.priceCents); if (!Number.isInteger(n) || n < 0) return { error: "Price must be a non-negative integer number of cents." }; data.priceCents = n; }
+  if (body.demoKind !== undefined) { if (body.demoKind === null || body.demoKind === "") data.demoKind = null; else if (body.demoKind === "video" || body.demoKind === "live") data.demoKind = body.demoKind; else return { error: "Demo kind must be video or live." }; }
+  if (body.replicationManifest !== undefined) { if (body.replicationManifest === null || body.replicationManifest === "") data.replicationManifest = null; else { const value = typeof body.replicationManifest === "string" ? body.replicationManifest : JSON.stringify(body.replicationManifest); try { const parsed = JSON.parse(value); if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error(); data.replicationManifest = value.slice(0, 12000); } catch { return { error: "Replication manifest must be valid JSON." }; } } }
   return { data };
 }
+
+export interface SpaceGroupItem { owner: { displayName: string }; }
+export function groupSpacesByOwner<T extends SpaceGroupItem>(spaces: T[]): Array<{ ownerKey: string; ownerName: string; spaces: T[] }> {
+  const groups: Array<{ ownerKey: string; ownerName: string; spaces: T[] }> = [];
+  const byName = new Map<string, typeof groups[number]>();
+  for (const space of spaces) {
+    const ownerName = space.owner.displayName || "Whop Army member";
+    let group = byName.get(ownerName);
+    if (!group) { group = { ownerKey: ownerName, ownerName, spaces: [] }; byName.set(ownerName, group); groups.push(group); }
+    group.spaces.push(space);
+  }
+  return groups;
+}
+
+export const HOUSE_SPACE: PublicApplication = {
+  slug: "plunder-riffle-content-engine", name: "P&R Content Engine",
+  description: "Enter a business URL and get a real content pack back — all 27 Plunder & Riffle MCP tools behind one approval inbox, run by your own Muse.",
+  category: "Content engine", priceCents: 0, currency: "USD", demoKind: "live", videoUrl: null, screenshotUrl: null,
+  liveUrl: null, buyUrl: null, repoUrl: null, buildPrompt: null,
+  replicationManifest: { skills: ["Plunder & Riffle MCP bridge — runs in your own Muse"], keys: ["Plunder & Riffle API key — your own, saved by your Muse via the bridge"], crons: ["Daily engine check, 07:15 ET"] },
+  createdAt: "2026-11-24T00:00:00.000Z", updatedAt: "2026-11-24T00:00:00.000Z",
+  builtBy: { agentName: "Plunder & Riffle", agentSlug: null, agentProfilePublic: false }, owner: { displayName: "Plunder & Riffle" },
+  appUrl: `${PUBLIC_SITE_ORIGIN}/spaces/plunder-riffle-content-engine`,
+};

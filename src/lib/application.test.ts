@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   cleanAppFields,
+  groupSpacesByOwner,
   isHttpUrl,
   isValidSlug,
   serializePublicApplication,
@@ -82,6 +83,8 @@ const appRow: PublicApplicationRow & Record<string, unknown> = {
   agentId: "agent-secret-id",
   userId: "user-secret-id",
   public: true,
+  videoUrl: "https://media.example.com/demo.mp4", priceCents: 1299, currency: "USD", category: "Lead gen",
+  demoKind: "video", buyUrl: "https://buy.example.com", replicationManifest: JSON.stringify({ skills: ["replicate_space"], keys: ["API key"], crons: ["daily"] }),
 };
 
 const agentRow: PublicApplicationAgentRow & Record<string, unknown> = {
@@ -101,11 +104,17 @@ describe("serializePublicApplication", () => {
     assert.equal(app.name, "Roofing Lead Finder");
     assert.equal(app.slug, "roofing-lead-finder");
     assert.equal(app.liveUrl, "https://leads.example.com/");
+    assert.equal(app.videoUrl, "https://media.example.com/demo.mp4");
+    assert.equal(app.priceCents, 1299);
+    assert.equal(app.currency, "USD");
+    assert.equal(app.category, "Lead gen");
+    assert.equal(app.demoKind, "video");
+    assert.deepEqual(app.replicationManifest, { skills: ["replicate_space"], keys: ["API key"], crons: ["daily"] });
     assert.equal(app.builtBy.agentName, "BTC Barry");
     assert.equal(app.builtBy.agentSlug, "btc-barry");
     assert.equal(app.builtBy.agentProfilePublic, true);
     assert.equal(app.owner.displayName, "Dave");
-    assert.equal(app.appUrl, "https://whop.plunderandriffle.com/apps/roofing-lead-finder");
+    assert.equal(app.appUrl, "https://whop.plunderandriffle.com/spaces/roofing-lead-finder");
     assert.equal(app.createdAt, "2026-11-21T00:00:00.000Z");
     const flat = JSON.stringify(app);
     for (const leaked of [
@@ -123,6 +132,11 @@ describe("serializePublicApplication", () => {
     }
   });
 
+  it("nulls invalid added URLs and defaults malformed manifests to empty lists", () => {
+    const app = serializePublicApplication({ ...appRow, videoUrl: "javascript:bad", buyUrl: "nope", replicationManifest: "{" }, agentRow, { name: "Dave", whopUsername: null });
+    assert.equal(app.videoUrl, null); assert.equal(app.buyUrl, null);
+    assert.deepEqual(app.replicationManifest, { skills: [], keys: [], crons: [] });
+  });
   it("unlinks the builder when the agent profile is not public", () => {
     const app = serializePublicApplication(
       appRow,
@@ -170,5 +184,18 @@ describe("cleanAppFields", () => {
     assert.deepEqual(cleanAppFields({ description: "New line" }, true), { data: { description: "New line" } });
     assert.deepEqual(cleanAppFields({ name: "" }, true), { error: "Name is required." });
     assert.deepEqual(cleanAppFields({}, true), { data: {} });
+  });
+});
+
+
+describe("groupSpacesByOwner", () => {
+  it("groups in first owner appearance order and preserves item order", () => {
+    const a = { slug: "a", owner: { displayName: "Alice" } };
+    const b = { slug: "b", owner: { displayName: "Bob" } };
+    const c = { slug: "c", owner: { displayName: "Alice" } };
+    assert.deepEqual(groupSpacesByOwner([a, b, c]), [
+      { ownerKey: "Alice", ownerName: "Alice", spaces: [a, c] },
+      { ownerKey: "Bob", ownerName: "Bob", spaces: [b] },
+    ]);
   });
 });

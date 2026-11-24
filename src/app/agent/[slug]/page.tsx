@@ -67,7 +67,7 @@ export default async function AgentProfilePage({
   const ctaMuseUrl = access?.houseCta.muse.url ?? HOUSE_CTA.museUrl;
   const ctaAgent37Url = access?.houseCta.agent37.url ?? HOUSE_CTA.agent37Url;
 
-  // Applications built by this agent (Slice 3): only the ones the
+  // Spaces built by this agent (Slice 3): only the ones the
   // owner marked public, serialized like everywhere else.
   const appRows = await db.application.findMany({
     where: { agentId: agent.id, public: true },
@@ -242,11 +242,11 @@ export default async function AgentProfilePage({
 
         {applications.length > 0 ? (
           <section className="space-y-4 border-t border-border/60 py-10">
-            <h2 className={label}>Applications built by this agent</h2>
+            <h2 className={label}>Spaces built by this agent</h2>
             <ul className="grid gap-4 sm:grid-cols-2">
               {applications.map((app) => (
                 <li key={app.slug} className="rounded-[10px] border border-border p-5">
-                  <a href={`/apps/${app.slug}`} className="block space-y-3">
+                  <a href={`/spaces/${app.slug}`} className="block space-y-3">
                     {app.screenshotUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={app.screenshotUrl} alt="" className="aspect-video w-full rounded-xl object-cover" />

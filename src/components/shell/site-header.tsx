@@ -10,7 +10,7 @@ import type { ReactNode } from "react";
  */
 const NAV = [
   { href: "/agents", label: "Agents" },
-  { href: "/apps", label: "Apps" },
+  { href: "/spaces", label: "Spaces" },
   { href: "/rotator", label: "Rotator" },
   { href: "/town", label: "Town" },
   { href: "/how", label: "How it works" },
