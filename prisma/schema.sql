@@ -505,7 +505,7 @@ CREATE TABLE "RotatorBid" (
 );
 
 -- CreateTable
-CREATE TABLE IF NOT EXISTS "RotatorPurchaseIntent" (
+CREATE TABLE "RotatorPurchaseIntent" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "userId" TEXT NOT NULL,
     "partner" TEXT NOT NULL,
@@ -519,7 +519,7 @@ CREATE TABLE IF NOT EXISTS "RotatorPurchaseIntent" (
     CONSTRAINT "RotatorPurchaseIntent_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS "PaidRotatorSlot" (
+CREATE TABLE "PaidRotatorSlot" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "intentId" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
@@ -774,12 +774,12 @@ CREATE UNIQUE INDEX "RotatorDay_date_key" ON "RotatorDay"("date");
 CREATE UNIQUE INDEX "RotatorBid_dayId_userId_key" ON "RotatorBid"("dayId", "userId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX IF NOT EXISTS "RotatorPurchaseIntent_txHash_key" ON "RotatorPurchaseIntent"("txHash");
-CREATE INDEX IF NOT EXISTS "RotatorPurchaseIntent_userId_idx" ON "RotatorPurchaseIntent"("userId");
-CREATE INDEX IF NOT EXISTS "RotatorPurchaseIntent_status_idx" ON "RotatorPurchaseIntent"("status");
-CREATE UNIQUE INDEX IF NOT EXISTS "PaidRotatorSlot_intentId_key" ON "PaidRotatorSlot"("intentId");
-CREATE INDEX IF NOT EXISTS "PaidRotatorSlot_date_idx" ON "PaidRotatorSlot"("date");
-CREATE INDEX IF NOT EXISTS "PaidRotatorSlot_userId_idx" ON "PaidRotatorSlot"("userId");
+CREATE UNIQUE INDEX "RotatorPurchaseIntent_txHash_key" ON "RotatorPurchaseIntent"("txHash");
+CREATE INDEX "RotatorPurchaseIntent_userId_idx" ON "RotatorPurchaseIntent"("userId");
+CREATE INDEX "RotatorPurchaseIntent_status_idx" ON "RotatorPurchaseIntent"("status");
+CREATE UNIQUE INDEX "PaidRotatorSlot_intentId_key" ON "PaidRotatorSlot"("intentId");
+CREATE INDEX "PaidRotatorSlot_date_idx" ON "PaidRotatorSlot"("date");
+CREATE INDEX "PaidRotatorSlot_userId_idx" ON "PaidRotatorSlot"("userId");
 -- CreateIndex
 CREATE INDEX "RotatorPlacement_date_idx" ON "RotatorPlacement"("date");
 
