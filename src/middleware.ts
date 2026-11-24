@@ -33,8 +33,16 @@ const PUBLIC_API_PREFIXES = [
   // handler — same class as the trends ingest door below; the session
   // floor must not block the hourly cron first.
   "/api/whop/reconcile",
+  // Marketplace battery drain (2026-11-24): carries its own credential
+  // (x-battery-secret vs MARKETPLACE_BATTERY_SECRET), checked inside
+  // the handler — same class as reconcile above.
+  "/api/internal/marketplace/battery",
   "/api/bridge/exchange",
   "/api/bridge/mcp",
+  // Marketplace submit/status (2026-11-24): bridge-token auth inside
+  // the handlers (verifyAnyBridgeToken), same class as /api/bridge/mcp —
+  // the session floor must not block a member's Muse first.
+  "/api/bridge/marketplace/",
   // /build Step-0 Muse invite (2026-11-24): read-only public teaser
   // in the same class as /api/showcase — it returns only the Muse
   // invite code that applies to the visitor (the house code is printed
