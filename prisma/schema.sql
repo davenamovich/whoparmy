@@ -256,6 +256,9 @@ CREATE TABLE "Application" (
     "replicationManifest" TEXT,
     "listingStatus" TEXT NOT NULL DEFAULT 'DRAFT',
     "feeStatus" TEXT NOT NULL DEFAULT 'UNPAID',
+    "whopProductId" TEXT,
+    "whopPlanId" TEXT,
+    "whopProductError" TEXT,
     "public" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
@@ -705,6 +708,38 @@ CREATE INDEX "Application_userId_idx" ON "Application"("userId");
 
 -- CreateIndex
 CREATE INDEX "Application_public_idx" ON "Application"("public");
+
+-- CreateTable
+CREATE TABLE "MarketplaceSale" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "listingId" TEXT NOT NULL,
+    "buyerUserId" TEXT NOT NULL,
+    "sellerUserId" TEXT NOT NULL,
+    "referrerUserId" TEXT,
+    "grossCents" INTEGER NOT NULL,
+    "sellerCents" INTEGER NOT NULL,
+    "platformCents" INTEGER NOT NULL,
+    "referrerCents" INTEGER NOT NULL,
+    "rail" TEXT NOT NULL,
+    "whopMembershipId" TEXT,
+    "txHash" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'ACTIVE',
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "MarketplaceSale_listingId_fkey" FOREIGN KEY ("listingId") REFERENCES "Application" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "KitPurchaseIntent" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "listingId" TEXT NOT NULL,
+    "buyerUserId" TEXT NOT NULL,
+    "amountCents" INTEGER NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'PENDING',
+    "txHash" TEXT,
+    "expiresAt" DATETIME NOT NULL,
+    "paidAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 
 -- CreateTable
 CREATE TABLE "MarketplaceSubmission" (

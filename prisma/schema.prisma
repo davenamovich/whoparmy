@@ -12,87 +12,87 @@ datasource db {
 // connected, whopId is set from the verified Whop token — client-supplied
 // IDs are never trusted for authorization (see src/lib/auth.ts).
 model User {
-  id             String   @id @default(cuid())
-  whopId         String?  @unique
-  whopUsername   String? // preferred_username from Whop OAuth userinfo
-  whopAvatarUrl  String? // picture from Whop OAuth userinfo
-  email          String   @unique
-  name           String?
-  plan           String   @default("FREE") // FREE | CREATOR | PRO | AGENCY
-  planSource     String   @default("default") // default | whop_membership | whop_access | manual
-  planUpdatedAt  DateTime?
-  memeArmyPlan   String? // CUSTOM | AGENCY (premium upsell)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id            String    @id @default(cuid())
+  whopId        String?   @unique
+  whopUsername  String? // preferred_username from Whop OAuth userinfo
+  whopAvatarUrl String? // picture from Whop OAuth userinfo
+  email         String    @unique
+  name          String?
+  plan          String    @default("FREE") // FREE | CREATOR | PRO | AGENCY
+  planSource    String    @default("default") // default | whop_membership | whop_access | manual
+  planUpdatedAt DateTime?
+  memeArmyPlan  String? // CUSTOM | AGENCY (premium upsell)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  brands       BrandProfile[]
-  campaigns    Campaign[]
-  usageRecords UsageRecord[]
-  bridgeConnection BridgeConnection?
-  bridgeCodes  BridgeCode[]
-  telegramPairCodes TelegramPairCode[]
-  bridgeTokens BridgeToken[]
-  bridgeUpdateTokens BridgeUpdateToken[]
-  researchJobs ResearchJob[]
-  videoJobs    VideoJob[]
-  engineLinks  EngineLink[]
-  linkClicksOwned LinkClick[] @relation("LinkClickOwner")
-  rotatorBids  RotatorBid[]
-  rotatorWins  RotatorDay[] @relation("RotatorWins")
-  rotatorPlacements RotatorPlacement[]
+  brands                 BrandProfile[]
+  campaigns              Campaign[]
+  usageRecords           UsageRecord[]
+  bridgeConnection       BridgeConnection?
+  bridgeCodes            BridgeCode[]
+  telegramPairCodes      TelegramPairCode[]
+  bridgeTokens           BridgeToken[]
+  bridgeUpdateTokens     BridgeUpdateToken[]
+  researchJobs           ResearchJob[]
+  videoJobs              VideoJob[]
+  engineLinks            EngineLink[]
+  linkClicksOwned        LinkClick[]             @relation("LinkClickOwner")
+  rotatorBids            RotatorBid[]
+  rotatorWins            RotatorDay[]            @relation("RotatorWins")
+  rotatorPlacements      RotatorPlacement[]
   rotatorPurchaseIntents RotatorPurchaseIntent[]
-  paidRotatorSlots PaidRotatorSlot[]
-  trafficDays  AgentTrafficDay[]
-  linksSavedAt DateTime? // first bridge link save — pays the referrer's free generations (lib/bridge.ts)
+  paidRotatorSlots       PaidRotatorSlot[]
+  trafficDays            AgentTrafficDay[]
+  linksSavedAt           DateTime? // first bridge link save — pays the referrer's free generations (lib/bridge.ts)
   // BTC Experiment (Flow v2, 2026-11-19): PUBLIC receive addresses
   // only — receive-only, never a seed phrase or private key. The
   // agent address is the payout address the member enters on DH
   // Media at registration (lib/btc-addresses.ts).
-  btcReceiveAddress String?
-  agentBtcAddress   String?
-  assets       Asset[]
-  jobs         GenerationJob[]
-  army         ArmyBot?
-  gameProfile  GameProfile?
-  xpEvents     XpEvent[]
-  hiredAgents  HiredAgent[]
-  agentJobs    AgentJob[]
-  applications Application[]
+  btcReceiveAddress      String?
+  agentBtcAddress        String?
+  assets                 Asset[]
+  jobs                   GenerationJob[]
+  army                   ArmyBot?
+  gameProfile            GameProfile?
+  xpEvents               XpEvent[]
+  hiredAgents            HiredAgent[]
+  agentJobs              AgentJob[]
+  applications           Application[]
   marketplaceSubmissions MarketplaceSubmission[]
-  listingFeeIntents ListingFeeIntent[]
-  listings     CampaignListing[]
-  doorsSessions DoorsSession[]
-  bidPointEvents BidPointEvent[]
-  keyBids      KeyBid[]
-  keyAuctionWins KeyAuction[] @relation("KeyWins")
+  listingFeeIntents      ListingFeeIntent[]
+  listings               CampaignListing[]
+  doorsSessions          DoorsSession[]
+  bidPointEvents         BidPointEvent[]
+  keyBids                KeyBid[]
+  keyAuctionWins         KeyAuction[]            @relation("KeyWins")
 
   // Referral program (30%): every member gets a code; attribution is
   // set once, never overwritten. Earnings accrue in ReferralEarning.
-  refCode      String?  @unique
-  referredById String?
+  refCode              String?           @unique
+  referredById         String?
   // Free generations earned from referrals (lib/referrals.ts): granted
   // on a referral's conversion, spent automatically once the plan's
   // monthly allowance is used up (lib/usage-server.ts applyFreeGens).
-  freeGenBalance Int     @default(0)
-  freeGenMonth   String? // YYYY-MM the applied counter belongs to
-  freeGenApplied Int     @default(0)
-  listingActive Boolean @default(false)
-  listingCheckedAt DateTime?
-  marketplaceBundleAt DateTime?
-  freeAgentListingUsed Boolean @default(false)
-  creditGrants CreditGrant[]
-  referredBy   User?    @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
-  referrals    User[]   @relation("Referrals")
-  earnings     ReferralEarning[] @relation("Earner")
-  earnedFrom   ReferralEarning[] @relation("Recruit")
+  freeGenBalance       Int               @default(0)
+  freeGenMonth         String? // YYYY-MM the applied counter belongs to
+  freeGenApplied       Int               @default(0)
+  listingActive        Boolean           @default(false)
+  listingCheckedAt     DateTime?
+  marketplaceBundleAt  DateTime?
+  freeAgentListingUsed Boolean           @default(false)
+  creditGrants         CreditGrant[]
+  referredBy           User?             @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals            User[]            @relation("Referrals")
+  earnings             ReferralEarning[] @relation("Earner")
+  earnedFrom           ReferralEarning[] @relation("Recruit")
 
-  clipPages    ClipPage[]
-  clipJobs     ClipJob[]
-  userRotator UserRotator?
-  agentRotators AgentRotator[]
-  identityLinks IdentityLink[]
+  clipPages            ClipPage[]
+  clipJobs             ClipJob[]
+  userRotator          UserRotator?
+  agentRotators        AgentRotator[]
+  identityLinks        IdentityLink[]
   pendingReferralsMade PendingReferral[] @relation("PendingReferrer")
-  agentWallets AgentWallet[]
+  agentWallets         AgentWallet[]
 }
 
 // First-party, coarse page analytics. Never store IPs or full referrers.
@@ -110,33 +110,34 @@ model PageView {
 }
 
 model CreditGrant {
-  id String @id @default(cuid())
-  userId String
-  source String
-  externalId String @unique
-  amount Int
-  createdAt DateTime @default(now())
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  userId     String
+  source     String
+  externalId String   @unique
+  amount     Int
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId])
 }
 
 // ─── Brand profiles (multiple allowed for agencies) ─────────────────
 model BrandProfile {
-  id          String   @id @default(cuid())
-  userId      String
-  name        String
-  website     String?
-  industry    String?
-  description String?
-  products    String?
-  audience    String?
-  voice       String?
-  languages   String   @default("[\"en\"]")
-  cta         String?
-  links       String?
+  id           String   @id @default(cuid())
+  userId       String
+  name         String
+  website      String?
+  industry     String?
+  description  String?
+  products     String?
+  audience     String?
+  voice        String?
+  languages    String   @default("[\"en\"]")
+  cta          String?
+  links        String?
   researchJson String? // P&R deep-research summary (slice 3), JSON-encoded ResearchSummary
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -163,7 +164,7 @@ model Campaign {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   assets Asset[]
   jobs   GenerationJob[]
 
@@ -284,33 +285,33 @@ model XpEvent {
 // completion. Campaign bounties are reserved from the poster's wallet
 // and stay SIMULATED value until real payments exist.
 model HiredAgent {
-  id          String    @id @default(cuid())
-  userId      String
-  templateKey String // scout | meme-smith | hook-smith | qa-editor
-  name        String
-  tokenBudget Int // weighted tokens allocated from the plan wallet
-  tokensUsed  Int       @default(0)
-  status      String    @default("ACTIVE") // ACTIVE | PAUSED | DEPLETED
-  source      String    @default("RENTAL") // RENTAL (a plan seat) | REFERRAL (24h earned bot — not a seat)
-  expiresAt   DateTime? // REFERRAL bots only: the grant dies at this instant
-  agent37Ref  String? // Agent37 instance/session ref once provisioned
-  role         String? // SMB Agent Factory (2026-11-18): the agent's job in plain words
-  instructions String? // Factory: the agent's standing instructions (CUSTOM kind runs on these)
-  toolsJson    String? // Factory: JSON array of selected tools [{id,label,kind}]
+  id                   String    @id @default(cuid())
+  userId               String
+  templateKey          String // scout | meme-smith | hook-smith | qa-editor
+  name                 String
+  tokenBudget          Int // weighted tokens allocated from the plan wallet
+  tokensUsed           Int       @default(0)
+  status               String    @default("ACTIVE") // ACTIVE | PAUSED | DEPLETED
+  source               String    @default("RENTAL") // RENTAL (a plan seat) | REFERRAL (24h earned bot — not a seat)
+  expiresAt            DateTime? // REFERRAL bots only: the grant dies at this instant
+  agent37Ref           String? // Agent37 instance/session ref once provisioned
+  role                 String? // SMB Agent Factory (2026-11-18): the agent's job in plain words
+  instructions         String? // Factory: the agent's standing instructions (CUSTOM kind runs on these)
+  toolsJson            String? // Factory: JSON array of selected tools [{id,label,kind}]
   // Whop Army 2.0 Slice 2 (2026-11-21): public agent profile. All
   // nullable/defaulted — a profile exists only when publicProfile is
   // true AND slug is set; nothing here is exposed until then.
-  slug           String?  @unique // public /agent/{slug} path segment
-  publicProfile  Boolean  @default(false)
-  avatarUrl      String?
-  description    String? // one-line public description
-  category       String? // one of AGENT_CATEGORIES (lib/agent-profile.ts)
-  capabilitiesJson String? // JSON array of capability strings
-  demoUrl        String?
-  appUrl         String?
-  gitUrl         String?
-  buildPrompt    String?
-  spaceUrl       String? // Muse Space URL where applicable
+  slug                 String?   @unique // public /agent/{slug} path segment
+  publicProfile        Boolean   @default(false)
+  avatarUrl            String?
+  description          String? // one-line public description
+  category             String? // one of AGENT_CATEGORIES (lib/agent-profile.ts)
+  capabilitiesJson     String? // JSON array of capability strings
+  demoUrl              String?
+  appUrl               String?
+  gitUrl               String?
+  buildPrompt          String?
+  spaceUrl             String? // Muse Space URL where applicable
   // Agent card upgrade (2026-11-21): Bankr token + proceeds preference.
   // The token address is paste-and-save by the owner AFTER launching on
   // Bankr in their own session — this app never launches, never holds
@@ -320,18 +321,18 @@ model HiredAgent {
   // is separately approved.
   bankrTokenAddress    String?
   bankrTokenChain      String? // EVM | SOLANA (derived from the address shape at save time)
-  proceedsToCoin       Boolean @default(false)
-  proceedsToCoinPct    Int     @default(0) // 0–100
-  proceedsToCoinTarget String  @default("BTC") // BTC | TOKEN (TOKEN needs a saved bankrTokenAddress)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  proceedsToCoin       Boolean   @default(false)
+  proceedsToCoinPct    Int       @default(0) // 0–100
+  proceedsToCoinTarget String    @default("BTC") // BTC | TOKEN (TOKEN needs a saved bankrTokenAddress)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
-  user User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  jobs AgentJob[]
-  trafficDays AgentTrafficDay[]
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobs         AgentJob[]
+  trafficDays  AgentTrafficDay[]
   agentRotator AgentRotator?
   applications Application[]
-  wallets AgentWallet[]
+  wallets      AgentWallet[]
 
   @@index([userId])
 }
@@ -344,50 +345,90 @@ model HiredAgent {
 // Nothing here is exposed until public is true AND the app has a slug;
 // serialization goes through lib/application.ts only.
 model Application {
-  id             String   @id @default(cuid())
-  agentId        String
-  userId         String
-  slug           String   @unique // public /apps/{slug} path segment
-  name           String
-  description    String? // one-line public description
-  liveUrl        String? // live demo / public URL
-  screenshotUrl  String?
-  repoUrl        String? // source repository
-  buildPrompt    String?
-  videoUrl       String?
-  priceCents     Int      @default(0)
-  currency       String   @default("USD")
-  category       String?
-  demoKind       String?
-  buyUrl         String?
+  id                  String   @id @default(cuid())
+  agentId             String
+  userId              String
+  slug                String   @unique // public /apps/{slug} path segment
+  name                String
+  description         String? // one-line public description
+  liveUrl             String? // live demo / public URL
+  screenshotUrl       String?
+  repoUrl             String? // source repository
+  buildPrompt         String?
+  videoUrl            String?
+  priceCents          Int      @default(0)
+  currency            String   @default("USD")
+  category            String?
+  demoKind            String?
+  buyUrl              String?
   replicationManifest String?
-  listingStatus   String   @default("DRAFT") // DRAFT | IN_REVIEW | READY | PUBLISHED | REJECTED
-  feeStatus       String   @default("UNPAID") // UNPAID | PENDING | PAID | WAIVED
-  public         Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  listingStatus       String   @default("DRAFT") // DRAFT | IN_REVIEW | READY | PUBLISHED | REJECTED
+  feeStatus           String   @default("UNPAID") // UNPAID | PENDING | PAID | WAIVED
+  whopProductId       String?
+  whopPlanId          String?
+  whopProductError    String?
+  public              Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
-  agent HiredAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agent            HiredAgent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  marketplaceSales MarketplaceSale[]
 
   @@index([agentId])
   @@index([userId])
   @@index([public])
 }
 
+model MarketplaceSale {
+  id               String      @id @default(cuid())
+  listingId        String
+  buyerUserId      String
+  sellerUserId     String
+  referrerUserId   String?
+  grossCents       Int
+  sellerCents      Int
+  platformCents    Int
+  referrerCents    Int
+  rail             String
+  whopMembershipId String?     @unique
+  txHash           String?     @unique
+  status           String      @default("ACTIVE") // ACTIVE | VOID
+  createdAt        DateTime    @default(now())
+  listing          Application @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([buyerUserId])
+  @@index([sellerUserId])
+  @@index([referrerUserId])
+}
+
+model KitPurchaseIntent {
+  id          String    @id @default(cuid())
+  listingId   String
+  buyerUserId String
+  amountCents Int
+  status      String    @default("PENDING") // PENDING | PAID | EXPIRED
+  txHash      String?   @unique
+  expiresAt   DateTime
+  paidAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([buyerUserId, status])
+}
+
 model MarketplaceSubmission {
-  id        String   @id @default(cuid())
-  userId    String
-  kind      String // SPACE | AGENT
-  refId     String
-  status    String   @default("PENDING_BATTERY") // PENDING_BATTERY | READY | NEEDS_WORK | REJECTED
-  reviewApproved Boolean @default(false)
-  publishedAt DateTime?
-  kitJson   String?
-  batteryJson String?
-  batteryAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String    @id @default(cuid())
+  userId         String
+  kind           String // SPACE | AGENT
+  refId          String
+  status         String    @default("PENDING_BATTERY") // PENDING_BATTERY | READY | NEEDS_WORK | REJECTED
+  reviewApproved Boolean   @default(false)
+  publishedAt    DateTime?
+  kitJson        String?
+  batteryJson    String?
+  batteryAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -396,17 +437,18 @@ model MarketplaceSubmission {
 }
 
 model ListingFeeIntent {
-  id String @id @default(cuid())
-  userId String
-  applicationId String
-  kind String // SPACE | AGENT
-  status String @default("PENDING") // PENDING | PAID | WAIVED
-  feeCents Int @default(2000)
-  whopMembershipId String? @unique
-  referrerUserId String?
-  createdAt DateTime @default(now())
-  paidAt DateTime?
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id               String    @id @default(cuid())
+  userId           String
+  applicationId    String
+  kind             String // SPACE | AGENT
+  status           String    @default("PENDING") // PENDING | PAID | WAIVED
+  feeCents         Int       @default(2000)
+  whopMembershipId String?   @unique
+  referrerUserId   String?
+  createdAt        DateTime  @default(now())
+  paidAt           DateTime?
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId, status])
 }
 
@@ -483,56 +525,56 @@ model RoutingPolicy {
 
 // ─── P&R MEME ARMY — multi-tenant Telegram bot engine ───────────────
 model ArmyBot {
-  id            String   @id @default(cuid())
-  userId        String   @unique // one army per owner in this build
-  armyName      String
-  slug          String   @unique // secret webhook path segment
-  logoUrl       String?
-  colorPrimary  String   @default("#FF5C1A")
-  colorSecondary String  @default("#111111")
-  website       String?
-  botToken      String // stored server-side only, never returned to client
-  botUsername   String?
-  telegramBotId String?
-  webhookUrl    String?
-  webhookStatus String   @default("PENDING") // PENDING | ACTIVE | FAILED
-  secretToken   String? // Telegram webhook secret header check
-  groupId       String?
-  groupTitle    String?
-  languages     String   @default("[\"en\",\"es\"]")
+  id             String   @id @default(cuid())
+  userId         String   @unique // one army per owner in this build
+  armyName       String
+  slug           String   @unique // secret webhook path segment
+  logoUrl        String?
+  colorPrimary   String   @default("#FF5C1A")
+  colorSecondary String   @default("#111111")
+  website        String?
+  botToken       String // stored server-side only, never returned to client
+  botUsername    String?
+  telegramBotId  String?
+  webhookUrl     String?
+  webhookStatus  String   @default("PENDING") // PENDING | ACTIVE | FAILED
+  secretToken    String? // Telegram webhook secret header check
+  groupId        String?
+  groupTitle     String?
+  languages      String   @default("[\"en\",\"es\"]")
   welcomeMessage String?
-  rewardsJson   String   @default("[]") // [{name,type,cost,description}]
-  status        String   @default("DRAFT") // DRAFT | LIVE | PAUSED
-  demoSeeded    Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  rewardsJson    String   @default("[]") // [{name,type,cost,description}]
+  status         String   @default("DRAFT") // DRAFT | LIVE | PAUSED
+  demoSeeded     Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  missions Mission[]
-  members ArmyMember[]
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  missions    Mission[]
+  members     ArmyMember[]
   submissions Submission[]
 
   @@index([userId])
 }
 
 model Mission {
-  id               String   @id @default(cuid())
+  id               String    @id @default(cuid())
   botId            String
   title            String
   product          String?
   description      String
   targetUrl        String?
   audience         String?
-  languages        String   @default("[\"en\"]")
-  durationDays     Int      @default(7)
+  languages        String    @default("[\"en\"]")
+  durationDays     Int       @default(7)
   dailyRequirement String?
   rewardBudget     String?
   rules            String?
-  contentPackJson  String   @default("[]") // approved, ready-to-share items
-  status           String   @default("DRAFT") // DRAFT | LIVE | ENDED
+  contentPackJson  String    @default("[]") // approved, ready-to-share items
+  status           String    @default("DRAFT") // DRAFT | LIVE | ENDED
   announcedAt      DateTime?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   bot         ArmyBot      @relation(fields: [botId], references: [id], onDelete: Cascade)
   submissions Submission[]
@@ -541,22 +583,22 @@ model Mission {
 }
 
 model ArmyMember {
-  id            String   @id @default(cuid())
-  botId         String
-  telegramId    String
-  username      String?
-  displayName   String
-  language      String   @default("en")
-  points        Int      @default(0)
-  shares        Int      @default(0)
-  referrals     Int      @default(0)
-  clicks        Int      @default(0)
-  verifiedClicks Int     @default(0)
-  badges        String   @default("[]")
-  isDemo        Boolean  @default(false)
-  refCode       String?
-  joinedAt      DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id             String   @id @default(cuid())
+  botId          String
+  telegramId     String
+  username       String?
+  displayName    String
+  language       String   @default("en")
+  points         Int      @default(0)
+  shares         Int      @default(0)
+  referrals      Int      @default(0)
+  clicks         Int      @default(0)
+  verifiedClicks Int      @default(0)
+  badges         String   @default("[]")
+  isDemo         Boolean  @default(false)
+  refCode        String?
+  joinedAt       DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   bot         ArmyBot      @relation(fields: [botId], references: [id], onDelete: Cascade)
   submissions Submission[]
@@ -576,9 +618,9 @@ model Submission {
   clicks    Int      @default(0)
   createdAt DateTime @default(now())
 
-  bot     ArmyBot     @relation(fields: [botId], references: [id], onDelete: Cascade)
-  mission Mission?    @relation(fields: [missionId], references: [id], onDelete: SetNull)
-  member  ArmyMember  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  bot     ArmyBot    @relation(fields: [botId], references: [id], onDelete: Cascade)
+  mission Mission?   @relation(fields: [missionId], references: [id], onDelete: SetNull)
+  member  ArmyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
   @@index([botId])
   @@index([missionId])
@@ -632,17 +674,17 @@ model ResearchJob {
 // engine). The FIRST save is an onboarding event: it pays the
 // member's referrer free generations (see lib/bridge.ts).
 model EngineLink {
-  id        String   @id @default(cuid())
-  userId    String
-  partner   String // canonical key = the P&R MCP step (lib/offer-catalog.ts); legacy keys migrated at boot
-  url       String
-  source    String   @default("manual") // "manual" (typed on /bridge) | "pr-mcp" (synced from the member's own list_my_offers via the bridge)
+  id          String   @id @default(cuid())
+  userId      String
+  partner     String // canonical key = the P&R MCP step (lib/offer-catalog.ts); legacy keys migrated at boot
+  url         String
+  source      String   @default("manual") // "manual" (typed on /bridge) | "pr-mcp" (synced from the member's own list_my_offers via the bridge)
   externalRef String? // the member's affiliate id extracted from the link (fpr/ref/via/affid/code/… or Temu /k/<id>)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  rotatorLinks UserRotatorLink[]
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rotatorLinks      UserRotatorLink[]
   agentRotatorLinks AgentRotatorLink[]
 
   @@unique([userId, partner])
@@ -657,18 +699,18 @@ model UserRotator {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   links UserRotatorLink[]
 }
 
 model UserRotatorLink {
-  id           String  @id @default(cuid())
+  id           String   @id @default(cuid())
   rotatorId    String
   engineLinkId String
-  weight       Int     @default(1)
+  weight       Int      @default(1)
   dailyCap     Int?
-  position     Int     @default(0)
-  enabled      Boolean @default(true)
+  position     Int      @default(0)
+  enabled      Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -680,18 +722,18 @@ model UserRotatorLink {
 }
 
 model AgentRotator {
-  id        String   @id @default(cuid())
-  agentId   String   @unique
-  userId    String
-  mode      String   @default("WEIGHTED")
-  enabled   Boolean  @default(true)
+  id         String   @id @default(cuid())
+  agentId    String   @unique
+  userId     String
+  mode       String   @default("WEIGHTED")
+  enabled    Boolean  @default(true)
   offersJson String? // owner-picked partner keys (JSON array) this agent promotes; null = not configured (lib/agent-rotator-policy-core.ts)
-  pool       String  @default("OWNER") // OWNER = only the owner's saved links | MEMBERS = every member's saved link for those offers, round robin
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  pool       String   @default("OWNER") // OWNER = only the owner's saved links | MEMBERS = every member's saved link for those offers, round robin
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  agent HiredAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agent HiredAgent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  user  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   links AgentRotatorLink[]
 
   @@index([userId])
@@ -718,7 +760,7 @@ model AgentRotatorLink {
 model RotatorHop {
   id           String   @id @default(cuid())
   ts           DateTime @default(now())
-  surface      String   // USER | AGENT | ALLOCATOR (S1 only writes USER)
+  surface      String // USER | AGENT | ALLOCATOR (S1 only writes USER)
   rotatorId    String?
   agentId      String?
   userId       String?
@@ -740,11 +782,11 @@ model RotatorHop {
 // forfeit slots, or remove an agent or member without rewriting hops.
 model RotatorEnforcement {
   id        String    @id @default(cuid())
-  scope     String   // AGENT | USER
-  scopeId   String   // HiredAgent.id when scope is AGENT; User.id when scope is USER
-  level     String   // WARN | THROTTLE | FORFEIT | REMOVED
+  scope     String // AGENT | USER
+  scopeId   String // HiredAgent.id when scope is AGENT; User.id when scope is USER
+  level     String // WARN | THROTTLE | FORFEIT | REMOVED
   reason    String
-  createdBy String   // operator User.id who applied it
+  createdBy String // operator User.id who applied it
   createdAt DateTime  @default(now())
   liftedAt  DateTime?
 
@@ -818,18 +860,18 @@ model BridgeCode {
 // SHA-256 is stored. spentCredits is settled from the engine's own
 // credit deltas after every generating call, never from estimates.
 model BridgeToken {
-  id            String    @id @default(cuid())
-  userId        String
-  tokenHash     String    @unique
-  budgetCredits Int
-  scope         String    @default("week") // inherited from the code it was exchanged from; enforced on every MCP call
-  spentCredits  Int       @default(0)
-  pendingCredits Int      @default(0) // budget reserved by in-flight proxied calls; settled or released exactly once per call
-  pendingSince  DateTime? // when the oldest live reservation was placed (stale-reservation sweep)
-  expiresAt     DateTime
-  revokedAt     DateTime?
-  lastUsedAt    DateTime?
-  createdAt     DateTime  @default(now())
+  id             String    @id @default(cuid())
+  userId         String
+  tokenHash      String    @unique
+  budgetCredits  Int
+  scope          String    @default("week") // inherited from the code it was exchanged from; enforced on every MCP call
+  spentCredits   Int       @default(0)
+  pendingCredits Int       @default(0) // budget reserved by in-flight proxied calls; settled or released exactly once per call
+  pendingSince   DateTime? // when the oldest live reservation was placed (stale-reservation sweep)
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  lastUsedAt     DateTime?
+  createdAt      DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -838,10 +880,10 @@ model BridgeToken {
 
 // Permanent update-only bridge credential (pru_…). Only its SHA-256 is stored.
 model BridgeUpdateToken {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   userId     String
-  tokenHash  String   @unique
-  createdAt  DateTime @default(now())
+  tokenHash  String    @unique
+  createdAt  DateTime  @default(now())
   revokedAt  DateTime?
   lastUsedAt DateTime?
 
@@ -911,19 +953,18 @@ model RotatorPlacement {
   @@index([date])
 }
 
-
 model RotatorPurchaseIntent {
-  id        String   @id @default(cuid())
-  userId    String
-  partner   String
-  date      String
+  id         String   @id @default(cuid())
+  userId     String
+  partner    String
+  date       String
   priceCents Int
-  status    String   @default("PENDING")
-  txHash    String?  @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status     String   @default("PENDING")
+  txHash     String?  @unique
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([status])
@@ -994,30 +1035,30 @@ model TrendDay {
 // The prize assignment is server-only until the game finishes; commitmentHash
 // is shown to the player from the moment they pick their keeper door.
 model DoorsSession {
-  id              String    @id @default(cuid())
-  userId          String
-  gameDate        String // YYYY-MM-DD (ET game day)
-  language        String   @default("en")
-  caller          String // joe | grandma | grandpa | young-mom | college-kid | shop-owner-mike
-  keeperDoor      Int
-  assignment      Json // door index -> prize (server-only until finished)
-  commitmentHash  String
-  state           String   @default("opening") // opening | banker1 | opening2 | banker2 | finished
-  opened          Json     @default("[]") // door indices, in open order
-  offers          Json     @default("[]") // {round, amount, decision}
-  streak          Int      @default(0)
-  bestStreak      Int      @default(0)
-  peeksBanked     Int      @default(0)
-  peeksUsed       Json     @default("[]") // door indices whose band was peeked
-  sweatArmed      Boolean  @default(false) // Banker Sweat earned, applies to next offer
-  calls           Json     @default("[]") // {door, band, correct} — Call It results
-  readGuess       String? // keeper band guessed in Read the Banker
-  result          Json? // {type: deal|keeper|dud, amount, gensAwarded, readBonus}
-  prizeGensAwarded Int     @default(0)
-  version         Int      @default(0) // optimistic-concurrency claim for state transitions (open/peek/read/decide)
-  createdAt       DateTime @default(now())
-  finishedAt      DateTime?
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id               String    @id @default(cuid())
+  userId           String
+  gameDate         String // YYYY-MM-DD (ET game day)
+  language         String    @default("en")
+  caller           String // joe | grandma | grandpa | young-mom | college-kid | shop-owner-mike
+  keeperDoor       Int
+  assignment       Json // door index -> prize (server-only until finished)
+  commitmentHash   String
+  state            String    @default("opening") // opening | banker1 | opening2 | banker2 | finished
+  opened           Json      @default("[]") // door indices, in open order
+  offers           Json      @default("[]") // {round, amount, decision}
+  streak           Int       @default(0)
+  bestStreak       Int       @default(0)
+  peeksBanked      Int       @default(0)
+  peeksUsed        Json      @default("[]") // door indices whose band was peeked
+  sweatArmed       Boolean   @default(false) // Banker Sweat earned, applies to next offer
+  calls            Json      @default("[]") // {door, band, correct} — Call It results
+  readGuess        String? // keeper band guessed in Read the Banker
+  result           Json? // {type: deal|keeper|dud, amount, gensAwarded, readBonus}
+  prizeGensAwarded Int       @default(0)
+  version          Int       @default(0) // optimistic-concurrency claim for state transitions (open/peek/read/decide)
+  createdAt        DateTime  @default(now())
+  finishedAt       DateTime?
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, gameDate])
   @@index([gameDate])
@@ -1049,38 +1090,38 @@ model BidPointEvent {
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
-  @@index([kind, refUserId])
   // Once-only referral awards: one REF_* event per (kind, referrer,
   // referred member), ever. BID_* rows carry refUserId NULL, which
   // SQLite treats as distinct, so stakes/refunds are unaffected.
   @@unique([kind, userId, refUserId])
+  @@index([userId])
+  @@index([kind, refUserId])
 }
 
 // Weekly auction for one 10,000,000-token OpenAI-compatible key.
 model KeyAuction {
-  id         String    @id @default(cuid())
-  weekKey    String    @unique // e.g. 2026-W47
-  prizeLabel String
-  opensAt    DateTime
-  closesAt   DateTime
-  status     String    @default("OPEN") // OPEN | CLOSED
-  winnerId   String?
-  winningBid Int?
-  closedAt   DateTime?
+  id          String    @id @default(cuid())
+  weekKey     String    @unique // e.g. 2026-W47
+  prizeLabel  String
+  opensAt     DateTime
+  closesAt    DateTime
+  status      String    @default("OPEN") // OPEN | CLOSED
+  winnerId    String?
+  winningBid  Int?
+  closedAt    DateTime?
   fulfilledAt DateTime? // manual key mint (Addendum v2 §A4)
-  createdAt  DateTime  @default(now())
-  winner     User?     @relation("KeyWins", fields: [winnerId], references: [id], onDelete: SetNull)
-  bids       KeyBid[]
+  createdAt   DateTime  @default(now())
+  winner      User?     @relation("KeyWins", fields: [winnerId], references: [id], onDelete: SetNull)
+  bids        KeyBid[]
 }
 
 model KeyBid {
-  id        String   @id @default(cuid())
+  id        String     @id @default(cuid())
   auctionId String
   userId    String
   points    Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
   auction   KeyAuction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1125,22 +1166,22 @@ model ClaimVoidedNonce {
 // drafts and read the queue; only a signed-in click writes `approved`.
 
 model ClipPage {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   userId        String
   name          String // "GTA 6 Daily"
   handle        String // @gtadaily6
   niche         String // the one angle the page runs
-  platforms     String   @default("[]") // json: ["tiktok","reels","shorts"]
-  timezone      String   @default("UTC")
+  platforms     String    @default("[]") // json: ["tiktok","reels","shorts"]
+  timezone      String    @default("UTC")
   approvalHours String? // "09:00-22:00" — nothing is approved outside it
-  cadence       String   @default("{}") // json: {"tiktok":2,"reels":1}
-  creatorAllow  String   @default("[]") // json: ["@studio"] — empty = any public source
-  creatorBlock  String   @default("[]") // json: ["@handle"] — page-local refusals
+  cadence       String    @default("{}") // json: {"tiktok":2,"reels":1}
+  creatorAllow  String    @default("[]") // json: ["@studio"] — empty = any public source
+  creatorBlock  String    @default("[]") // json: ["@handle"] — page-local refusals
   disclosure    String? // "Not affiliated with Rockstar Games"
-  voiceStyle    String   @default("captions") // the clipping agent is captions, never a host
+  voiceStyle    String    @default("captions") // the clipping agent is captions, never a host
   archivedAt    DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   clips ClipJob[]
@@ -1149,39 +1190,39 @@ model ClipPage {
 }
 
 model ClipJob {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   userId        String
   pageId        String
   // draft | queued | rendering | ready | approved | exported | failed | blocked
-  status        String   @default("draft")
+  status        String    @default("draft")
   sourceUrl     String
   sourceKind    String // platform | media
   sourceHost    String // youtube.com, x.com, …
-  clipSeconds   Int      @default(15)
+  clipSeconds   Int       @default(15)
   hook          String?
   caption       String?
-  warnings      String   @default("[]") // json: engine QA warnings, verbatim
+  warnings      String    @default("[]") // json: engine QA warnings, verbatim
   pageUrl       String? // engine preview page
   mp4Url        String?
   creditWho     String? // @creator
   creditUrl     String? // the source the credit points at
-  spoiler       Boolean  @default(false)
+  spoiler       Boolean   @default(false)
   series        String?
   episode       Int?
   engineJobId   String?
   bridgeTokenId String? // set when queued through the Muse bridge; the worker re-checks the token is live before charging
   fundingLane   String? // byok | paid | plan | paid-released — which clip lane this render reserved against
   grantId       String? // ClipCreditGrant the unit was drawn from (paid lane)
-  attempts      Int      @default(0) // the worker retries once, then fails
+  attempts      Int       @default(0) // the worker retries once, then fails
   blockedReason String? // guard code + hint when status = blocked
   approvedAt    DateTime? // written only by the review desk
   exportedAt    DateTime?
   error         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  user   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  page   ClipPage  @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  user   User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  page   ClipPage          @relation(fields: [pageId], references: [id], onDelete: Cascade)
   credit ClipCredit?
   tokens ClipExportToken[]
 
@@ -1192,13 +1233,13 @@ model ClipJob {
 // The credit ledger. A clip cannot reach `ready` without one — the
 // engine's "🎬 @creator" placeholder fails the guard.
 model ClipCredit {
-  id         String   @id @default(cuid())
-  userId     String
-  clipId     String   @unique
-  who        String // @creator
-  url        String // where the clip came from
-  verified   Boolean  @default(false) // a human checked it points at the source
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  clipId    String   @unique
+  who       String // @creator
+  url       String // where the clip came from
+  verified  Boolean  @default(false) // a human checked it points at the source
+  createdAt DateTime @default(now())
 
   clip ClipJob @relation(fields: [clipId], references: [id], onDelete: Cascade)
 
@@ -1254,20 +1295,20 @@ model ClipPost {
 // reload cannot fish for a better board: the same seed always deals the
 // same two options.
 model ClipGameSession {
-  id        String   @id @default(cuid())
-  userId    String
-  pageId    String
-  floor     Int // clips bought — the number that can never go down
-  bonus     Int      @default(0)
-  briefs    String   @default("[]") // json: BriefCard[]
-  round     Int      @default(0)
-  maxRounds Int      @default(3)
-  seed      Int
-  chosen    String   @default("[]") // json: 0 | 1 | -1 per round, for the audit trail
-  status    String   @default("open") // open | resolved | abandoned
+  id         String    @id @default(cuid())
+  userId     String
+  pageId     String
+  floor      Int // clips bought — the number that can never go down
+  bonus      Int       @default(0)
+  briefs     String    @default("[]") // json: BriefCard[]
+  round      Int       @default(0)
+  maxRounds  Int       @default(3)
+  seed       Int
+  chosen     String    @default("[]") // json: 0 | 1 | -1 per round, for the audit trail
+  status     String    @default("open") // open | resolved | abandoned
   resolvedAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@index([userId, status])
 }
@@ -1487,89 +1528,89 @@ model PendingReferral {
 // Anonymous public game sessions keep their assignment server-only until
 // the game finishes; events provide the append-only audit trail.
 model PickaphoneSession {
-  id              String             @id @default(cuid())
-  assignment      Json // phone slot (0-11) -> library asset id; server-only until finished
-  commitmentHash  String
-  state           String             @default("playing") // playing | offer | finished
-  picks           Json               @default("[]") // slot indices in pick order
-  bankedTokens    Int                @default(0) // Vault Tokens banked from reveals; only ever grows
-  pendingOffer    Int? // offer milestone index awaiting a decision
-  offers          Json               @default("[]") // {milestone, gens, decision} records
-  streak          Int                @default(0) // current Call It read streak
-  bestStreak      Int                @default(0)
-  peeksBanked     Int                @default(0) // earned Peeks not yet spent (max 2)
-  peeksUsed       Json               @default("[]") // {slot, band} — bands revealed by spent Peeks
-  sweatArmed      Boolean            @default(false) // Host Sweat earned, applies to the next offer
-  calls           Json               @default("[]") // {slot, call, correct} — Call It results
-  readGuess       String? // Final Read lock: "HIGH" | "LOW" (final phone >= 100 VT?)
-  pendingOfferTokens Int?           // effective Vault Token value of the pending offer (Host Sweat applied at presentation)
-  pendingOfferSweat  Boolean        @default(false) // whether Host Sweat was applied to the pending offer
-  finalTokens     Int?
-  gensAwarded     Int                @default(0)
-  claimNonce      String?            @unique // nonce of the minted W1 claim token (mint-once lock)
-  claimToken      String? // the minted token, returned to the player exactly at finish
-  version         Int                @default(0) // optimistic-concurrency claim, same pattern as DoorsSession
-  createdAt       DateTime           @default(now())
-  finishedAt      DateTime?
-  events          PickaphoneEvent[]
+  id                 String            @id @default(cuid())
+  assignment         Json // phone slot (0-11) -> library asset id; server-only until finished
+  commitmentHash     String
+  state              String            @default("playing") // playing | offer | finished
+  picks              Json              @default("[]") // slot indices in pick order
+  bankedTokens       Int               @default(0) // Vault Tokens banked from reveals; only ever grows
+  pendingOffer       Int? // offer milestone index awaiting a decision
+  offers             Json              @default("[]") // {milestone, gens, decision} records
+  streak             Int               @default(0) // current Call It read streak
+  bestStreak         Int               @default(0)
+  peeksBanked        Int               @default(0) // earned Peeks not yet spent (max 2)
+  peeksUsed          Json              @default("[]") // {slot, band} — bands revealed by spent Peeks
+  sweatArmed         Boolean           @default(false) // Host Sweat earned, applies to the next offer
+  calls              Json              @default("[]") // {slot, call, correct} — Call It results
+  readGuess          String? // Final Read lock: "HIGH" | "LOW" (final phone >= 100 VT?)
+  pendingOfferTokens Int? // effective Vault Token value of the pending offer (Host Sweat applied at presentation)
+  pendingOfferSweat  Boolean           @default(false) // whether Host Sweat was applied to the pending offer
+  finalTokens        Int?
+  gensAwarded        Int               @default(0)
+  claimNonce         String?           @unique // nonce of the minted W1 claim token (mint-once lock)
+  claimToken         String? // the minted token, returned to the player exactly at finish
+  version            Int               @default(0) // optimistic-concurrency claim, same pattern as DoorsSession
+  createdAt          DateTime          @default(now())
+  finishedAt         DateTime?
+  events             PickaphoneEvent[]
 
   @@index([createdAt])
 }
 
 model PickaphoneEvent {
-  id         String             @id @default(cuid())
-  sessionId  String
-  type       String // game_start | phone_pick | reveal | call_it | peek_earned | peek_used | sweat_earned | sweat_applied | offer_presented | offer_accepted | offer_declined | final_read | game_finish | claim_minted
-  payload    Json?
-  createdAt  DateTime           @default(now())
-  session    PickaphoneSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  id        String            @id @default(cuid())
+  sessionId String
+  type      String // game_start | phone_pick | reveal | call_it | peek_earned | peek_used | sweat_earned | sweat_applied | offer_presented | offer_accepted | offer_declined | final_read | game_finish | claim_minted
+  payload   Json?
+  createdAt DateTime          @default(now())
+  session   PickaphoneSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
   @@index([type])
 }
 
 model BtcgameSession {
-  id              String          @id @default(cuid())
-  assignment      Json // case slot (0-25) -> board tile id; server-only until finished
-  commitmentHash  String
-  state           String          @default("playing") // playing | offer | finished
-  picks           Json            @default("[]") // slot indices in pick order
-  bankedTokens    Int             @default(0) // Vault Tokens banked from reveals; only ever grows
-  perks           Json            @default("[]") // {kind, slot} AGENT BOOST perks banked from reveals; fulfillment is a follow-up
-  pendingOffer    Int? // offer milestone index awaiting a decision
-  offers          Json            @default("[]") // {milestone, gens, decision} records
-  finalTokens     Int?
-  gensAwarded     Int             @default(0)
-  claimNonce      String?         @unique // nonce of the minted W1 claim token (mint-once lock)
-  claimToken      String? // the minted token, returned to the player exactly at finish
-  version         Int             @default(0) // optimistic-concurrency claim, same pattern as DoorsSession
-  createdAt       DateTime        @default(now())
-  finishedAt      DateTime?
-  events          BtcgameEvent[]
+  id             String         @id @default(cuid())
+  assignment     Json // case slot (0-25) -> board tile id; server-only until finished
+  commitmentHash String
+  state          String         @default("playing") // playing | offer | finished
+  picks          Json           @default("[]") // slot indices in pick order
+  bankedTokens   Int            @default(0) // Vault Tokens banked from reveals; only ever grows
+  perks          Json           @default("[]") // {kind, slot} AGENT BOOST perks banked from reveals; fulfillment is a follow-up
+  pendingOffer   Int? // offer milestone index awaiting a decision
+  offers         Json           @default("[]") // {milestone, gens, decision} records
+  finalTokens    Int?
+  gensAwarded    Int            @default(0)
+  claimNonce     String?        @unique // nonce of the minted W1 claim token (mint-once lock)
+  claimToken     String? // the minted token, returned to the player exactly at finish
+  version        Int            @default(0) // optimistic-concurrency claim, same pattern as DoorsSession
+  createdAt      DateTime       @default(now())
+  finishedAt     DateTime?
+  events         BtcgameEvent[]
 
   @@index([createdAt])
 }
 
 model BtcgameEvent {
-  id         String         @id @default(cuid())
-  sessionId  String
-  type       String // game_start | case_pick | reveal | offer_presented | offer_accepted | offer_declined | game_finish | claim_minted
-  payload    Json?
-  createdAt  DateTime       @default(now())
-  session    BtcgameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  id        String         @id @default(cuid())
+  sessionId String
+  type      String // game_start | case_pick | reveal | offer_presented | offer_accepted | offer_declined | game_finish | claim_minted
+  payload   Json?
+  createdAt DateTime       @default(now())
+  session   BtcgameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
   @@index([type])
 }
 
 model AgentGameAgent {
-  id             String            @id @default(cuid())
-  handle         String            @unique // public agent id, chosen at registration
+  id             String             @id @default(cuid())
+  handle         String             @unique // public agent id, chosen at registration
   name           String
   website        String?
   secretHash     String // SHA-256 of the agent secret; plaintext shown once at registration, never stored
-  createdAt      DateTime          @default(now())
-  lastActivityAt DateTime          @default(now())
+  createdAt      DateTime           @default(now())
+  lastActivityAt DateTime           @default(now())
   solves         AgentGameSolve[]
   attempts       AgentGameAttempt[]
   events         AgentGameEvent[]
@@ -1646,9 +1687,9 @@ model BtcPayoutBatch {
 }
 
 model BtcPayoutLine {
-  id      String         @id @default(cuid())
-  batchId String
-  batch   BtcPayoutBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  id         String         @id @default(cuid())
+  batchId    String
+  batch      BtcPayoutBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
   // Plain id, no FK: the line is a snapshot. The address below is the
   // member's saved address AT RUN CREATION — a later address change
   // never rewrites an existing run.

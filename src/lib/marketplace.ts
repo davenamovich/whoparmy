@@ -10,6 +10,17 @@ export interface BatteryInput {
 }
 export interface BatteryCheck { id: string; label: string; pass: boolean; reason: string }
 
+export function splitSale(grossCents: number): { sellerCents: number; platformCents: number; referrerCents: number } {
+  const gross = Math.max(0, Math.trunc(grossCents));
+  const sellerCents = Math.round(gross * 0.70);
+  const platformCents = Math.round(gross * 0.15);
+  return { sellerCents, platformCents, referrerCents: gross - sellerCents - platformCents };
+}
+
+export function canDownloadKit(input: { isOwner: boolean; priceCents: number; hasActiveSale: boolean }): boolean {
+  return input.isOwner || input.priceCents === 0 || input.hasActiveSale;
+}
+
 export const LISTING_FEE_CENTS = 2000;
 export type ListingFeeStatus = "UNPAID" | "PENDING" | "PAID" | "WAIVED";
 export function publishGate(input: { batteryReady: boolean; feeStatus: ListingFeeStatus; reviewRequired: boolean; reviewApproved: boolean; isOperator: boolean }): { ok: boolean; reasons: string[] } {

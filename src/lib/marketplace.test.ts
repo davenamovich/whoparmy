@@ -1,6 +1,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { runBattery, scanForSecrets, validateBundle, publishGate, isTrustedSeller, type BatteryInput, type Bundle } from "./marketplace.ts";
+import { runBattery, scanForSecrets, validateBundle, publishGate, isTrustedSeller, splitSale, canDownloadKit, type BatteryInput, type Bundle } from "./marketplace.ts";
+
+test("70/15/15 sale split preserves the gross, with referrer absorbing rounding", () => {
+  assert.deepEqual(splitSale(2500), { sellerCents: 1750, platformCents: 375, referrerCents: 375 });
+  for (const gross of [1, 3, 99, 101, 1999, 12345]) { const split = splitSale(gross); assert.equal(split.sellerCents + split.platformCents + split.referrerCents, gross); }
+  assert.deepEqual(splitSale(0), { sellerCents: 0, platformCents: 0, referrerCents: 0 });
+});
+test("kit downloads require ownership, a free listing, or an active sale", () => {
+  assert.equal(canDownloadKit({ isOwner: true, priceCents: 100, hasActiveSale: false }), true);
+  assert.equal(canDownloadKit({ isOwner: false, priceCents: 0, hasActiveSale: false }), true);
+  assert.equal(canDownloadKit({ isOwner: false, priceCents: 100, hasActiveSale: true }), true);
+  assert.equal(canDownloadKit({ isOwner: false, priceCents: 100, hasActiveSale: false }), false);
+});
 
 const goodBundle: Bundle = { files: [{ path: "BUILD-PROMPT.md", text: "Build the app" }, { path: "keys.md", text: "No keys committed" }] };
 const base: BatteryInput = { bundle: goodBundle, manifest: { skills: ["known"], keys: ["Weather API"] }, listing: { name: "Demo", priceCents: 0, demoKind: null, videoUrl: null }, demoProbe: null, skillExists: (s) => s === "known", oneInput: "A topic" };
