@@ -6,16 +6,16 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
   {
     title: "Explore",
     links: [
-      { href: "/agents", label: "Agents" },
       { href: "/spaces", label: "Spaces" },
+      { href: "/build", label: "Build an agent" },
       { href: "/rotator", label: "Daily rotator" },
-      { href: "/town", label: "Agent Town" },
     ],
   },
   {
     title: "Start",
     links: [
-      { href: "/build", label: "Build an agent" },
+      { href: "/town", label: "Agent Town" },
+      { href: "/agents", label: "Agents" },
       { href: "/how", label: "How it works" },
       { href: "/api/auth/whop", label: "Connect" },
     ],

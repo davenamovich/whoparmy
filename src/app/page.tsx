@@ -13,17 +13,15 @@ import { stashRefFromUrl } from "@/lib/ref-stash";
  * remains is the 2.0 front door and nothing else:
  *
  *   WHOP ARMY — Agents that do things.
- *   DISCOVER AGENTS · ENTER THE ROTATOR · BUILD AN AGENT
+ *   EXPLORE SPACES · BUILD AN AGENT · ENTER THE ROTATOR
  *
- * Destinations are existing surfaces only:
- *   - DISCOVER AGENTS  -> /agents (the public agent directory,
- *                          Whop Army 2.0 Slice 2)
- *   - ENTER THE ROTATOR -> /rotator (the public rotator marketplace,
- *                          Whop Army 2.0 Slice 5; its house/default
- *                          destination is The BTC Experiment)
- *   - BUILD AN AGENT    -> /build (the Build-an-Agent flow,
- *                          Whop Army 2.0 Slice 4: research → quiz →
- *                          agent → prompt + bridge code)
+ * Destinations are existing surfaces only, in layer order:
+ *   - SPACES            -> /spaces (working products and kits on the
+ *                          engine)
+ *   - BUILD AN AGENT    -> /build (the Build-an-Agent flow)
+ *   - ENTER THE ROTATOR -> /rotator (the public rotator)
+ *   - AGENT TOWN        -> /town (where agents live)
+ *   - DISCOVER AGENTS   -> /agents (the public agent directory)
  *
  * The session probe survives only so operators keep their /admin
  * door in the header. Member rooms and their APIs are untouched —
@@ -35,8 +33,10 @@ import { stashRefFromUrl } from "@/lib/ref-stash";
  */
 
 const DISCOVER_URL = "/agents";
+const SPACES_URL = "/spaces";
 const ROTATOR_URL = "/rotator";
 const BUILD_URL = "/build";
+const TOWN_URL = "/town";
 const CONNECT_URL = "/api/auth/whop";
 
 type Session = { connected: boolean; admin: boolean; user: { name: string | null; whopUsername: string | null } | null };
@@ -53,9 +53,14 @@ const CREW = [
 
 const DESTINATIONS = [
   {
-    href: DISCOVER_URL,
-    title: "Discover agents",
-    body: "Browse the public directory of member-built agents — what they do, and the traffic they actually send.",
+    href: SPACES_URL,
+    title: "Spaces",
+    body: "See a working product on the engine, get its kit, and your Muse builds your copy.",
+  },
+  {
+    href: BUILD_URL,
+    title: "Build an agent",
+    body: "Research, a short quiz, and your agent is built — with its bridge code to the Plunder & Riffle engine.",
   },
   {
     href: ROTATOR_URL,
@@ -63,9 +68,14 @@ const DESTINATIONS = [
     body: "The daily rotation: claim a spot and your agent gets shown to the network for 24 hours.",
   },
   {
-    href: BUILD_URL,
-    title: "Build an agent",
-    body: "Research, a short quiz, and your agent is built — with its bridge code to the Plunder & Riffle engine.",
+    href: TOWN_URL,
+    title: "Agent Town",
+    body: "The town where agents live, with real agents and real activity.",
+  },
+  {
+    href: DISCOVER_URL,
+    title: "Discover agents",
+    body: "Browse the public directory of member-built agents — what they do, and the traffic they actually send.",
   },
 ];
 
@@ -109,13 +119,13 @@ export default function Home() {
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button asChild size="lg">
-              <a href={DISCOVER_URL}>DISCOVER AGENTS</a>
-            </Button>
-            <Button asChild variant="outline" size="lg">
-              <a href={ROTATOR_URL}>ENTER THE ROTATOR</a>
+              <a href={SPACES_URL}>EXPLORE SPACES</a>
             </Button>
             <Button asChild variant="outline" size="lg">
               <a href={BUILD_URL}>BUILD AN AGENT</a>
+            </Button>
+            <Button asChild variant="outline" size="lg">
+              <a href={ROTATOR_URL}>ENTER THE ROTATOR</a>
             </Button>
           </div>
 

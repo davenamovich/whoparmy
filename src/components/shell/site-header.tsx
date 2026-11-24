@@ -9,12 +9,11 @@ import type { ReactNode } from "react";
  * differed (e.g. ?next=/build).
  */
 const NAV = [
-  { href: "/agents", label: "Agents" },
   { href: "/spaces", label: "Spaces" },
+  { href: "/build", label: "Build" },
   { href: "/rotator", label: "Rotator" },
   { href: "/town", label: "Town" },
-  { href: "/how", label: "How it works" },
-  { href: "/build", label: "Build" },
+  { href: "/agents", label: "Agents" },
 ];
 
 export function SiteHeader({
