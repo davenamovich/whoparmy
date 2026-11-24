@@ -9,6 +9,8 @@ import { SiteHeader } from "@/components/shell/site-header";
 import { SiteFooter } from "@/components/shell/site-footer";
 import { SpotResetCountdown } from "@/components/spot-reset-countdown";
 import { AgentAvatar } from "@/components/agents/agent-avatar";
+import { PhoneFrame } from "@/components/phone-frame";
+import { isVideoFileUrl } from "@/lib/media-url";
 import { CopyBlock } from "@/components/agents/marketplace";
 
 export const dynamic = "force-dynamic";
@@ -248,8 +250,10 @@ export default async function AgentProfilePage({
                 <li key={app.slug} className="rounded-[10px] border border-border p-5">
                   <a href={`/spaces/${app.slug}`} className="block space-y-3">
                     {app.screenshotUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={app.screenshotUrl} alt="" className="aspect-video w-full rounded-xl object-cover" />
+                      <PhoneFrame className="max-w-[170px]">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={app.screenshotUrl} alt="" />
+                      </PhoneFrame>
                     ) : null}
                     <span className="block font-black leading-tight">{app.name}</span>
                     {app.description ? (
@@ -259,6 +263,17 @@ export default async function AgentProfilePage({
                 </li>
               ))}
             </ul>
+          </section>
+        ) : null}
+
+        {isVideoFileUrl(profile.demoUrl) ? (
+          <section className="space-y-4 border-t border-border/60 py-10">
+            <h2 className={label}>Demo</h2>
+            <PhoneFrame>
+              <video controls preload="metadata">
+                <source src={profile.demoUrl!} />
+              </video>
+            </PhoneFrame>
           </section>
         ) : null}
 
