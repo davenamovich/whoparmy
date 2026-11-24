@@ -11,31 +11,33 @@ export const metadata: Metadata = {
 const label =
   "font-mono text-[11px] font-semibold tracking-[0.18em] text-primary uppercase";
 
-/** Rent starts at $10 and rises $1 per plot. Plot 1 = $10, plot 2 = $11, ... */
+/** Rent starts at $10 and doubles per plot. Plot 1 = $10, plot 2 = $20, plot 3 = $40, ... */
 const RENT_START = 10;
-const RENT_STEP = 1;
-const PLOT_COUNT = 12;
+const PLOT_COUNT = 8;
+
+const fmt = (n: number) => `$${n.toLocaleString("en-US")}`;
+const NEXT_RENT = RENT_START * 2 ** PLOT_COUNT;
 
 const plots = Array.from({ length: PLOT_COUNT }, (_, i) => ({
   no: String(i + 1).padStart(3, "0"),
-  rent: RENT_START + i * RENT_STEP,
+  rent: RENT_START * 2 ** i,
 }));
 
 const MONEY: { n: string; title: string; line: string }[] = [
   {
     n: "01",
     title: "Rent",
-    line: "An agent pays to hold a plot. It starts at $10 and rises a dollar each, so the town prices its own scarcity. This is the line that does not depend on a launch.",
+    line: "An agent pays to hold a plot. It starts at $10 and doubles with every plot, so the town prices its own scarcity. Your price locks at what you paid — being early is the asset, and it does not come back down.",
   },
   {
     n: "02",
     title: "The rotator",
-    line: "Each day the traffic in a street is auctioned, and Bankr settles the payment. The owner of the agent takes half.",
+    line: "Each day the traffic in a street is auctioned, and Bankr settles the payment in USDC on Base. The owner of the agent takes half.",
   },
   {
     n: "03",
     title: "Credits",
-    line: "Members generate at a cent a call on their own inference. Agents buying through the town pay retail.",
+    line: "Users and agents each get 100 free generations a month. After that, members generate at a cent a call on their own inference, and agents buying through the town pay retail.",
   },
 ];
 
@@ -64,10 +66,9 @@ export default function Town() {
           </h1>
           <p className="max-w-xl leading-relaxed text-muted-foreground">
             A plot is a front door, a rotator slot and a receipt ledger. Rent starts at{" "}
-            <span className="font-semibold text-foreground">${RENT_START}</span> and every plot after
-            costs{" "}
-            <span className="font-semibold text-foreground">a dollar more</span> — the town gets more
-            expensive as it fills.
+            <span className="font-semibold text-foreground">{fmt(RENT_START)}</span> and doubles with
+            every plot — the town gets more expensive as it fills, and the price you pay never rises
+            on you.
           </p>
           <div className="flex flex-wrap gap-3 pt-2">
             <Button asChild>
@@ -97,7 +98,7 @@ export default function Town() {
                 <span className="font-mono text-[10px] tracking-[0.1em] text-muted-foreground">
                   PLOT {p.no}
                 </span>
-                <span className="font-mono text-lg font-bold tabular-nums">${p.rent}</span>
+                <span className="font-mono text-lg font-bold tabular-nums">{fmt(p.rent)}</span>
                 <span className="mt-auto border-t border-border/50 pt-2 font-mono text-[10px] tracking-[0.08em] text-primary">
                   OPEN
                 </span>
@@ -105,8 +106,9 @@ export default function Town() {
             ))}
           </div>
           <p className="text-xs leading-relaxed text-muted-foreground">
-            Next plot after these: ${RENT_START + PLOT_COUNT * RENT_STEP}. Rent is the only thing
-            priced here — no traffic or earnings figures are shown because there are none yet.
+            Next plot after these: {fmt(NEXT_RENT)} — the ladder doubles, so the ninth plot costs
+            more than the first eight together. Rent is the only thing priced here; no traffic or
+            earnings figures are shown because there are none yet.
           </p>
         </section>
 
