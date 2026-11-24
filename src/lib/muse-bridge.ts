@@ -6,6 +6,8 @@ import { isDesignatedOperator } from "@/lib/auth";
 import { getSavedDhMediaLink } from "@/lib/btc-addresses";
 import { EXPERIMENT_GENERATING_COSTS, codeTtlMsForScope } from "@/lib/experiment-scope";
 import { publicUpdateTokenStatus, tokenKind } from "@/lib/update-token-core";
+import { BRIDGE_FREE_TOOLS, bridgeToolAllowedByTables, filterBridgeTools } from "@/lib/bridge-tool-policy";
+export { BRIDGE_FREE_TOOLS } from "@/lib/bridge-tool-policy";
 
 /**
  * ─── Muse bridge connector (Dave, 2026-11-17) ───────────────────────
@@ -39,7 +41,8 @@ import { publicUpdateTokenStatus, tokenKind } from "@/lib/update-token-core";
  *   at the engine's actual charge (balance delta) after; a failed call
  *   settles at 0 because the bot refunds it.
  * - Publishing and MP4 rendering are NOT in the allowlist: the member
- *   approves pieces first, per the standing approval rules.
+ *   approves pieces first, per the standing approval rules. Member
+ *   unlock tools are available through the derived key.
  */
 
 // ─── Config ─────────────────────────────────────────────────────────
@@ -189,17 +192,8 @@ export async function assertExperimentEligible(user: Pick<User, "id" | "whopId">
 // Free tools never touch the budget. Generating tools reserve their
 // LIST cost (from the bot MCP's own tool descriptions) and settle at
 // the actual charge. Anything not listed here is refused — notably
-// publish_clip, post_to_socials and request_mp4.
-
-export const BRIDGE_FREE_TOOLS = new Set([
-  "research_brand",
-  "create_campaign_from_research",
-  "get_job_status",
-  "get_account",
-  "get_usage",
-  "list_ad_options",
-  "list_services",
-]);
+// member unlock/key tools. Publishing (publish_clip, post_to_socials) and
+// MP4 rendering (request_mp4) remain refused.
 
 /** Week-scope generating tools (the /muse-week offer's allowlist). */
 export const BRIDGE_GENERATING_COSTS: Record<string, number> = {
@@ -234,7 +228,7 @@ export function generatingCostsForScope(scope: BridgeScope): Record<string, numb
 export function bridgeToolAllowedForScope(scope: BridgeScope, name: string): boolean {
   // Object.hasOwn, never `in`: `in` walks the prototype chain, so a
   // tool literally named "constructor" or "toString" would pass.
-  return BRIDGE_FREE_TOOLS.has(name) || Object.hasOwn(generatingCostsForScope(scope), name);
+  return bridgeToolAllowedByTables(name, BRIDGE_FREE_TOOLS, generatingCostsForScope(scope));
 }
 
 /** Week-scope check (the original behavior, kept for existing callers). */
@@ -792,7 +786,7 @@ export async function proxyToolsList(session: BridgeSession): Promise<unknown> {
       })),
     };
   }
-  return { tools: tools.filter((t) => typeof t.name === "string" && bridgeToolAllowedForScope(session.scope, t.name)) };
+  return { tools: filterBridgeTools(tools, (name) => bridgeToolAllowedForScope(session.scope, name)) };
 }
 
 // ─── Member-facing account view ─────────────────────────────────────
