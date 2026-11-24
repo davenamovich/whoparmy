@@ -3,6 +3,11 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { SiteHeader } from "@/components/shell/site-header";
 import { SiteFooter } from "@/components/shell/site-footer";
+import { RotatorCountdown } from "@/components/rotator-countdown";
+import { getWhopUser } from "@/lib/auth";
+import { loadTown } from "@/lib/town-server";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Agent Town — the five, the key, the terms",
@@ -15,16 +20,7 @@ const label =
 
 const mono = "font-mono tabular-nums";
 
-/** Rent starts at $10 and doubles per plot. Plot 1 = $10, plot 2 = $20, ... */
-const RENT_START = 10;
-const PLOT_COUNT = 8;
 const fmt = (n: number) => `$${n.toLocaleString("en-US")}`;
-const NEXT_RENT = RENT_START * 2 ** PLOT_COUNT;
-
-const plots = Array.from({ length: PLOT_COUNT }, (_, i) => ({
-  no: String(i + 1).padStart(3, "0"),
-  rent: RENT_START * 2 ** i,
-}));
 
 const FIVE: { n: string; name: string; why: string; gives: string }[] = [
   {
@@ -66,7 +62,14 @@ const PATHS = [
   ["Who pays for inference", "You — your own key", "Included in the retail rate"],
 ];
 
-export default function Town() {
+export default async function Town() {
+  let viewerUserId: string | null = null;
+  try {
+    viewerUserId = (await getWhopUser()).id;
+  } catch {
+    viewerUserId = null;
+  }
+  const town = await loadTown(viewerUserId);
   return (
     <main className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex min-h-screen max-w-2xl flex-col px-5 py-10">
@@ -173,37 +176,66 @@ export default function Town() {
         <section className="space-y-4 border-t border-border/60 py-10">
           <p className={label}>A plot</p>
           <h2 className="font-display text-2xl font-bold tracking-tight">
-            A front door, a rotator slot, a receipt ledger.
+            Public agents, a rotator slot, and the live map.
           </h2>
+          {town.viewerDistrict ? (
+            <section className="space-y-4 rounded-[10px] border border-primary/40 bg-card p-4">
+              <p className={label}>Your district</p>
+              {town.viewerDistrict.agents.length === 0 && town.viewerDistrict.paidSlots.length === 0 && town.viewerDistrict.applications.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Your district is quiet — no public agents, paid slots, or Spaces yet.</p>
+              ) : null}
+              {town.viewerDistrict.agents.map((agent) => (
+                <p key={agent.id} className="text-sm"><Link className="text-primary underline" href={agent.slug ? `/agent/${agent.slug}` : "/agents"}>{agent.name}</Link> · plot {String(town.plots.find((p) => p.agent?.id === agent.id)?.plotNo ?? "—").padStart(3, "0")}</p>
+              ))}
+              {town.viewerDistrict.paidSlots.map((slot) => <p key={slot.id} className="text-sm text-muted-foreground">Paid rotator slot · {slot.partner} · {slot.date}</p>)}
+              {town.viewerDistrict.applications.map((app) => <p key={app.id} className="text-sm"><Link className="text-primary underline" href={`/spaces/${app.slug}`}>{app.name}</Link></p>)}
+            </section>
+          ) : null}
           <p className="leading-relaxed text-muted-foreground">
-            An agent rents a plot to hold its offer in the town. Rent is monthly and progressive: it
-            starts at {fmt(RENT_START)} and doubles with each plot taken. Your price locks at what
-            you paid and never rises on you — being early is the asset.
+            Rent follows the monthly ladder: plot 1 starts at $10 and each plot doubles. An occupied plot keeps its ladder price at move-in.
           </p>
-          <div className="grid grid-cols-2 gap-3 pt-1 sm:grid-cols-4">
-            {plots.map((p) => (
-              <div
-                key={p.no}
-                className="flex min-h-[92px] flex-col gap-1 rounded-[10px] border border-border/60 bg-card p-3"
-              >
-                <span className="font-mono text-[10px] tracking-[0.1em] text-muted-foreground">
-                  PLOT {p.no}
-                </span>
-                <span className={`text-lg font-bold ${mono}`}>{fmt(p.rent)}</span>
-                <span className="mt-auto border-t border-border/50 pt-2 font-mono text-[10px] tracking-[0.08em] text-primary">
-                  OPEN
-                </span>
-              </div>
+          <div data-phase={town.phase} className="space-y-3 rounded-[10px] border border-border/60 bg-card p-4">
+            <p className="text-sm font-semibold">{town.phase === "day" ? "Town — daytime in ET" : "Town — night in ET"}</p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {town.plots.map((plot) => (
+                <div key={plot.plotNo} className="flex min-h-[120px] flex-col gap-1 rounded-[10px] border border-border/60 bg-background p-3">
+                  <span className="font-mono text-[10px] tracking-[0.1em] text-muted-foreground">PLOT {String(plot.plotNo).padStart(3, "0")} · ladder {fmt(plot.rentDollars)}/mo</span>
+                  {plot.agent ? <Link className="font-semibold leading-tight text-primary underline" href={`/agent/${plot.agent.slug}`}>{plot.agent.name}</Link> : <span className="text-lg font-bold">OPEN</span>}
+                  {plot.agent?.ownerName ? <span className="text-xs text-muted-foreground">Owner: {plot.agent.ownerName}</span> : null}
+                  <div className="mt-auto border-t border-border/50 pt-2">
+                    {plot.agent ? <span className="block text-[10px] text-muted-foreground">Activity · level {plot.level}/4</span> : null}
+                    <div aria-label={plot.agent ? `Activity level ${plot.level} of 4` : "No activity"} className="mt-1 flex h-2 items-end gap-1">
+                      {[1, 2, 3, 4].map((level) => <span key={level} className={`w-3 rounded-sm bg-primary ${level <= plot.level ? "opacity-100" : "opacity-15"}`} style={{ height: `${4 + level * 2}px` }} />)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <p className="text-xs leading-relaxed text-muted-foreground">Next plot ladder price: {fmt(town.nextRent)}. Activity level is a display scale from counted ledger rows over seven days.</p>
+        </section>
+
+        <section className="space-y-4 border-t border-border/60 py-10">
+          <p className={label}>The billboard</p>
+          <h2 className="font-display text-2xl font-bold tracking-tight">Today in the rotator.</h2>
+          <p className="text-sm font-semibold text-primary"><RotatorCountdown closesAt={town.billboard.closesAt} /></p>
+          {town.billboard.placements.length === 0 ? <p className="text-sm text-muted-foreground">No billboard placements are available right now.</p> : null}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {town.billboard.placements.map((placement) => (
+              <article key={`${placement.partner}-${placement.source}`} className="space-y-2 rounded-[10px] border border-border/60 bg-card p-4">
+                <p className="font-bold">{placement.partnerName}</p>
+                <p className="text-xs text-muted-foreground">{placement.source === "paid" ? "Paid slot" : placement.source === "auction" ? "Auction winner" : placement.source === "free-placement" ? "Free placement" : "House rotation"}{placement.host ? ` · ${placement.host}` : ""}{placement.ownerName ? ` · by ${placement.ownerName}` : ""}</p>
+                <a href={`/api/rotator/launch?partner=${encodeURIComponent(placement.partner)}`} className="inline-flex min-h-11 items-center justify-center rounded-full bg-primary px-5 text-sm font-bold text-primary-foreground">TRY IT</a>
+              </article>
             ))}
           </div>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Next plot: {fmt(NEXT_RENT)}. The ladder doubles, so the ninth plot costs more than the
-            first eight together. Rent is the only thing priced here — there are no traffic or
-            earnings figures on this page because there are none yet.
-          </p>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            Rent is payable monthly in Whop. USDC on Base through Bankr is being wired for rotator slots first; town rent on that rail is not live yet.
-          </p>
+          <Link className="text-sm text-primary underline" href="/rotator">Open the full market →</Link>
+        </section>
+
+        <section className="space-y-4 border-t border-border/60 py-10">
+          <p className={label}>Town ticker</p>
+          {town.ticker.length ? <ul className="space-y-3">{town.ticker.map((event, index) => <li key={`${event.kind}-${new Date(event.ts).toISOString()}-${index}`} className="flex justify-between gap-4 rounded-[10px] border border-border/60 bg-card p-3 text-sm"><span>{event.text}</span><time className="shrink-0 font-mono text-xs text-muted-foreground" dateTime={new Date(event.ts).toISOString()}>{new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit", month: "short", day: "numeric" }).format(new Date(event.ts))} ET</time></li>)}</ul> : <p className="text-sm text-muted-foreground">Town is quiet — no counted events yet.</p>}
+          <p className="text-xs text-muted-foreground">Day/night follows Eastern Time — the market closes 23:50 ET.</p>
         </section>
 
         {/* THE AUCTION */}
