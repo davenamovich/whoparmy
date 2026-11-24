@@ -14,10 +14,18 @@ const CLOSED_STATUSES = new Set(["canceled", "expired", "unresolved", "drafted"]
 
 export class MarketplaceError extends Error { constructor(message: string, public status = 400) { super(message); } }
 // M1 registry: the house replication skill named in HOUSE_SPACE and the house skills documented in the app manifest.
-export const KNOWN_SKILLS = ["Plunder & Riffle MCP bridge — runs in your own Muse", "replicate_space", "Plunder & Riffle API key — your own, saved by your Muse via the bridge"];
+// Real skill registry for the battery's manifest check (M1 seeded this
+// with descriptive strings copied from the house listing's manifest —
+// two of them were KEYS, not skills — so every real member submission
+// naming actual skills failed. Fixed 2026-11-24 during the first proof
+// run.) Names are the house catalog's; comparison normalizes case and
+// underscores (Space manifests write seo_gaps, skill dirs write seo-gaps).
+export const KNOWN_SKILLS = ["seo_gaps", "find_local_clients", "pitch_the_fix", "space_demo_walkthrough", "social_publishing", "replicate_space", "space_demo_and_replicate", "content_atomizer", "affiliate_content", "speed_to_lead", "brand_bot_setup", "mnemos_training", "agent37_board_onboarding", "design_engine", "taste_finish_gate", "hyperframes", "gpt_researcher", "fxtwitter_post_reader", "grok_x_search", "drive_media_staging", "ethel_episode_runner", "character_intro_video", "video_production_engine", "present_script_engine", "starimg_job_tier_routing", "plunder_riffle_mcp_bridge"];
 export const LISTING_FEE_PLAN_ID = process.env.WHOP_LISTING_FEE_PLAN_ID?.trim() || LISTING_PLAN_ID;
 export function listingFeeCheckoutUrl() { return process.env.WHOP_CHECKOUT_URL_LISTING_FEE?.trim() || `https://whop.com/checkout/${LISTING_FEE_PLAN_ID}`; }
-const skillExists = (name: string) => KNOWN_SKILLS.includes(name);
+const normalizeSkill = (name: string) => name.trim().toLowerCase().replace(/_/g, "-");
+const KNOWN_SKILL_SET = new Set(KNOWN_SKILLS.map(normalizeSkill));
+const skillExists = (name: string) => KNOWN_SKILL_SET.has(normalizeSkill(name));
 const probe = async (url: string | null | undefined) => {
   if (!url) return null;
   const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 5000);
