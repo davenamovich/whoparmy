@@ -23,6 +23,8 @@ export interface BridgeAccountLike {
   connected: boolean;
   credits: number | null;
   errorCode: string | null;
+  /** BYOK recognition from the account view; null/absent = not checked. */
+  byok?: { anySaved: boolean } | null;
 }
 
 export interface WhopConnectionState {
@@ -50,6 +52,9 @@ export function deriveWhopConnection(
       // the /muse-week credits card renders as "Unlimited").
       text += account.credits === -1 ? " · Unlimited credits" : ` · ${account.credits} credits`;
     }
+    // A member running on their own saved keys is marked as such —
+    // their credit figure is their live balance, not the allowance.
+    if (account.byok?.anySaved) text += " · BYOK";
     return { tone: "connected", text };
   }
   let text = "Whop · Signed in — engine not linked";

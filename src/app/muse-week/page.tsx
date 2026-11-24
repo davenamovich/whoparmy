@@ -8,6 +8,7 @@ import { Bot, CheckCircle2, Coins, Copy, Download, KeyRound, Loader2, Lock, Refr
 import { museWeekCommand } from "@/lib/muse-week-command";
 import { TelegramLinkCard } from "@/components/factory/telegram-link";
 import { deriveWhopConnection, type WhopConnectionTone } from "@/lib/whop-connection";
+import { deriveCreditsDisplay, type BridgeByokView } from "@/lib/bridge-byok";
 
 /**
  * ─── MUSE WEEK ───────────────────────────────────────────────────────
@@ -26,6 +27,8 @@ interface BridgeAccount {
   credits: number | null;
   granted: number;
   period: string | null;
+  /** BYOK recognition from the account view (null = not checked). */
+  byok: BridgeByokView | null;
   brand: { name: string; website: string | null } | null;
   tokens: Array<{ id: string; budgetCredits: number; spentCredits: number; expiresAt: string; active: boolean }>;
   weekBudgetCredits: number;
@@ -187,6 +190,7 @@ export default function MuseWeekPage() {
     );
   }
 
+  const creditsDisplay = deriveCreditsDisplay({ byok: account?.byok ?? null });
   const businessUrl = account?.brand?.website || "https://your-business-website.com";
   const offers = account?.offers?.length ? account.offers : FALLBACK_OFFERS;
   const selectedOffer = offers.find((o) => o.id === offerId) ?? offers[0];
@@ -237,14 +241,37 @@ export default function MuseWeekPage() {
           {account?.connected && (
             <>
               <p>
-                Balance: <strong>{account.credits === -1 ? "Unlimited" : `${account.credits} credits`}</strong>
+                {creditsDisplay.balanceLabel}:{" "}
+                <strong>{account.credits === -1 ? "Unlimited" : `${account.credits} credits`}</strong>
                 {account.granted > 0 && <> · {account.granted} granted this cycle</>}
                 {account.period && <> · cycle {account.period.replace("paid:", "")}</>}
               </p>
-              <p className="text-muted-foreground">
-                These credits live on your own Plunder &amp; Riffle key, issued for your Whop account. Your Muse
-                spends them through this bridge — it never sees the key itself.
-              </p>
+              {creditsDisplay.byok ? (
+                <>
+                  <p>
+                    You run on your own keys — saved on your record: {creditsDisplay.savedLabels.join(", ")}. The
+                    balance above is read live from the engine on this page load; it is your real position, not
+                    the flat monthly allowance.
+                  </p>
+                  {creditsDisplay.llmSaved && (
+                    <p className="text-muted-foreground">
+                      With your own LLM key saved, generation calls run on it at 1 credit each.
+                    </p>
+                  )}
+                  {creditsDisplay.ownWorker && (
+                    <p className="text-muted-foreground">
+                      Your own render worker is saved, so an MP4 render costs{" "}
+                      {creditsDisplay.mp4QuoteCredits ?? 1} credit{creditsDisplay.mp4QuoteCredits === 1 ? "" : "s"}{" "}
+                      instead of 25 on house servers.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-muted-foreground">
+                  These credits live on your own Plunder &amp; Riffle key, issued for your Whop account. Your Muse
+                  spends them through this bridge — it never sees the key itself.
+                </p>
+              )}
             </>
           )}
           {account && !account.connected && (

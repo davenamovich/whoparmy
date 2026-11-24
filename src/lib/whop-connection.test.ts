@@ -52,3 +52,37 @@ test("signed in with no bridge account at all (fetch failed) reads as unlinked w
     text: "Whop · Signed in — engine not linked",
   });
 });
+
+test("a connected BYOK member's pill carries the BYOK marker after the live balance", () => {
+  assert.deepEqual(
+    deriveWhopConnection(
+      { connected: true, user: { planName: "Creator" } },
+      { connected: true, credits: 432, errorCode: null, byok: { anySaved: true } },
+    ),
+    { tone: "connected", text: "Whop · Connected · Creator · 432 credits · BYOK" },
+  );
+});
+
+test("the BYOK marker also follows the unlimited sentinel", () => {
+  const state = deriveWhopConnection(
+    { connected: true, user: { planName: "Operator" } },
+    { connected: true, credits: -1, errorCode: null, byok: { anySaved: true } },
+  );
+  assert.equal(state.text, "Whop · Connected · Operator · Unlimited credits · BYOK");
+});
+
+test("no BYOK marker when nothing is saved or the check did not run", () => {
+  const base = { connected: true, user: { planName: "Creator" } };
+  assert.equal(
+    deriveWhopConnection(base, { connected: true, credits: 100, errorCode: null, byok: { anySaved: false } }).text,
+    "Whop · Connected · Creator · 100 credits",
+  );
+  assert.equal(
+    deriveWhopConnection(base, { connected: true, credits: 100, errorCode: null, byok: null }).text,
+    "Whop · Connected · Creator · 100 credits",
+  );
+  assert.equal(
+    deriveWhopConnection(base, { connected: true, credits: 100, errorCode: null }).text,
+    "Whop · Connected · Creator · 100 credits",
+  );
+});

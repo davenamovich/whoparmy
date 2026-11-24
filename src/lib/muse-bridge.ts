@@ -7,6 +7,8 @@ import { EXPERIMENT_GENERATING_COSTS, codeTtlMsForScope } from "@/lib/experiment
 import { publicUpdateTokenStatus, tokenKind } from "@/lib/update-token-core";
 import { BRIDGE_FREE_TOOLS, bridgeToolAllowedByTables, filterBridgeTools } from "@/lib/bridge-tool-policy";
 export { BRIDGE_FREE_TOOLS } from "@/lib/bridge-tool-policy";
+import { byokViewFromUnlockPayload, type BridgeByokView } from "@/lib/bridge-byok";
+export type { BridgeByokView } from "@/lib/bridge-byok";
 
 /**
  * ─── Muse bridge connector (Dave, 2026-11-17) ───────────────────────
@@ -418,6 +420,23 @@ export async function getMemberCredits(key: string): Promise<number | null> {
   }
 }
 
+/**
+ * The member's BYOK state, read with their own derived key through the
+ * engine's check_my_unlock (Dave, 2026-11-24): which unlocks are saved
+ * on their record + the live MP4 quote. Null whenever the check can't
+ * run or answers an unrecognizable payload — the account view must
+ * degrade to its plain presentation, never break over this.
+ */
+export async function getMemberByok(key: string): Promise<BridgeByokView | null> {
+  try {
+    const reply = await mcpCall(key, "tools/call", { name: "check_my_unlock", arguments: {} });
+    if (reply.result?.isError) return null;
+    return byokViewFromUnlockPayload(resultPayload(reply));
+  } catch {
+    return null;
+  }
+}
+
 // ─── Bridge codes + tokens ──────────────────────────────────────────
 
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
@@ -790,6 +809,13 @@ export interface BridgeAccountView {
   credits: number | null;
   granted: number;
   period: string | null;
+  /**
+   * BYOK recognition (Dave, 2026-11-24): the member's saved unlocks on
+   * their engine record, via check_my_unlock on their own key. Null
+   * when the member is not linked or the check could not run — the
+   * page then keeps its plain allowance presentation.
+   */
+  byok: BridgeByokView | null;
   brand: { name: string; website: string | null } | null;
   tokens: Array<{ id: string; budgetCredits: number; spentCredits: number; expiresAt: Date; active: boolean; scope: BridgeScope }>;
   weekBudgetCredits: number;
@@ -818,6 +844,7 @@ export async function getBridgeAccountView(user: User): Promise<BridgeAccountVie
     credits: null,
     granted: 0,
     period: null,
+    byok: null,
     brand: brand ?? null,
     tokens: tokens.map((t) => ({
       id: t.id,
@@ -833,12 +860,21 @@ export async function getBridgeAccountView(user: User): Promise<BridgeAccountVie
     errorCode: null,
   };
   try {
-    const member = await getMemberEngineKey(user);
+    // Fresh, never the 10-minute cache (Dave, 2026-11-24): the credits
+    // on this page are the member's live engine balance at page load.
+    // A BYOK member's balance moves with their own keys' 1-credit
+    // calls, so a cached snapshot would show them a stale figure —
+    // and read as the flat monthly allowance.
+    const member = await getMemberEngineKey(user, { fresh: true });
     view.connected = true;
     view.botPlan = member.plan;
     view.credits = member.credits;
     view.granted = member.granted;
     view.period = member.period || null;
+    // BYOK recognition rides the same live key; a failed check leaves
+    // byok null and the view exactly as it was (getMemberByok never
+    // throws).
+    view.byok = await getMemberByok(member.key);
   } catch (err) {
     if (err instanceof BridgeError) {
       view.error = err.message;
