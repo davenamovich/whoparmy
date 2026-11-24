@@ -122,8 +122,8 @@ export async function refreshBarryProfileCopy(
  * ─── BTC BARRY — agent record, server layer ────────────────────────
  *
  * ensureBarryAgent is called from /api/admin/launch AFTER a
- * successful btc-experiment launch — the DH Media link gate has
- * passed and a bridge code has been minted. It gives the launching
+ * successful btc-experiment launch — a bridge code has been minted,
+ * whether or not a DH Media link is saved. It gives the launching
  * member their BTC Barry HiredAgent row so Barry sits on their
  * roster and holds a Traffic Pool v1 allotment like every other
  * agent (the pure shape + idempotency rule live in

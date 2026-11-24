@@ -1,10 +1,10 @@
 import "server-only";
 import type { User } from "@prisma/client";
 import type { Stack } from "@/lib/stacks";
-import { catalogEntrySync } from "@/lib/offer-catalog";
 import { getSavedDhMediaLink } from "@/lib/btc-addresses";
 import { getMemberLanguage } from "@/lib/member-language";
 import { codeTtlLabel } from "@/lib/experiment-scope";
+import { fillDhMediaLink } from "@/lib/stack-prompt-core";
 
 /**
  * Fill a stack's ignition prompt for one member and one minted code.
@@ -28,13 +28,10 @@ export async function fillStackPrompt(
     prompt = prompt.replaceAll("{MEMBER_NAME}", user.name ?? user.whopUsername ?? "a Whop Army member");
   }
   if (prompt.includes("{DH_MEDIA_LINK}")) {
-    // Callers gate the BTC stack on a saved link; the fallback is the
-    // /bridge placeholder example for any template carrying the slot
-    // ungated.
+    // A saved link is supplied when available. Without one, DH Media
+    // stays an optional offer and the prompt continues without a URL.
     const saved = await getSavedDhMediaLink(user.id).catch(() => null);
-    const fallback =
-      catalogEntrySync("salarium")?.example ?? "https://dh.media/?affid=Vesselprotocol";
-    prompt = prompt.replaceAll("{DH_MEDIA_LINK}", saved ?? fallback);
+    prompt = fillDhMediaLink(prompt, saved);
   }
   if (prompt.includes("{LANGUAGE}")) {
     const memberLanguage = await getMemberLanguage(user.id).catch(() => null);

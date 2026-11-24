@@ -29,10 +29,6 @@ export function AdminPanel({ gate, stacks }: { gate: GateState; stacks: StackRow
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [launched, setLaunched] = useState<Record<string, { prompt: string; expiresAt: string; budgetCredits: number }>>({});
-  // BTC Experiment gate (Flow v2): stack ids whose last launch was
-  // refused because no DH Media link is saved yet — the card shows a
-  // save-your-link prompt linking to /bridge instead of a prompt.
-  const [needsDhLink, setNeedsDhLink] = useState<Record<string, boolean>>({});
   const [copied, setCopied] = useState<string | null>(null);
 
   async function post(url: string, body: unknown): Promise<Record<string, unknown>> {
@@ -83,13 +79,8 @@ export function AdminPanel({ gate, stacks }: { gate: GateState; stacks: StackRow
       });
       const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
       if (!res.ok) {
-        if (data.code === "NEEDS_DH_MEDIA_LINK") {
-          setNeedsDhLink((prev) => ({ ...prev, [stack.id]: true }));
-          return;
-        }
         throw new Error(typeof data.error === "string" ? data.error : `Request failed (${res.status})`);
       }
-      setNeedsDhLink((prev) => ({ ...prev, [stack.id]: false }));
       setLaunched((prev) => ({
         ...prev,
         [stack.id]: {
@@ -195,19 +186,6 @@ export function AdminPanel({ gate, stacks }: { gate: GateState; stacks: StackRow
                 </Button>
               )}
             </div>
-            {needsDhLink[stack.id] && (
-              <div className="space-y-2 rounded-md border border-primary/40 bg-primary/5 p-4">
-                <p className="text-sm font-medium">Save your DH Media link first.</p>
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  The BTC Experiment agent build unlocks when a DH Media link is saved — and follows your
-                  current saved link, so the prompt always carries the link you have saved now. No bridge code
-                  was minted.
-                </p>
-                <a href="/build" className="text-sm text-primary underline underline-offset-2">
-                  Manage your agent setup on /build
-                </a>
-              </div>
-            )}
             {launched[stack.id] && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">

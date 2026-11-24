@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionOperator } from "@/lib/site-gate";
 import { stackById } from "@/lib/stacks";
-import { getSavedDhMediaLink } from "@/lib/btc-addresses";
 import { ensureBarryAgent, ensureBarryRotatorForOperator } from "@/lib/barry-agent";
 import { fillStackPrompt } from "@/lib/stack-prompt";
 import { ownBalanceBudget } from "@/lib/experiment-scope";
@@ -42,27 +41,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // BTC Experiment gate (Flow v2, 2026-11-19): the agent build
-  // unlocks only once the member's DH Media link is saved through your agent’s links sync.
-  // The save is the gate, and access follows the CURRENT saved link —
-  // the prompt below is filled from the link saved right now, never
-  // from a cached copy. No code is minted for a gated launch.
-  if (stack.id === "btc-experiment" && !(await getSavedDhMediaLink(operator.id))) {
-    return NextResponse.json(
-      {
-        error:
-          "The BTC Experiment unlocks when your DH Media link is saved. Have your agent sync your DH Media link first — the operator launch follows your current saved link.",
-        code: "NEEDS_DH_MEDIA_LINK",
-      },
-      { status: 400 },
-    );
-  }
-
   try {
     let minted: { code: string; expiresAt: Date; budgetCredits: number };
     if (stack.bridgeScope === "clips" || stack.bridgeScope === "experiment") {
       // Own-balance scopes: the connection's budget is the account's
-      // own credits. Experiment also re-checks the saved-link gate.
+      // own credits. The experiment has no DH Media link gate.
       if (stack.bridgeScope === "clips") assertClipsEligible(operator);
       else await assertExperimentEligible(operator);
       const member = await getMemberEngineKey(operator);
@@ -76,7 +59,7 @@ export async function POST(req: NextRequest) {
     // launch is what puts Barry on the member's roster — one
     // HiredAgent row per member, so he holds a Traffic Pool v1
     // allotment like every other agent and shows on their agents
-    // view. Only AFTER the gate above passed and the code minted;
+    // view. After the code minted;
     // no other stack creates a record here. Best-effort by design:
     // the record is roster/pool bookkeeping, and a failure must
     // never eat a launch that already minted its bridge code.

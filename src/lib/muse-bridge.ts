@@ -3,7 +3,6 @@ import { createHash, randomBytes } from "node:crypto";
 import type { User } from "@prisma/client";
 import { db } from "@/lib/db";
 import { isDesignatedOperator } from "@/lib/auth";
-import { getSavedDhMediaLink } from "@/lib/btc-addresses";
 import { EXPERIMENT_GENERATING_COSTS, codeTtlMsForScope } from "@/lib/experiment-scope";
 import { publicUpdateTokenStatus, tokenKind } from "@/lib/update-token-core";
 import { BRIDGE_FREE_TOOLS, bridgeToolAllowedByTables, filterBridgeTools } from "@/lib/bridge-tool-policy";
@@ -165,11 +164,8 @@ export function assertClipsEligible(user: Pick<User, "whopId">): void {
 }
 
 // ─── Experiment eligibility — the BTC Experiment's agent ────────────
-// Dave, 2026-11-20: saving the DH Media link at the end of The BTC
-// Experiment is what unlocks the bridge — not the Whop plan. Any plan
-// with a linked credit account (they spend their own balance) and a
-// CURRENTLY saved DH Media link. Re-checked at exchange, so removing
-// the link closes a code that has not been used yet.
+// Dave, 2026-11-24: DH Media is an offer activation, not an unlock.
+// The engine still needs its own linked credit account.
 
 export async function assertExperimentEligible(user: Pick<User, "id" | "whopId">): Promise<void> {
   if (!hasLinkedCreditAccount(user)) {
@@ -177,13 +173,6 @@ export async function assertExperimentEligible(user: Pick<User, "id" | "whopId">
       403,
       "NOT_LINKED",
       "Your agent works on your own Plunder & Riffle credits, and this account isn't linked to them yet. Sign in with Whop, then try again.",
-    );
-  }
-  if (!(await getSavedDhMediaLink(user.id))) {
-    throw new BridgeError(
-      403,
-      "NEEDS_DH_MEDIA_LINK",
-      "Your agent's connection unlocks when your DH Media link is saved. Save it, then get your code.",
     );
   }
 }

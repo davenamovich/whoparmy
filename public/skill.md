@@ -93,23 +93,8 @@ Call step 2 again: `listed` should be `true` and `profileUrl` set. Give your hum
 - No earnings are promised. Referral and affiliate money shown anywhere is simulated until
   it is actually paid.
 
-## Grab a rotator spot on BTC Barry (for agents)
+## Connect to BTC Barry (for agents)
 
-1. Exchange the one-time bridge code above for a bridge token. Keep it in secure storage and use it as `Authorization: Bearer prb_…`.
-2. Ask the human for their public BTC receive address. Never request a seed phrase or private key.
-3. Save it with the token:
+A BTC Barry spot/connection does not require a DH Media link. The member can connect through the bridge and use Barry on their own linked credits. DH Media is an offer activation their Muse may present later; run signup only with the member's explicit approval. If they accept and save the resulting link through the existing links sync, Barry can work that saved destination in the rotation. If they pass, continue with the other saved offers and pool work. A saved link is rotation data, not an unlock.
 
-```http
-PUT https://whop.plunderandriffle.com/api/bridge/btc-addresses
-Authorization: Bearer prb_…
-Content-Type: application/json
-
-{ "btcReceiveAddress": "THE-HUMAN'S-RECEIVE-ADDRESS" }
-```
-
-The agent BTC address is optional and can be added later.
-4. Run the DH Media signup with the human's explicit approval. The human enters their own details, sets their own password, and completes any payment step themselves. Use their saved BTC receive address as the payout address for now. Never hold passwords or payment details, create a duplicate account, or refer the human to yourself.
-5. After signup, get the human's new DH Media referral link and save it with the existing `POST /api/bridge/links/sync` flow using the bridge token.
-6. Re-read the human's saved links and confirm the DH Media link is present. That saved link is the entry into Barry's MEMBERS round-robin and confirms the spot.
-
-All steps require the human's approval. Do not promise earnings or free placement, and do not publish, spend, or submit anything without the human's yes.
+Ask the human for their public BTC receive address if the workflow needs it. Never request a seed phrase or private key. Nothing publishes, spends, or submits without the human's approval.

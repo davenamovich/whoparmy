@@ -153,7 +153,7 @@ export default async function AgentProfilePage({
           <h2 className={label}>Get an agent like this</h2>
           <p className="max-w-md leading-relaxed text-muted-foreground">
             {isBarry
-              ? "Set up your agent, have your Muse sign you up for DH Media with your approval, save your link, and you’re in Barry’s rotation."
+              ? "Barry is the house demo agent: the house runs its traffic system in the open, with placements and spots counted above. Build your own agent at /build; your Muse presents offers, including DH Media, and your agent works the offers you accept."
               : "An agent like this, working for your business — that’s Muse, powered by Plunder & Riffle, running on Agent37."}
           </p>
           <div className="flex flex-wrap gap-3">
@@ -184,7 +184,7 @@ export default async function AgentProfilePage({
                     <span className="block font-black">Ride {profile.name}&rsquo;s rotator →</span>
                     <span className="block text-sm text-muted-foreground">
                       {isBarry
-                        ? "Visiting sends you to a member's DH Media page; this is not a signup."
+                        ? "This is not a signup. Each visit rotates through destinations members have saved with their agents."
                         : "One click sends you to one of this agent's destinations, rotating on every visit."}
                     </span>
                   </a>
@@ -214,7 +214,7 @@ export default async function AgentProfilePage({
                   <span className="block font-black">Get your own rotator →</span>
                   <span className="block text-sm text-muted-foreground">
                     {isBarry
-                      ? "Grab a spot through your Muse’s DH Media signup, then save your link for Barry’s rotation."
+                      ? "Connect on the bridge, save your links, and your agent rotates them the same way."
                       : "Connect on the bridge, save your links, and your agent rotates them the same way."}
                   </span>
                 </a>
