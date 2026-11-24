@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 /**
  * POST /api/telegram/pair — the signed-in member mints a one-time
  * Telegram pairing code. The response carries the deep link that
- * opens @PlunderRiffleBot with the code attached; the plaintext code
+ * opens @PlunderWelcomeBot with the code attached; the plaintext code
  * is shown once (only its hash is stored). The anonymous fallback in
  * getWhopUser resolves to the operator account, which is Dave's own
  * test path — the Account card that calls this only renders inside
@@ -20,7 +20,7 @@ export async function POST() {
     {
       code: minted.code,
       expiresAt: minted.expiresAt,
-      botLink: `https://t.me/PlunderRiffleBot?start=whop_${minted.code}`,
+      botLink: `https://t.me/PlunderWelcomeBot?start=whop_${minted.code}`,
     },
     { headers: { "Cache-Control": "no-store" } },
   );

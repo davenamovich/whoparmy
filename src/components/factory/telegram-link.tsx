@@ -4,12 +4,13 @@ import { useState } from "react";
 import { Link2, Send } from "lucide-react";
 
 /**
- * Ralph on Telegram (Dave, 2026-11-18): the real bot is
- * meme-loop-engine's @PlunderRiffleBot — Whoparmy does not rebuild
- * it. This card is the door, plus pairing: the member mints a
+ * Welcome bot on Telegram (Dave, 2026-11-18; repointed to
+ * @PlunderWelcomeBot 2026-11-24): the pairing door opens the
+ * meme-loop-engine welcome bot — Whoparmy does not rebuild it.
+ * This card is the door, plus pairing: the member mints a
  * one-time code here and opens the bot with it, which binds their
- * Telegram account to this one — from then on, Ralph's memory is
- * the same on Telegram and on the web (one shared store).
+ * Telegram account to this one — from then on, the member's
+ * memory is the same on Telegram and on the web (one shared store).
  */
 export function TelegramLinkCard() {
   const [pair, setPair] = useState<{ code: string; botLink: string } | null>(null);
@@ -38,19 +39,20 @@ export function TelegramLinkCard() {
           <Send className="h-5 w-5" />
         </span>
         <div className="flex-1 min-w-0">
-          <h2 className="font-semibold">Ralph on Telegram</h2>
+          <h2 className="font-semibold">Welcome bot on Telegram</h2>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            The full P&amp;R bot lives on Telegram — memes, packs, research, your account, and a chat with Ralph.
-            Pair it to this account and Ralph&apos;s memory of your business is the same in both places.
+            The P&amp;R welcome bot lives on Telegram — it walks you through getting set up, connects your Muse,
+            runs your free first proof, makes memes, and shows you where you are.
+            Pair it to this account and your memory is the same in both places.
           </p>
         </div>
         <a
-          href="https://t.me/PlunderRiffleBot"
+          href="https://t.me/PlunderWelcomeBot"
           target="_blank"
           rel="noopener noreferrer"
           className="rounded-xl border px-4 py-2.5 text-sm font-semibold shrink-0 text-center"
         >
-          Open @PlunderRiffleBot
+          Open @PlunderWelcomeBot
         </a>
       </div>
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 border-t border-border/60 pt-4">

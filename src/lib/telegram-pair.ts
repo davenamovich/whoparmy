@@ -4,8 +4,8 @@ import { db as prisma } from "@/lib/db";
 /**
  * Telegram pairing codes (Dave, 2026-11-18) — the Whoparmy half of
  * wire 3 in BOT-TELEGRAM-UPGRADE-SPEC.md. A signed-in member mints a
- * one-time code, opens @PlunderRiffleBot with it
- * (t.me/PlunderRiffleBot?start=whop_<code>), and the bot trades the
+ * one-time code, opens @PlunderWelcomeBot with it
+ * (t.me/PlunderWelcomeBot?start=whop_<code>), and the bot trades the
  * code back here server-to-server for the member's userId. From then
  * on the bot uses the member's Mnemos scope (member-<userId>) — the
  * same scope the web Ralph chat uses — so memory is one store on
