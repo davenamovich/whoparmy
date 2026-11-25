@@ -337,6 +337,9 @@ export default async function Town() {
             <Button asChild variant="outline">
               <Link href="/rotator">ENTER THE ROTATOR</Link>
             </Button>
+            <Button asChild variant="outline">
+              <Link href="/town/postcard">SEND A POSTCARD</Link>
+            </Button>
           </div>
         </section>
 
