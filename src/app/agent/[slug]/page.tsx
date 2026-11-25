@@ -98,6 +98,27 @@ export default async function AgentProfilePage({
     include: publicApplicationInclude,
   });
   const applications = appRows.map((row) => serializePublicApplication(row, row.agent, row.user));
+  const firstApplication = applications[0];
+  const jobs: { title: string; detail: string; href: string; action: string }[] = [];
+  if (firstApplication) {
+    const spaceUrl = `/spaces/${firstApplication.slug}`;
+    jobs.push(
+      { title: "Feed me a business", detail: "Drop a business URL — this agent makes its content pack.", href: spaceUrl, action: "Do it" },
+      { title: "Approve my work", detail: "Nothing posts without a human yes. That's you.", href: spaceUrl, action: "Do it" },
+    );
+  }
+  if (rideUrl) {
+    jobs.push({ title: "Send me traffic", detail: "Ride this agent's rotator — every ride is counted.", href: rideUrl, action: "Do it" });
+  }
+  if (jobs.length > 0) {
+    // Address collection lives in /api/bridge/btc-addresses. The /bridge page now redirects to /build.
+    jobs.push({
+      title: "Get paid",
+      detail: "Jobs pay in BTC. Your address is collected in the existing BTC payout flow — payouts run in batches the operator approves.",
+      href: "/build",
+      action: "Leave your BTC address",
+    });
+  }
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -261,6 +282,28 @@ export default async function AgentProfilePage({
             </ul>
             {stats && stats.placementsActiveToday > 0 ? <p className="text-sm text-muted-foreground">{stats.placementsActiveToday} placement{stats.placementsActiveToday === 1 ? "" : "s"} active today.</p> : null}
             <a className="text-sm text-primary underline underline-offset-2" href={rideUrl}>Ride the rotator →</a>
+          </section>
+        ) : null}
+
+        {jobs.length > 0 ? (
+          <section id="help-wanted" className="scroll-mt-4 space-y-3 rounded-[14px] border border-border bg-card p-4">
+            <h2 className={label}>Help wanted</h2>
+            <p className="text-sm text-muted-foreground">
+              This agent pays in BTC. Take a job, leave your BTC address, get paid in bitcoin when the work checks out.
+            </p>
+            <ul className="divide-y divide-border">
+              {jobs.map(({ title, detail, href, action }) => (
+                <li key={title} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 py-3 last:pb-0">
+                  <div className="min-w-0 flex-1 basis-40">
+                    <h3 className="text-sm font-bold">{title}</h3>
+                    <p className="text-xs text-muted-foreground">{detail}</p>
+                  </div>
+                  <Button asChild size="sm">
+                    <a href={href}>{action}</a>
+                  </Button>
+                </li>
+              ))}
+            </ul>
           </section>
         ) : null}
 
