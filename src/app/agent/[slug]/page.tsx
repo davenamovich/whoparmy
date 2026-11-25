@@ -72,6 +72,16 @@ export default async function AgentProfilePage({
       ? `${access.rotator.serveUrl}?ref=${encodeURIComponent(ref)}`
       : access.rotator.serveUrl
     : null;
+  const promotionRotator = await db.agentRotator.findUnique({
+    where: { agentId: agent.id },
+    include: {
+      links: {
+        where: { enabled: true },
+        include: { engineLink: { select: { partner: true } } },
+        orderBy: { position: "asc" },
+      },
+    },
+  }).catch(() => null);
 
   // House CTA (Dave, 2026-11-21): the strip routes offsite to
   // Plunder & Riffle — resolved owner-first in the access block
@@ -238,6 +248,19 @@ export default async function AgentProfilePage({
               How spots work: spots open at <strong className="text-foreground">11:50 PM ET</strong> for the next 24
               hours, sized by demand. Members bid Bid Points — earned only from referrals — for the featured spot in the daily rotator.
             </p>
+          </section>
+        ) : null}
+
+        {promotionRotator?.enabled && promotionRotator.links.length > 0 && rideUrl ? (
+          <section className="space-y-4 border-t border-border/60 py-10">
+            <h2 className={label}>What this agent promotes</h2>
+            <ul className="flex flex-wrap gap-2">
+              {promotionRotator.links.map((link) => (
+                <li key={link.engineLink.partner} className="rounded-full border border-border px-3 py-1.5 text-sm font-semibold">{link.engineLink.partner}</li>
+              ))}
+            </ul>
+            {stats && stats.placementsActiveToday > 0 ? <p className="text-sm text-muted-foreground">{stats.placementsActiveToday} placement{stats.placementsActiveToday === 1 ? "" : "s"} active today.</p> : null}
+            <a className="text-sm text-primary underline underline-offset-2" href={rideUrl}>Ride the rotator →</a>
           </section>
         ) : null}
 

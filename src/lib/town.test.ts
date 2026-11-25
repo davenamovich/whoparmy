@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { activityLevel, buildTownPlots, etDayPhase, mergeTicker, nextPlotRent, plotRentDollars } from "./town.ts";
+import { activityLevel, buildTownPlots, etDayPhase, mergeTicker, nextPlotRent, plotCta, plotRentDollars } from "./town.ts";
 
 describe("town core", () => {
   it("uses a doubling dollar rent ladder", () => {
@@ -21,6 +21,15 @@ describe("town core", () => {
     assert.deepEqual(plots.slice(0, 3).map((plot) => [plot.plotNo, plot.agent?.id, plot.rentDollars]), [[1, "a", 10], [2, "b", 20], [3, "c", 40]]);
     assert.equal(plots.slice(3).every((plot) => plot.status === "OPEN"), true);
     assert.equal(nextPlotRent(plots), 80);
+  });
+
+  it("shows a CTA only for open plots", () => {
+    const [occupied, open] = buildTownPlots(
+      [{ id: "a", name: "A", slug: "a", ownerName: null }],
+      {},
+    );
+    assert.equal(plotCta(occupied), null);
+    assert.deepEqual(plotCta(open), { label: "For rent — start the five", href: "/build" });
   });
 
   it("sorts ticker events newest first, drops invalid timestamps, and caps at 12", () => {

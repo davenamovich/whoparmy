@@ -27,6 +27,10 @@ export interface TownPlot {
   level: number;
 }
 
+export function plotCta(plot: TownPlot): { label: string; href: string } | null {
+  return plot.status === "OPEN" ? { label: "For rent — start the five", href: "/build" } : null;
+}
+
 export function buildTownPlots(
   agents: TownAgent[],
   activityByAgentId: Record<string, { slotsUsed7d: number; countedLaunches7d: number }>,

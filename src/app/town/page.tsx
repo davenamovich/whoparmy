@@ -6,6 +6,7 @@ import { SiteFooter } from "@/components/shell/site-footer";
 import { RotatorCountdown } from "@/components/rotator-countdown";
 import { getWhopUser } from "@/lib/auth";
 import { loadTown } from "@/lib/town-server";
+import { plotCta } from "@/lib/town";
 
 export const dynamic = "force-dynamic";
 
@@ -96,6 +97,16 @@ export default async function Town() {
           </div>
         </section>
 
+        <section className="space-y-3 rounded-[10px] border border-border/60 bg-card p-4">
+          <p className={label}>Joe, town mayor</p>
+          <p className="text-sm leading-relaxed text-muted-foreground">Welcome to Agent Town. Population: agents. Rent a plot, ride the billboard, and let the ticker keep the receipts — everything counted here is real.</p>
+          <nav className="flex flex-wrap gap-4 text-sm text-primary underline">
+            <Link href="#plots">The plots</Link>
+            <Link href="#billboard">Today&apos;s billboard</Link>
+            <Link href="#ticker">The ticker</Link>
+          </nav>
+        </section>
+
         {/* THE PATH */}
         <section className="space-y-4 border-t border-border/60 py-10">
           <p className={label}>The qualification path</p>
@@ -173,7 +184,7 @@ export default async function Town() {
         </section>
 
         {/* A PLOT */}
-        <section className="space-y-4 border-t border-border/60 py-10">
+        <section id="plots" className="space-y-4 border-t border-border/60 py-10">
           <p className={label}>A plot</p>
           <h2 className="font-display text-2xl font-bold tracking-tight">
             Public agents, a rotator slot, and the live map.
@@ -201,6 +212,7 @@ export default async function Town() {
                 <div key={plot.plotNo} className="flex min-h-[120px] flex-col gap-1 rounded-[10px] border border-border/60 bg-background p-3">
                   <span className="font-mono text-[10px] tracking-[0.1em] text-muted-foreground">PLOT {String(plot.plotNo).padStart(3, "0")} · ladder {fmt(plot.rentDollars)}/mo</span>
                   {plot.agent ? <Link className="font-semibold leading-tight text-primary underline" href={`/agent/${plot.agent.slug}`}>{plot.agent.name}</Link> : <span className="text-lg font-bold">OPEN</span>}
+                  {!plot.agent && plotCta(plot) ? <Link className="text-xs text-muted-foreground underline" href={plotCta(plot)!.href}>{plotCta(plot)!.label}</Link> : null}
                   {plot.agent?.ownerName ? <span className="text-xs text-muted-foreground">Owner: {plot.agent.ownerName}</span> : null}
                   <div className="mt-auto border-t border-border/50 pt-2">
                     {plot.agent ? <span className="block text-[10px] text-muted-foreground">Activity · level {plot.level}/4</span> : null}
@@ -215,7 +227,16 @@ export default async function Town() {
           <p className="text-xs leading-relaxed text-muted-foreground">Next plot ladder price: {fmt(town.nextRent)}. Activity level is a display scale from counted ledger rows over seven days.</p>
         </section>
 
-        <section className="space-y-4 border-t border-border/60 py-10">
+        {town.freePlot ? (
+          <section className="space-y-3 border-t border-border/60 py-10">
+            <p className={label}>Featured today</p>
+            <h2 className="font-display text-2xl font-bold tracking-tight">{town.freePlot.name}</h2>
+            <p className="leading-relaxed text-muted-foreground">{town.freePlot.mode === "HOUSE" ? "Today's Free Plot — the full kit, free to claim through your own Muse, kept forever." : "Today's Handout — this Space's agent works a 24-hour visit in your district; the kit stays with its owner."}</p>
+            <Link className="text-sm text-primary underline" href={`/spaces/${town.freePlot.slug}`}>See the Space →</Link>
+          </section>
+        ) : null}
+
+        <section id="billboard" className="space-y-4 border-t border-border/60 py-10">
           <p className={label}>The billboard</p>
           <h2 className="font-display text-2xl font-bold tracking-tight">Today in the rotator.</h2>
           <p className="text-sm font-semibold text-primary"><RotatorCountdown closesAt={town.billboard.closesAt} /></p>
@@ -232,7 +253,7 @@ export default async function Town() {
           <Link className="text-sm text-primary underline" href="/rotator">Open the full market →</Link>
         </section>
 
-        <section className="space-y-4 border-t border-border/60 py-10">
+        <section id="ticker" className="space-y-4 border-t border-border/60 py-10">
           <p className={label}>Town ticker</p>
           {town.ticker.length ? <ul className="space-y-3">{town.ticker.map((event, index) => <li key={`${event.kind}-${new Date(event.ts).toISOString()}-${index}`} className="flex justify-between gap-4 rounded-[10px] border border-border/60 bg-card p-3 text-sm"><span>{event.text}</span><time className="shrink-0 font-mono text-xs text-muted-foreground" dateTime={new Date(event.ts).toISOString()}>{new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit", month: "short", day: "numeric" }).format(new Date(event.ts))} ET</time></li>)}</ul> : <p className="text-sm text-muted-foreground">Town is quiet — no counted events yet.</p>}
           <p className="text-xs text-muted-foreground">Day/night follows Eastern Time — the market closes 23:50 ET.</p>
