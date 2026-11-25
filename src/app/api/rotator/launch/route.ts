@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveMarketLaunch } from "@/lib/rotator-market-server";
+import { FREE_DAY_BILLBOARD } from "@/lib/free-day-core";
+import { getFreeDay } from "@/lib/free-day-server";
 
 export const runtime = "nodejs";
 
@@ -17,6 +19,10 @@ export async function GET(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip");
   const meta = { ip, ua: req.headers.get("user-agent"), referer: req.headers.get("referer") };
   try {
+    if (partner === FREE_DAY_BILLBOARD) {
+      const day = await getFreeDay();
+      return NextResponse.redirect(new URL(day?.spaceUrl ?? "/spaces", req.nextUrl.origin), 302);
+    }
     const url = partner ? await resolveMarketLaunch(partner, meta) : null;
     if (url) return NextResponse.redirect(url, 302);
   } catch (err) {

@@ -3,7 +3,8 @@ import { db } from "@/lib/db";
 import { etDateString, getRotatorPool, type RotatorPoolEntry } from "@/lib/rotator";
 import { recordRotatorHop } from "@/lib/rotator-v2";
 import { recordLinkClick } from "@/lib/link-clicks";
-import { getPaidSlotPrices, listPaidSlotsForDate } from "@/lib/paid-slots-server";
+import { getPaidSlotPrices, listPaidSlotsForDate, placedPaidSlot } from "@/lib/paid-slots-server";
+import { FREE_DAY_SOURCE } from "@/lib/free-day-core";
 import { partnerNameSync } from "@/lib/offer-catalog";
 import {
   addDaysToEtDate,
@@ -65,6 +66,7 @@ export const MARKET_HOUSE_URL = "https://whop.plunderandriffle.com/play";
 
 const impLinkId = (partner: string) => `market-imp:${partner}`;
 const clickLinkId = (partner: string) => `market-click:${partner}`;
+const FREE_DAY_SLOT_PREFIX = "free-day-slot:";
 
 export interface MarketTodayView {
   date: string;
@@ -92,7 +94,7 @@ async function inventoryFor(dates: string[], today: string): Promise<MarketDayIn
     where: { date: { in: dates } },
     include: { _count: { select: { bids: true } } },
   });
-  const [prices, paidCounts] = await Promise.all([getPaidSlotPrices(), Promise.all(dates.map(date => db.paidRotatorSlot.count({ where: { date } })))]);
+  const [prices, paidCounts] = await Promise.all([getPaidSlotPrices(), Promise.all(dates.map(date => db.paidRotatorSlot.count({ where: { date, ...placedPaidSlot } })))]);
   const byDate = new Map(days.map((d) => [d.date, d]));
   return dates.map((date, i) => {
     const day = byDate.get(date);
@@ -164,7 +166,7 @@ export async function loadMarketToday(now = new Date()): Promise<{ view: MarketT
 
   const paidSlots = await listPaidSlotsForDate(today);
   internal.push(...paidSlots.map((slot) => ({
-    partner: slot.partner,
+    partner: slot.source === FREE_DAY_SOURCE ? `${FREE_DAY_SLOT_PREFIX}${slot.id}` : slot.partner,
     partnerName: partnerNameSync(slot.partner),
     host: hostOf(slot.url),
     source: "paid" as const,
@@ -226,12 +228,15 @@ export async function resolveMarketLaunch(
   meta: { ip: string | null; ua: string | null; referer: string | null },
 ): Promise<string | null> {
   const today = etDateString();
-  let target: { url: string; userId: string | null; agentId: string | null } | null = null;
+  let target: { url: string; userId: string | null; agentId: string | null; canonicalPartner?: string } | null = null;
 
   if (partner === MARKET_HOUSE_PARTNER) {
     target = { url: MARKET_HOUSE_URL, userId: null, agentId: null };
+  } else if (partner.startsWith(FREE_DAY_SLOT_PREFIX)) {
+    const credit = await db.paidRotatorSlot.findFirst({ where: { id: partner.slice(FREE_DAY_SLOT_PREFIX.length), date: today, source: FREE_DAY_SOURCE, redeemedAt: { not: null } } });
+    if (credit) target = { url: credit.url, userId: credit.userId, agentId: null, canonicalPartner: credit.partner };
   } else {
-    const paid = await db.paidRotatorSlot.findFirst({ where: { date: today, partner } });
+    const paid = await db.paidRotatorSlot.findFirst({ where: { date: today, partner, source: "paid" }, orderBy: { createdAt: "asc" } });
     if (paid) target = { url: paid.url, userId: paid.userId, agentId: null };
     else {
       const pool = await getRotatorPool(today);
@@ -250,7 +255,7 @@ export async function resolveMarketLaunch(
     code: "marketplace",
     meta,
   });
-  await recordLinkClick({ ownerUserId: target.userId, partner, source: "rotator" });
+  await recordLinkClick({ ownerUserId: target.userId, partner: target.canonicalPartner ?? partner, source: "rotator" });
   return target.url;
 }
 

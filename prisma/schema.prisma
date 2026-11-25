@@ -368,6 +368,7 @@ model Application {
   whopProductId       String?
   whopPlanId          String?
   whopProductError    String?
+  handoutOptIn        Boolean  @default(false)
   public              Boolean  @default(false)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
@@ -392,6 +393,7 @@ model MarketplaceSale {
   platformCents    Int
   referrerCents    Int
   rail             String
+  source           String?
   whopMembershipId String?     @unique
   txHash           String?     @unique
   status           String      @default("ACTIVE") // ACTIVE | VOID
@@ -401,6 +403,36 @@ model MarketplaceSale {
   @@index([buyerUserId])
   @@index([sellerUserId])
   @@index([referrerUserId])
+}
+
+model FreeDay {
+  date         String   @id
+  spaceId      String
+  slug         String
+  name         String
+  mode         String
+  createdAt    DateTime @default(now())
+
+  @@index([spaceId, date])
+}
+
+model FreeDayClaim {
+  id           String   @id @default(cuid())
+  userId       String
+  spaceId      String
+  date         String
+  claimKey     String
+  slug         String
+  name         String
+  kind         String
+  grantId      String?
+  expiresAt    DateTime?
+  kitJson      String?
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, claimKey])
+  @@unique([userId, date])
+  @@index([userId, slug, kind])
 }
 
 model KitPurchaseIntent {
@@ -981,6 +1013,9 @@ model PaidRotatorSlot {
   priceCents   Int
   txHash       String
   settlementId String?
+  source       String   @default("paid")
+  expiresAt    DateTime?
+  redeemedAt   DateTime?
   createdAt    DateTime @default(now())
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 

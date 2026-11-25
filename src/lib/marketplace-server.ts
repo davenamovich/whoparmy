@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
+import type { Application, Prisma } from "@prisma/client";
 import { cleanAppFields, slugify, uniqueSlug, type AppFieldInput } from "@/lib/application";
 import { capabilitiesFromJson } from "@/lib/agent-profile";
 import { runBattery, validateBundle, splitSale, canDownloadKit, parseSkillsyncUrl, type Bundle, type Manifest, type SkillsyncProbeOutcome } from "@/lib/marketplace";
@@ -12,7 +13,24 @@ import { BASE_USDC, HOUSE_EVM, INTENT_TTL_MS, isIntentExpired, verifyUsdcPayment
 const ENTITLED_STATUSES = new Set(["active", "trialing", "past_due", "completed", "canceling"]);
 const CLOSED_STATUSES = new Set(["canceled", "expired", "unresolved", "drafted"]);
 
-export class MarketplaceError extends Error { constructor(message: string, public status = 400) { super(message); } }
+export class MarketplaceError extends Error {
+  readonly status: number;
+  constructor(message: string, status = 400) { super(message); this.status = status; }
+}
+
+function handoutSetting(value: unknown) {
+  if (value === undefined) return {};
+  if (typeof value !== "boolean") throw new MarketplaceError("handoutOptIn must be a boolean.");
+  return { handoutOptIn: value };
+}
+
+export async function grantMarketplaceBundle(store: Prisma.TransactionClient, userId: string, now = new Date()) {
+  await store.user.updateMany({ where: { id: userId, marketplaceBundleAt: null }, data: { marketplaceBundleAt: now } });
+}
+
+export function recordMarketplaceGrant(store: Prisma.TransactionClient, data: Omit<Prisma.MarketplaceSaleUncheckedCreateInput, "sellerCents" | "platformCents" | "referrerCents">) {
+  return store.marketplaceSale.create({ data: { ...data, ...splitSale(data.grossCents) } });
+}
 // M1 registry: the house replication skill named in HOUSE_SPACE and the house skills documented in the app manifest.
 // Real skill registry for the battery's manifest check (M1 seeded this
 // with descriptive strings copied from the house listing's manifest —
@@ -71,7 +89,8 @@ async function executeBattery(bundle: unknown, manifestRaw: unknown, listing: { 
   return runBattery({ bundle: validated.ok ? validated.bundle : bundle, manifest: parseManifest(manifestRaw), listing, demoProbe, skillExists, oneInput, skillsyncUrl: skillsyncUrl ?? null, skillsyncProbe });
 }
 
-export async function submitSpace(userId: string, body: AppFieldInput & { agentSlug?: unknown; bundle?: unknown; oneInput?: unknown }) {
+export async function submitSpace(userId: string, body: AppFieldInput & { agentSlug?: unknown; bundle?: unknown; oneInput?: unknown; handoutOptIn?: unknown }) {
+  const handout = handoutSetting(body.handoutOptIn);
   if (typeof body.agentSlug !== "string" || !body.agentSlug.trim()) throw new MarketplaceError("agentSlug is required.");
   const agent = await db.hiredAgent.findFirst({ where: { slug: body.agentSlug, userId } });
   if (!agent) throw new MarketplaceError("Agent not found or not owned by this member.", 403);
@@ -86,25 +105,26 @@ export async function submitSpace(userId: string, body: AppFieldInput & { agentS
   });
   const same = owned;
   const application = same
-    ? await db.application.update({ where: { id: same.id }, data: { agentId: agent.id, name: data.name!, description: data.description ?? null, liveUrl: data.liveUrl ?? null, screenshotUrl: data.screenshotUrl ?? null, repoUrl: data.repoUrl ?? null, buildPrompt: data.buildPrompt ?? null, videoUrl: data.videoUrl ?? null, priceCents: data.priceCents ?? 0, currency: data.currency ?? "USD", category: data.category ?? null, demoKind: data.demoKind ?? null, buyUrl: data.buyUrl ?? null, skillsyncUrl: data.skillsyncUrl ?? null, replicationManifest: data.replicationManifest ?? null, public: false, listingStatus: "IN_REVIEW" } })
-    : await db.application.create({ data: { agentId: agent.id, userId, slug: candidate, name: data.name!, description: data.description ?? null, liveUrl: data.liveUrl ?? null, screenshotUrl: data.screenshotUrl ?? null, repoUrl: data.repoUrl ?? null, buildPrompt: data.buildPrompt ?? null, videoUrl: data.videoUrl ?? null, priceCents: data.priceCents ?? 0, currency: data.currency ?? "USD", category: data.category ?? null, demoKind: data.demoKind ?? null, buyUrl: data.buyUrl ?? null, skillsyncUrl: data.skillsyncUrl ?? null, replicationManifest: data.replicationManifest ?? null, public: false, listingStatus: "IN_REVIEW" } });
+    ? await db.application.update({ where: { id: same.id }, data: { ...handout, agentId: agent.id, name: data.name!, description: data.description ?? null, liveUrl: data.liveUrl ?? null, screenshotUrl: data.screenshotUrl ?? null, repoUrl: data.repoUrl ?? null, buildPrompt: data.buildPrompt ?? null, videoUrl: data.videoUrl ?? null, priceCents: data.priceCents ?? 0, currency: data.currency ?? "USD", category: data.category ?? null, demoKind: data.demoKind ?? null, buyUrl: data.buyUrl ?? null, skillsyncUrl: data.skillsyncUrl ?? null, replicationManifest: data.replicationManifest ?? null, public: false, listingStatus: "IN_REVIEW" } })
+    : await db.application.create({ data: { ...handout, agentId: agent.id, userId, slug: candidate, name: data.name!, description: data.description ?? null, liveUrl: data.liveUrl ?? null, screenshotUrl: data.screenshotUrl ?? null, repoUrl: data.repoUrl ?? null, buildPrompt: data.buildPrompt ?? null, videoUrl: data.videoUrl ?? null, priceCents: data.priceCents ?? 0, currency: data.currency ?? "USD", category: data.category ?? null, demoKind: data.demoKind ?? null, buyUrl: data.buyUrl ?? null, skillsyncUrl: data.skillsyncUrl ?? null, replicationManifest: data.replicationManifest ?? null, public: false, listingStatus: "IN_REVIEW" } });
   const submission = await db.marketplaceSubmission.create({ data: { userId, kind: "SPACE", refId: application.id, kitJson: JSON.stringify(bundle.bundle) } });
   const battery = await executeBattery(bundle.bundle, data.replicationManifest, { name: data.name!, priceCents: data.priceCents ?? 0, demoKind: data.demoKind ?? null, videoUrl: data.videoUrl ?? null }, body.oneInput, data.skillsyncUrl ?? null);
   const saved = await storedBattery(submission.id, battery, battery.status === "READY" ? "READY" : "IN_REVIEW", application.id);
   return { submission: saved, application: { ...application, listingStatus: battery.status === "READY" ? "READY" : "IN_REVIEW", public: false }, battery };
 }
 
-export async function submitAgent(userId: string, body: { agentSlug?: unknown; bundle?: unknown; oneInput?: unknown }) {
+export async function submitAgent(userId: string, body: { agentSlug?: unknown; bundle?: unknown; oneInput?: unknown; handoutOptIn?: unknown }) {
+  const handout = handoutSetting(body.handoutOptIn);
   if (typeof body.agentSlug !== "string" || !body.agentSlug.trim()) throw new MarketplaceError("agentSlug is required.");
   const agent = await db.hiredAgent.findFirst({ where: { slug: body.agentSlug, userId } });
   if (!agent) throw new MarketplaceError("Agent not found or not owned by this member.", 403);
   if (!agent.publicProfile || !agent.name.trim() || !agent.category || capabilitiesFromJson(agent.capabilitiesJson).length === 0) throw new MarketplaceError("Agent profile is not ready for submission.");
   const bundle = validateBundle(body.bundle); if (!bundle.ok) throw new MarketplaceError(bundle.error);
   let capabilityKeys: unknown[] = capabilitiesFromJson(agent.capabilitiesJson);
-  const existingApp = await db.application.findFirst({ where: { userId, agentId: agent.id } });
+  const existingApp = await db.application.findFirst({ where: { userId, agentId: agent.id, listingStatus: { not: "CATALOG" } } });
   const app = existingApp
-    ? await db.application.update({ where: { id: existingApp.id }, data: { slug: agent.slug ?? existingApp.slug, name: agent.name, description: agent.description, liveUrl: agent.spaceUrl ?? agent.appUrl, videoUrl: agent.demoUrl, category: agent.category, buildPrompt: agent.buildPrompt, public: false, listingStatus: "IN_REVIEW" } })
-    : await db.application.create({ data: { agentId: agent.id, userId, slug: agent.slug ?? `agent-${agent.id}`, name: agent.name, description: agent.description, liveUrl: agent.spaceUrl ?? agent.appUrl, videoUrl: agent.demoUrl, category: agent.category, buildPrompt: agent.buildPrompt, public: false, listingStatus: "IN_REVIEW" } });
+    ? await db.application.update({ where: { id: existingApp.id }, data: { ...handout, slug: agent.slug ?? existingApp.slug, name: agent.name, description: agent.description, liveUrl: agent.spaceUrl ?? agent.appUrl, videoUrl: agent.demoUrl, category: agent.category, buildPrompt: agent.buildPrompt, public: false, listingStatus: "IN_REVIEW" } })
+    : await db.application.create({ data: { ...handout, agentId: agent.id, userId, slug: agent.slug ?? `agent-${agent.id}`, name: agent.name, description: agent.description, liveUrl: agent.spaceUrl ?? agent.appUrl, videoUrl: agent.demoUrl, category: agent.category, buildPrompt: agent.buildPrompt, public: false, listingStatus: "IN_REVIEW" } });
   const submission = await db.marketplaceSubmission.create({ data: { userId, kind: "AGENT", refId: agent.id, kitJson: JSON.stringify(bundle.bundle) } });
   const battery = await executeBattery(bundle.bundle, { skills: capabilitiesFromJson(agent.capabilitiesJson), keys: capabilityKeys }, { name: agent.name, priceCents: 0, demoKind: null, videoUrl: agent.demoUrl }, body.oneInput, app.skillsyncUrl ?? null);
   const saved = await storedBattery(submission.id, battery, battery.status === "READY" ? "READY" : "IN_REVIEW", app.id);
@@ -158,7 +178,7 @@ export async function confirmListingFees(userId: string): Promise<{ confirmed: n
       await db.application.update({ where: { id: intent.applicationId }, data: { feeStatus: "PAID" } });
       confirmed++;
     }
-    if (confirmed && !user.marketplaceBundleAt) await db.user.update({ where: { id: userId }, data: { marketplaceBundleAt: new Date() } });
+    if (confirmed && !user.marketplaceBundleAt) await grantMarketplaceBundle(db, userId);
     return { confirmed };
   } catch (err) { return { confirmed: 0, error: err instanceof Error ? err.message : "Whop fee confirmation failed." }; }
 }
@@ -205,6 +225,12 @@ async function findPublishedListing(slug: string) {
   return db.application.findFirst({ where: { slug, public: true, listingStatus: "PUBLISHED" }, include: { agent: true } });
 }
 
+export async function hasActiveWhopKit(userId: string, planId: string) {
+  const user = await db.user.findUnique({ where: { id: userId }, select: { whopId: true } });
+  if (!user?.whopId) return false;
+  return (await whopListMemberships()).some((membership) => membership.userId === user.whopId && membership.planId === planId && ENTITLED_STATUSES.has(membership.status));
+}
+
 export async function confirmWhopSalesForBuyer(buyerUserId: string): Promise<{ created: number; voided: number }> {
   const user = await db.user.findUnique({ where: { id: buyerUserId }, select: { whopId: true, referredById: true } });
   if (!user?.whopId) return { created: 0, voided: 0 };
@@ -216,9 +242,8 @@ export async function confirmWhopSalesForBuyer(buyerUserId: string): Promise<{ c
     if (!listing) continue;
     const prior = await db.marketplaceSale.findUnique({ where: { whopMembershipId: membership.id } });
     if (ENTITLED_STATUSES.has(membership.status) && !prior) {
-      const split = splitSale(listing.priceCents);
       try {
-        await db.marketplaceSale.create({ data: { listingId: listing.id, buyerUserId, sellerUserId: listing.userId, referrerUserId: user.referredById, grossCents: listing.priceCents, ...split, rail: "WHOP", whopMembershipId: membership.id } });
+        await recordMarketplaceGrant(db, { listingId: listing.id, buyerUserId, sellerUserId: listing.userId, referrerUserId: user.referredById, grossCents: listing.priceCents, rail: "WHOP", whopMembershipId: membership.id });
         created++;
       } catch (error) { if (!(error && typeof error === "object" && "code" in error && error.code === "P2002")) throw error; }
     } else if (CLOSED_STATUSES.has(membership.status) && prior?.status === "ACTIVE") {
@@ -238,15 +263,25 @@ export async function getBuyInfo(userId: string, slug: string) {
 }
 
 export async function getKitForBuyer(userId: string, slug: string) {
+  const retained = await db.freeDayClaim.findFirst({ where: { userId, slug, kind: "KIT", kitJson: { not: null } } });
+  if (retained?.kitJson) return JSON.parse(retained.kitJson) as Awaited<ReturnType<typeof readMarketplaceKit>>;
   await confirmWhopSalesForBuyer(userId);
   const listing = await findPublishedListing(slug);
   if (!listing) throw new MarketplaceError("Listing not found.", 404);
-  const [sale, submission] = await Promise.all([
-    db.marketplaceSale.findFirst({ where: { listingId: listing.id, buyerUserId: userId, status: "ACTIVE" } }),
-    db.marketplaceSubmission.findFirst({ where: { kind: "SPACE", refId: listing.id, status: "PUBLISHED" }, orderBy: { publishedAt: "desc" } }),
-  ]);
+  const sale = await db.marketplaceSale.findFirst({ where: { listingId: listing.id, buyerUserId: userId, status: "ACTIVE" } });
   if (!canDownloadKit({ isOwner: listing.userId === userId, priceCents: listing.priceCents, hasActiveSale: Boolean(sale) })) return { error: "not_purchased", buyInfo: await getBuyInfo(userId, slug) };
+  return readMarketplaceKit(db, listing);
+}
+
+export async function readMarketplaceKit(store: Prisma.TransactionClient, listing: Application, options?: { includePublicBuildPrompt: boolean }) {
+  const published = (kind: string, refId: string) => store.marketplaceSubmission.findFirst({ where: { userId: listing.userId, status: "PUBLISHED", kind, refId }, orderBy: [{ publishedAt: "desc" }, { id: "asc" }] });
+  let submission = await published("SPACE", listing.id);
+  if (!submission) {
+    const agent = await store.hiredAgent.findUnique({ where: { id: listing.agentId }, select: { slug: true } });
+    if (agent?.slug === listing.slug) submission = await published("AGENT", listing.agentId);
+  }
   let kit: unknown; try { kit = JSON.parse(submission?.kitJson ?? "null"); } catch { kit = null; }
+  if (!kit && options?.includePublicBuildPrompt && listing.public && listing.buildPrompt) kit = { files: [{ path: "BUILD.md", text: listing.buildPrompt }] };
   return { kit, manifest: parseManifest(listing.replicationManifest), skillsyncUrl: listing.skillsyncUrl ?? null };
 }
 
@@ -288,9 +323,8 @@ export async function verifyKitIntent(userId: string, intentId: string, txHash: 
       const listing = await txdb.application.findUnique({ where: { id: current.listingId } });
       const buyer = await txdb.user.findUnique({ where: { id: userId }, select: { referredById: true } });
       if (!listing || listing.listingStatus !== "PUBLISHED" || !listing.public) throw new Error("Listing is no longer available");
-      const split = splitSale(current.amountCents);
       await txdb.kitPurchaseIntent.update({ where: { id: current.id }, data: { status: "PAID", txHash, paidAt: new Date() } });
-      const sale = await txdb.marketplaceSale.create({ data: { listingId: listing.id, buyerUserId: userId, sellerUserId: listing.userId, referrerUserId: buyer?.referredById ?? null, grossCents: current.amountCents, ...split, rail: "BANKR", txHash } });
+      const sale = await recordMarketplaceGrant(txdb, { listingId: listing.id, buyerUserId: userId, sellerUserId: listing.userId, referrerUserId: buyer?.referredById ?? null, grossCents: current.amountCents, rail: "BANKR", txHash });
       return { ok: true as const, sale };
     });
   } catch (error) { return { ok: false as const, reason: error instanceof Error ? error.message : "Could not record payment" }; }
@@ -298,8 +332,8 @@ export async function verifyKitIntent(userId: string, intentId: string, txHash: 
 
 export async function getSellerBalance(userId: string) {
   const [seller, referrals] = await Promise.all([
-    db.marketplaceSale.findMany({ where: { sellerUserId: userId, status: "ACTIVE" }, select: { grossCents: true, sellerCents: true } }),
-    db.marketplaceSale.findMany({ where: { referrerUserId: userId, status: "ACTIVE" }, select: { referrerCents: true } }),
+    db.marketplaceSale.findMany({ where: { sellerUserId: userId, status: "ACTIVE", rail: { not: "FREE" } }, select: { grossCents: true, sellerCents: true } }),
+    db.marketplaceSale.findMany({ where: { referrerUserId: userId, status: "ACTIVE", rail: { not: "FREE" } }, select: { referrerCents: true } }),
   ]);
   const salesCount = seller.length, grossCents = seller.reduce((n, x) => n + x.grossCents, 0), sellerCents = seller.reduce((n, x) => n + x.sellerCents, 0), referrerCents = referrals.reduce((n, x) => n + x.referrerCents, 0);
   return { seller: { salesCount, grossCents, sellerCents }, referrer: { referralSalesCount: referrals.length, referrerCents }, payout: { thresholdCents: 2500, payoutReady: sellerCents + referrerCents >= 2500 } };

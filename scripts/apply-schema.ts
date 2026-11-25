@@ -38,6 +38,11 @@ try {
 // each entry is applied only when the column is absent, so it is safe
 // on every boot and never touches existing data.
 const ADDITIVE_COLUMNS: Array<{ table: string; column: string; ddl: string }> = [
+  { table: "Application", column: "handoutOptIn", ddl: 'ALTER TABLE "Application" ADD COLUMN "handoutOptIn" BOOLEAN NOT NULL DEFAULT false' },
+  { table: "MarketplaceSale", column: "source", ddl: 'ALTER TABLE "MarketplaceSale" ADD COLUMN "source" TEXT' },
+  { table: "PaidRotatorSlot", column: "source", ddl: 'ALTER TABLE "PaidRotatorSlot" ADD COLUMN "source" TEXT NOT NULL DEFAULT \'paid\'' },
+  { table: "PaidRotatorSlot", column: "expiresAt", ddl: 'ALTER TABLE "PaidRotatorSlot" ADD COLUMN "expiresAt" DATETIME' },
+  { table: "PaidRotatorSlot", column: "redeemedAt", ddl: 'ALTER TABLE "PaidRotatorSlot" ADD COLUMN "redeemedAt" DATETIME' },
   { table: "Application", column: "videoUrl", ddl: 'ALTER TABLE "Application" ADD COLUMN "videoUrl" TEXT' },
   { table: "Application", column: "priceCents", ddl: 'ALTER TABLE "Application" ADD COLUMN "priceCents" INTEGER NOT NULL DEFAULT 0' },
   { table: "Application", column: "currency", ddl: "ALTER TABLE \"Application\" ADD COLUMN \"currency\" TEXT NOT NULL DEFAULT 'USD'" },

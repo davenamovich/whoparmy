@@ -1,14 +1,40 @@
 import "server-only";
 import { db } from "@/lib/db";
+import type { Prisma } from "@prisma/client";
 import { etDateString } from "@/lib/rotator";
-import { addDaysToEtDate } from "@/lib/rotator-market";
+import { addDaysToEtDate, etWallTimeToUtc } from "@/lib/rotator-market";
+import { FREE_DAY_SOURCE } from "@/lib/free-day-core";
 import { splitCents } from "@/lib/settlement";
 import { BASE_USDC, HOUSE_EVM, INTENT_TTL_MS, isIntentExpired, slotPriceCents, verifyUsdcPayment } from "@/lib/paid-slots";
+
+export const placedPaidSlot: Prisma.PaidRotatorSlotWhereInput = { OR: [{ source: "paid" }, { redeemedAt: { not: null } }] };
+
+export function mintFreeDaySlotCredit(store: Prisma.TransactionClient, userId: string, date: string, claimId: string, now: Date) {
+  return store.paidRotatorSlot.create({ data: {
+    userId, date, intentId: `${FREE_DAY_SOURCE}:${claimId}`, source: FREE_DAY_SOURCE,
+    partner: "", url: "", txHash: "", priceCents: 0, expiresAt: etWallTimeToUtc(addDaysToEtDate(date, 7), 0, 0), createdAt: now,
+  } });
+}
+
+export async function redeemFreeDaySlotCredit(userId: string, input: { creditId: string; date: unknown; partner: unknown }, now = new Date()) {
+  const today = etDateString(now);
+  const { creditId, date, partner } = input;
+  if (typeof date !== "string" || ![today, addDaysToEtDate(today, 1), addDaysToEtDate(today, 2)].includes(date)) throw new Error("Choose today, tomorrow, or the day after");
+  if (typeof partner !== "string" || !partner) throw new Error("Choose a saved link");
+  const link = await db.engineLink.findUnique({ where: { userId_partner: { userId, partner } } });
+  if (!link) throw new Error("Save that link first");
+  const result = await db.paidRotatorSlot.updateMany({
+    where: { id: creditId, userId, source: FREE_DAY_SOURCE, redeemedAt: null, expiresAt: { gt: date === today ? now : etWallTimeToUtc(date, 0, 0) } },
+    data: { date, partner, url: link.url, redeemedAt: now },
+  });
+  if (!result.count) throw new Error("Credit is expired, already used, or unavailable for that date");
+  return db.paidRotatorSlot.findUniqueOrThrow({ where: { id: creditId } });
+}
 
 export async function getPaidSlotPrices(now = new Date()) {
   const today = etDateString(now);
   const dates = [0, 1, 2].map((n) => addDaysToEtDate(today, n));
-  const counts = await Promise.all(dates.map((date) => db.paidRotatorSlot.count({ where: { date } })));
+  const counts = await Promise.all(dates.map((date) => db.paidRotatorSlot.count({ where: { date, source: "paid" } })));
   return dates.map((date, i) => ({ date, priceCents: slotPriceCents({ date, today, paidSlotsSoldThatDay: counts[i], activeUsers: 0 }) }));
 }
 
@@ -19,7 +45,7 @@ export async function createIntent(userId: string, input: { date: unknown; partn
   if (![today, addDaysToEtDate(today, 1), addDaysToEtDate(today, 2)].includes(date)) throw new Error("Choose today, tomorrow, or the day after");
   const link = await db.engineLink.findUnique({ where: { userId_partner: { userId, partner } } });
   if (!link) throw new Error("Save that link first");
-  const sold = await db.paidRotatorSlot.count({ where: { date } });
+  const sold = await db.paidRotatorSlot.count({ where: { date, source: "paid" } });
   const priceCents = slotPriceCents({ date, today, paidSlotsSoldThatDay: sold, activeUsers: 0 });
   const expiresAt = new Date(Date.now() + INTENT_TTL_MS);
   const intent = await db.rotatorPurchaseIntent.create({ data: { userId, date, partner, priceCents, expiresAt } });
@@ -88,14 +114,15 @@ export async function submitPaidTx(userId: string, intentId: string, txHash: str
 }
 
 export async function listPaidSlotsForDate(date: string) {
-  return db.paidRotatorSlot.findMany({ where: { date }, include: { user: { select: { name: true, whopUsername: true } } }, orderBy: { createdAt: "asc" } });
+  return db.paidRotatorSlot.findMany({ where: { date, ...placedPaidSlot }, include: { user: { select: { name: true, whopUsername: true } } }, orderBy: { createdAt: "asc" } });
 }
 
 export async function getMyPaidSlotData(userId: string) {
-  const [intents, slots, prices] = await Promise.all([
+  const [intents, slots, prices, credits] = await Promise.all([
     db.rotatorPurchaseIntent.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 50 }),
-    db.paidRotatorSlot.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 50 }),
+    db.paidRotatorSlot.findMany({ where: { userId, ...placedPaidSlot }, orderBy: { createdAt: "desc" }, take: 50 }),
     getPaidSlotPrices(),
+    db.paidRotatorSlot.findMany({ where: { userId, source: FREE_DAY_SOURCE, redeemedAt: null, expiresAt: { gt: new Date() } }, orderBy: { expiresAt: "asc" } }),
   ]);
-  return { intents, slots, prices };
+  return { intents, slots, prices, credits };
 }

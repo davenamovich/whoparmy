@@ -1,7 +1,10 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { getFreeDay } from "@/lib/free-day-server";
+import { FREE_DAY_BILLBOARD, freeDayTickerEvent } from "@/lib/free-day-core";
+import { placedPaidSlot } from "@/lib/paid-slots-server";
 import { loadMarketToday, type MarketTodayView } from "@/lib/rotator-market-server";
-import { addDaysToEtDate, spotWindowFor } from "@/lib/rotator-market";
+import { addDaysToEtDate, spotWindowFor, type MarketPlacement } from "@/lib/rotator-market";
 import { etDateString } from "@/lib/rotator";
 import { buildTownPlots, etDayPhase, mergeTicker, nextPlotRent, type TownTickerEvent } from "@/lib/town";
 
@@ -20,13 +23,12 @@ const emptyMarket = (): MarketTodayView => ({
   stats: { countedImpressions: 0, countedLaunches: 0 },
 });
 
-export async function loadTown(viewerUserId: string | null) {
-  const now = new Date();
+export async function loadTown(viewerUserId: string | null, now = new Date()) {
   const today = etDateString(now);
   const windowKey = spotWindowFor(now).key;
   const activityDates = Array.from({ length: 7 }, (_, i) => addDaysToEtDate(windowKey, i - 6));
   const since = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  const [agentRows, marketResult, hourParts] = await Promise.all([
+  const [agentRows, marketResult, hourParts, freeDay] = await Promise.all([
     db.hiredAgent.findMany({
       where: { publicProfile: true, slug: { not: null } },
       orderBy: { createdAt: "asc" },
@@ -34,6 +36,7 @@ export async function loadTown(viewerUserId: string | null) {
     }).catch(() => []),
     loadMarketToday(now).catch(() => ({ view: emptyMarket(), internal: [] })),
     Promise.resolve(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "2-digit", hourCycle: "h23" }).format(now)),
+    getFreeDay(now).catch((error) => { console.error("[town] Free-Day flip failed:", error); return null; }),
   ]);
 
   const ownerIds = [...new Set(agentRows.map((agent) => agent.userId))];
@@ -72,7 +75,9 @@ export async function loadTown(viewerUserId: string | null) {
     try { tickerEvents.push(...(await query()).map(project)); } catch { /* This ledger may not exist in every deployment yet. */ }
   };
   await Promise.all([
-    readTicker<{ createdAt: Date; priceCents: number; partner: string }>(() => db.paidRotatorSlot.findMany({ orderBy: { createdAt: "desc" }, take: 12, select: { createdAt: true, priceCents: true, partner: true } }), (r) => ({ ts: r.createdAt, kind: "slot", text: `Paid slot bought: ${r.partner} · $${(r.priceCents / 100).toFixed(2)}` })),
+    readTicker<{ createdAt: Date; priceCents: number; partner: string }>(() => db.paidRotatorSlot.findMany({ where: { source: "paid" }, orderBy: { createdAt: "desc" }, take: 12, select: { createdAt: true, priceCents: true, partner: true } }), (r) => ({ ts: r.createdAt, kind: "slot", text: `Paid slot bought: ${r.partner} · $${(r.priceCents / 100).toFixed(2)}` })),
+    readTicker(() => db.freeDay.findMany({ orderBy: { createdAt: "desc" }, take: 12 }), (r) => freeDayTickerEvent(r, r.mode)),
+    readTicker(() => db.freeDayClaim.findMany({ orderBy: { createdAt: "desc" }, take: 12 }), (r) => freeDayTickerEvent(r, r.kind)),
     readTicker(() => db.rotatorBid.findMany({ orderBy: { createdAt: "desc" }, take: 12, include: { day: { select: { date: true } } } }), (r) => ({ ts: r.createdAt, kind: "bid", text: `Bid placed for ${r.day.date}` })),
     readTicker(() => db.rotatorDay.findMany({ where: { status: "CONFIRMED", confirmedAt: { not: null } }, orderBy: { confirmedAt: "desc" }, take: 12, select: { confirmedAt: true, winnerPartner: true, date: true } }), (r) => ({ ts: r.confirmedAt!, kind: "confirmed", text: `Rotator confirmed: ${r.winnerPartner ?? "winner"} · ${r.date}` })),
     readTicker(() => db.application.findMany({ where: { public: true }, orderBy: { createdAt: "desc" }, take: 12, select: { createdAt: true, name: true } }), (r) => ({ ts: r.createdAt, kind: "space", text: `Space listed: ${r.name}` })),
@@ -84,17 +89,26 @@ export async function loadTown(viewerUserId: string | null) {
   if (viewerUserId) {
     const [agents, paidSlots, applications] = await Promise.all([
       db.hiredAgent.findMany({ where: { userId: viewerUserId, publicProfile: true }, orderBy: { createdAt: "asc" }, select: { id: true, name: true, slug: true, createdAt: true } }).catch(() => []),
-      db.paidRotatorSlot.findMany({ where: { userId: viewerUserId, date: { gte: today, lte: addDaysToEtDate(today, 2) } }, orderBy: { date: "asc" }, select: { id: true, partner: true, date: true, priceCents: true, createdAt: true } }).catch(() => []),
+      db.paidRotatorSlot.findMany({ where: { userId: viewerUserId, date: { gte: today, lte: addDaysToEtDate(today, 2) }, ...placedPaidSlot }, orderBy: { date: "asc" }, select: { id: true, partner: true, date: true, priceCents: true, createdAt: true } }).catch(() => []),
       db.application.findMany({ where: { userId: viewerUserId, public: true }, orderBy: { createdAt: "desc" }, select: { id: true, name: true, slug: true, createdAt: true } }).catch(() => []),
     ]);
     viewerDistrict = { agents, paidSlots, applications };
   }
 
   const hour = Number(hourParts);
+  const banner: MarketPlacement[] = freeDay ? [{
+    partner: FREE_DAY_BILLBOARD,
+    partnerName: `${freeDay.mode === "HANDOUT" ? "Handout" : "Free Plot"} · ${freeDay.name}`,
+    host: null,
+    source: freeDay.mode === "HANDOUT" ? "free-placement" : "house",
+    ownerName: null,
+    lifecycle: "ACTIVE",
+  }] : [];
   return {
     plots,
     nextRent: nextPlotRent(plots),
-    billboard: marketResult.view,
+    freePlot: freeDay,
+    billboard: { ...marketResult.view, placements: [...banner, ...marketResult.view.placements] },
     ticker: mergeTicker(tickerEvents),
     phase: etDayPhase(Number.isFinite(hour) ? hour : 0),
     viewerDistrict,

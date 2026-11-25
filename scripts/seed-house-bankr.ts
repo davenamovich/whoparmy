@@ -20,39 +20,9 @@
 // env the app uses to designate operators).
 import { db } from "../src/lib/db";
 import { bindHouseBankr } from "../src/lib/wallet-bind-server";
+import { resolveHouseUserId } from "../src/lib/house-owner";
 
-async function resolveOperatorUserId(): Promise<string | null> {
-  const direct = process.env.HOUSE_BIND_USER_ID?.trim();
-  if (direct) {
-    const user = await db.user.findUnique({ where: { id: direct }, select: { id: true } });
-    return user?.id ?? null;
-  }
-  const whopId = (process.env.OPERATOR_WHOP_IDS ?? "")
-    .split(",")
-    .map((x) => x.trim())
-    .filter(Boolean)[0];
-  if (whopId) {
-    const user = await db.user.findUnique({ where: { whopId }, select: { id: true } });
-    if (user) return user.id;
-  }
-  const username = (process.env.OPERATOR_WHOP_USERNAMES ?? "")
-    .split(",")
-    .map((x) => x.trim().toLowerCase())
-    .filter(Boolean)[0];
-  if (username) {
-    // SQLite has no case-insensitive filter mode in Prisma — scan
-    // the (small) set of users that have a Whop username at all.
-    const candidates = await db.user.findMany({
-      where: { whopUsername: { not: null } },
-      select: { id: true, whopUsername: true },
-    });
-    const hit = candidates.find((u) => u.whopUsername?.toLowerCase() === username);
-    if (hit) return hit.id;
-  }
-  return null;
-}
-
-const userId = await resolveOperatorUserId();
+const userId = await resolveHouseUserId(db);
 if (!userId) {
   console.error(
     "[seed-house-bankr] No operator user found. Set HOUSE_BIND_USER_ID, or OPERATOR_WHOP_IDS / OPERATOR_WHOP_USERNAMES to the operator's Whop identity.",

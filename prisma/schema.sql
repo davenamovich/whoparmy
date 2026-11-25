@@ -260,6 +260,7 @@ CREATE TABLE "Application" (
     "whopProductId" TEXT,
     "whopPlanId" TEXT,
     "whopProductError" TEXT,
+    "handoutOptIn" BOOLEAN NOT NULL DEFAULT false,
     "public" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
@@ -544,6 +545,9 @@ CREATE TABLE "PaidRotatorSlot" (
     "priceCents" INTEGER NOT NULL,
     "txHash" TEXT NOT NULL,
     "settlementId" TEXT,
+    "source" TEXT NOT NULL DEFAULT 'paid',
+    "expiresAt" DATETIME,
+    "redeemedAt" DATETIME,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "PaidRotatorSlot_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
@@ -722,6 +726,7 @@ CREATE TABLE "MarketplaceSale" (
     "platformCents" INTEGER NOT NULL,
     "referrerCents" INTEGER NOT NULL,
     "rail" TEXT NOT NULL,
+    "source" TEXT,
     "whopMembershipId" TEXT,
     "txHash" TEXT,
     "status" TEXT NOT NULL DEFAULT 'ACTIVE',
@@ -730,6 +735,36 @@ CREATE TABLE "MarketplaceSale" (
 );
 
 -- CreateTable
+CREATE TABLE "FreeDay" (
+    "date" TEXT NOT NULL PRIMARY KEY,
+    "spaceId" TEXT NOT NULL,
+    "slug" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "mode" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX "FreeDay_spaceId_date_idx" ON "FreeDay"("spaceId", "date");
+
+CREATE TABLE "FreeDayClaim" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "spaceId" TEXT NOT NULL,
+    "date" TEXT NOT NULL,
+    "claimKey" TEXT NOT NULL,
+    "slug" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "kind" TEXT NOT NULL,
+    "grantId" TEXT,
+    "expiresAt" DATETIME,
+    "kitJson" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX "FreeDayClaim_userId_claimKey_key" ON "FreeDayClaim"("userId", "claimKey");
+CREATE UNIQUE INDEX "FreeDayClaim_userId_date_key" ON "FreeDayClaim"("userId", "date");
+CREATE INDEX "FreeDayClaim_userId_slug_kind_idx" ON "FreeDayClaim"("userId", "slug", "kind");
+
 CREATE TABLE "KitPurchaseIntent" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "listingId" TEXT NOT NULL,
