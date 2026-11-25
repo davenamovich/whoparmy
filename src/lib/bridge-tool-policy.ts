@@ -4,6 +4,8 @@ export const BRIDGE_FREE_TOOLS = new Set([
   "get_job_status",
   "get_account",
   "get_usage",
+  "get_free_day",
+  "claim_free_day",
   "list_ad_options",
   "list_services",
   "check_my_unlock",

@@ -17,13 +17,16 @@ const hooks = registerHooks({
   resolve(specifier, context, nextResolve) {
     if (specifier.startsWith("@/")) return nextResolve(new URL(`../${specifier.slice(2)}.ts`, import.meta.url).href, context);
     if (specifier.startsWith(".") && !/\.[cm]?[jt]sx?$/.test(specifier) && context.parentURL?.startsWith(new URL("../", import.meta.url).href)) return nextResolve(`${specifier}.ts`, context);
+    if (specifier === "next/headers") return nextResolve("next/headers.js", context);
     return nextResolve(specifier, specifier === "server-only" ? { ...context, conditions: [...context.conditions, "react-server"] } : context);
   },
 });
 
 const { db } = await import("./db.ts");
+const { HOUSE_SPACE } = await import("./application.ts");
 const { claimFreeDay, getFreeDay, getHandoutAccess } = await import("./free-day-server.ts");
 const { getKitForBuyer, getSellerBalance, submitAgent, submitSpace } = await import("./marketplace-server.ts");
+const { getBridgeAccountView, proxyToolCall, proxyToolsList } = await import("./muse-bridge.ts");
 const { redeemFreeDaySlotCredit, getPaidSlotPrices, listPaidSlotsForDate } = await import("./paid-slots-server.ts");
 const { loadTown } = await import("./town-server.ts");
 
@@ -118,9 +121,13 @@ test("a Whop kit owner without a local sale gets a credit without writing a paid
     await db.application.update({ where: { id: "house-space" }, data: { whopPlanId: null } });
   });
   context.mock.method(globalThis, "fetch", async () => Response.json({ data: [{ id: "membership-fixture", status: "active", user_id: "whop-kit-owner", variant_id: "kit-plan" }], page_info: { has_next_page: false } }));
-  await db.user.create({ data: { id: "whop-kit-owner", whopId: "whop-kit-owner", email: "whop-kit-owner@test.invalid" } });
+  const owner = await db.user.create({ data: { id: "whop-kit-owner", whopId: "whop-kit-owner", email: "whop-kit-owner@test.invalid" } });
   await db.application.update({ where: { id: "house-space" }, data: { whopPlanId: "kit-plan" } });
-  assert.equal((await claimFreeDay("whop-kit-owner", "2026-10-30", beforeFlip)).kind, "CREDIT");
+  context.mock.timers.enable({ apis: ["Date"], now: beforeFlip });
+  assert.equal((await getBridgeAccountView(owner)).freeDay?.owned, true);
+  const claim = await claimFreeDay(owner.id, "2026-10-30", beforeFlip);
+  assert.equal(claim.kind, "CREDIT");
+  assert.deepEqual((await getBridgeAccountView(owner)).freeDay?.credit, { id: claim.grantId, expiresAt: claim.expiresAt });
   assert.equal(await db.marketplaceSale.count({ where: { buyerUserId: "whop-kit-owner" } }), 0);
 });
 
@@ -165,4 +172,124 @@ test("the built-in house catalog Space grants its public replication kit through
   assert.equal(sale.rail, "FREE");
   const download = await getKitForBuyer("buyer", day!.slug);
   assert.ok("skillsyncUrl" in download && download.skillsyncUrl && download.kit);
+});
+
+test("a first Content Engine KIT claim keeps public fulfillment when a house listing shadows the catalog", async () => {
+  const now = new Date("2026-11-03T05:00:00Z");
+  const listing = await db.application.update({ where: { id: "catalog-collision" }, data: {
+    userId: "house", agentId: "house-agent", name: HOUSE_SPACE.name, public: true, listingStatus: "PUBLISHED",
+  } });
+  const day = await getFreeDay(now);
+  assert.equal(day?.slug, HOUSE_SPACE.slug);
+  assert.equal((await db.freeDay.findUniqueOrThrow({ where: { date: day!.date } })).spaceId, listing.id);
+  const claim = await claimFreeDay("seller", day?.date, now);
+  assert.equal(claim.kind, "KIT");
+  const sale = await db.marketplaceSale.findUniqueOrThrow({ where: { id: claim.grantId! } });
+  assert.equal(sale.listingId, listing.id);
+  assert.equal(sale.rail, "FREE");
+  const stored = await db.freeDayClaim.findUniqueOrThrow({ where: { id: claim.id } });
+  assert.ok(stored.kitJson);
+  const payload = JSON.parse(stored.kitJson);
+  assert.deepEqual(payload.kit, { files: [{ path: "BUILD.md", text: HOUSE_SPACE.buildPrompt }] });
+  assert.equal(payload.skillsyncUrl, HOUSE_SPACE.skillsyncUrl);
+  assert.deepEqual(await getKitForBuyer("seller", listing.slug), payload);
+});
+
+async function bridgeSession(userId: string) {
+  const user = await db.user.findUniqueOrThrow({ where: { id: userId } });
+  return { tokenId: "free-day-token", user, scope: "week" as const, budgetCredits: 0, spentCredits: 0, expiresAt: new Date("2026-12-01T00:00:00Z") };
+}
+
+test("the bridge lists both native Free Day tools with or without the engine tools list", async (context) => {
+  const previous = process.env.WHOP_BRIDGE_KEY;
+  process.env.WHOP_BRIDGE_KEY = "engine-fixture";
+  context.after(() => { if (previous === undefined) delete process.env.WHOP_BRIDGE_KEY; else process.env.WHOP_BRIDGE_KEY = previous; });
+  const session = await bridgeSession("buyer");
+  session.user.whopId = "user_fixture123";
+  let unavailable = false;
+  const methods: string[] = [];
+  const fetchMock = context.mock.method(globalThis, "fetch", async (url: string, request: RequestInit) => {
+    if (url.endsWith("/api/bridge/whop/key")) return Response.json({ ok: true, key: "engine-key" });
+    assert.ok(url.endsWith("/api/mcp"));
+    methods.push(JSON.parse(String(request.body)).method);
+    if (unavailable) return new Response(null, { status: 503 });
+    return Response.json({ result: { tools: [{ name: "get_account" }, { name: "claim_free_day", description: "upstream duplicate" }] } });
+  });
+  const online = await proxyToolsList(session);
+  unavailable = true;
+  const fallback = await proxyToolsList(session);
+  for (const list of [online, fallback]) {
+    const { tools } = list as { tools: Array<{ name: string; description?: string; inputSchema?: unknown }> };
+    assert.ok(tools.some(({ name }) => name === "get_account"));
+    const native = tools.filter(({ name }) => name === "get_free_day" || name === "claim_free_day");
+    assert.deepEqual(native.map(({ name }) => name), ["get_free_day", "claim_free_day"]);
+    assert.deepEqual(native[0].inputSchema, { type: "object", properties: {}, additionalProperties: false });
+    assert.ok(native[1].description?.includes("Pass the date"));
+  }
+  assert.deepEqual(methods, ["tools/list", "tools/list"]);
+  assert.equal(fetchMock.mock.callCount(), 3);
+});
+
+function bridgePayload({ reply, charged }: Awaited<ReturnType<typeof proxyToolCall>>) {
+  assert.equal(charged, 0);
+  assert.ok(!reply.result?.isError, reply.result?.content?.[0]?.text);
+  assert.ok(reply.result?.content?.[0]?.text);
+  return JSON.parse(reply.result.content[0].text);
+}
+
+test("native bridge calls read Free Day and dispatch KIT, CREDIT and VISIT without touching the engine", async (context) => {
+  const previous = process.env.WHOP_BRIDGE_KEY;
+  process.env.WHOP_BRIDGE_KEY = "engine-fixture";
+  context.after(() => { if (previous === undefined) delete process.env.WHOP_BRIDGE_KEY; else process.env.WHOP_BRIDGE_KEY = previous; });
+  const fetchMock = context.mock.method(globalThis, "fetch", async () => { throw new Error("Unexpected network request"); });
+  context.mock.timers.enable({ apis: ["Date"], now: beforeFlip });
+  await db.application.update({ where: { id: "house-space" }, data: { public: true } });
+  await db.application.update({ where: { id: "member-space" }, data: { slug: "zulu-member", name: "Zulu Member", public: true, handoutOptIn: true } });
+  const newcomer = await db.user.create({ data: { email: "bridge-kit@test.invalid", whopId: "user_freeDayKit" } });
+  const owner = await db.user.create({ data: { email: "bridge-credit@test.invalid", whopId: "user_freeDayCredit" } });
+  await db.marketplaceSale.create({ data: { listingId: "house-space", buyerUserId: owner.id, sellerUserId: "house", rail: "BANKR", grossCents: 2000, sellerCents: 1400, platformCents: 300, referrerCents: 300 } });
+  const session = await bridgeSession(newcomer.id);
+  const date = "2026-10-30";
+  const preview = bridgePayload(await proxyToolCall(session, "get_free_day", {}));
+  assert.deepEqual(preview.freeDay, { date, name: "Alpha House", slug: "alpha-house", mode: "HOUSE", endsAt: afterFlip.toISOString(), spaceUrl: "/spaces/alpha-house" });
+  const { claim: granted } = bridgePayload(await proxyToolCall(session, "claim_free_day", { date }));
+  assert.equal(granted.kind, "KIT");
+  assert.equal(granted.expiresAt, null);
+  assert.deepEqual(bridgePayload(await proxyToolCall(session, "claim_free_day", {})).claim, granted);
+  assert.equal((await db.marketplaceSale.findUniqueOrThrow({ where: { id: granted.grantId } })).buyerUserId, newcomer.id);
+  const { claim: credit } = bridgePayload(await proxyToolCall(await bridgeSession(owner.id), "claim_free_day", { date }));
+  assert.equal(credit.kind, "CREDIT");
+  assert.equal(credit.expiresAt, "2026-11-06T05:00:00.000Z");
+  context.mock.timers.setTime(afterFlip.getTime());
+  const stale = await proxyToolCall(session, "claim_free_day", { date });
+  assert.equal(stale.charged, 0);
+  assert.equal(stale.reply.result?.isError, true);
+  assert.match(stale.reply.result?.content?.[0]?.text ?? "", /Free Day has flipped/);
+  assert.equal(await db.freeDayClaim.count({ where: { userId: newcomer.id, date: "2026-10-31" } }), 0);
+  const { claim: visit } = bridgePayload(await proxyToolCall(session, "claim_free_day", { date: "2026-10-31" }));
+  assert.equal(visit.kind, "VISIT");
+  assert.equal(visit.expiresAt, "2026-11-01T04:00:00.000Z");
+  assert.equal(visit.grantId, null);
+  assert.equal((await db.freeDayClaim.findUniqueOrThrow({ where: { id: visit.id } })).kitJson, null);
+  assert.equal(fetchMock.mock.callCount(), 0);
+  context.mock.timers.setTime(beforeFlip.getTime());
+  const account = await getBridgeAccountView(owner);
+  assert.deepEqual(account.freeDay, { date, name: "Alpha House", slug: "alpha-house", ownerKind: "house", mode: "HOUSE", endsAt: afterFlip.toISOString(), claimed: true, owned: true, credit: { id: credit.grantId, expiresAt: new Date(credit.expiresAt) } });
+  context.mock.timers.setTime(Date.parse("2026-11-01T04:00:00Z"));
+  assert.deepEqual((await getBridgeAccountView(newcomer)).freeDay, { ...account.freeDay, date: "2026-11-01", endsAt: "2026-11-02T05:00:00.000Z", credit: null });
+});
+
+test("the bridge account shows unclaimed and claimed Handout state, and null with no rotation", async (context) => {
+  context.mock.timers.enable({ apis: ["Date"], now: afterFlip });
+  const user = await db.user.create({ data: { email: "bridge-handout@test.invalid" } });
+  const day = { date: "2026-10-31", name: "Zulu Member", slug: "zulu-member", ownerKind: "member", mode: "HANDOUT", endsAt: "2026-11-01T04:00:00.000Z", claimed: false, owned: false, credit: null };
+  assert.deepEqual((await getBridgeAccountView(user)).freeDay, day);
+  await claimFreeDay(user.id, day.date);
+  assert.deepEqual((await getBridgeAccountView(user)).freeDay, { ...day, claimed: true });
+  process.env.HOUSE_BIND_USER_ID = "nonexistent-house";
+  context.after(() => { process.env.HOUSE_BIND_USER_ID = "house"; });
+  await db.application.updateMany({ data: { handoutOptIn: false } });
+  context.mock.timers.setTime(Date.parse("2026-11-25T17:00:00Z"));
+  assert.equal((await getBridgeAccountView(user)).freeDay, null);
+  assert.deepEqual(bridgePayload(await proxyToolCall(await bridgeSession(user.id), "get_free_day", {})), { freeDay: null });
 });

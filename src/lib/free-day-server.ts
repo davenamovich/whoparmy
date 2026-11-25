@@ -73,11 +73,41 @@ function claimView(claim: FreeDayClaim) {
   return { id: claim.id, date: claim.date, slug: claim.slug, kind: claim.kind, grantId: claim.grantId, expiresAt: claim.expiresAt, source: FREE_DAY_SOURCE };
 }
 
+async function hasActiveSale(store: Prisma.TransactionClient, listingId: string, userId: string) {
+  return Boolean(await store.marketplaceSale.findFirst({ where: { listingId, buyerUserId: userId, status: "ACTIVE" }, select: { id: true } }));
+}
+
 export async function getFreeDay(now = new Date()) {
   return freeDayTransaction(async (store) => {
     const day = await ensureFreeDay(store, etDateStringFrom(now), now);
     return day && await validatePick(store, day) ? dayView(day) : null;
   });
+}
+
+export async function getFreeDayForUser(userId: string, now = new Date()) {
+  const state = await freeDayTransaction(async (store) => {
+    const day = await ensureFreeDay(store, etDateStringFrom(now), now);
+    if (!day) return null;
+    const pick = await validatePick(store, day);
+    if (!pick) return null;
+    const { date, name, slug, mode, endsAt } = dayView(day);
+    const ownerKind = mode === "HOUSE" ? "house" as const : "member" as const;
+    const listing = pick.listing;
+    const claimKey = freeDayClaimKey(mode, day.spaceId, date);
+    const claim = await store.freeDayClaim.findUnique({ where: { userId_date: { userId, date } } })
+      ?? (mode === "HOUSE" ? await store.freeDayClaim.findUnique({ where: { userId_claimKey: { userId, claimKey } } }) : null);
+    const owned = mode === "HOUSE" && (pick.houseId === userId || Boolean(listing && await hasActiveSale(store, listing.id, userId)));
+    const whopPlan = mode === "HOUSE" && !owned && listing?.listingStatus === "PUBLISHED" && listing.priceCents > 0 ? listing.whopPlanId : null;
+    const credit = claim?.kind === "CREDIT" && claim.grantId && claim.expiresAt ? { id: claim.grantId, expiresAt: claim.expiresAt } : null;
+    return { view: { date, name, slug, ownerKind, mode, endsAt, claimed: Boolean(claim), owned, credit }, whopPlan };
+  });
+  if (!state) return null;
+  if (state.whopPlan) state.view.owned = await hasActiveWhopKit(userId, state.whopPlan);
+  return state.view;
+}
+
+function contentEngineKit() {
+  return { kit: { files: [{ path: "BUILD.md", text: HOUSE_SPACE.buildPrompt! }] }, manifest: HOUSE_SPACE.replicationManifest, skillsyncUrl: HOUSE_SPACE.skillsyncUrl };
 }
 
 export async function claimFreeDay(userId: string, expectedDate?: string, now = new Date()) {
@@ -93,7 +123,7 @@ export async function claimFreeDay(userId: string, expectedDate?: string, now = 
     if (prior) return claimView(prior);
     const listing = await db.application.findFirst({ where: { id: day.spaceId, public: true, listingStatus: "PUBLISHED", whopPlanId: { not: null }, priceCents: { gt: 0 } }, select: { userId: true, whopPlanId: true } });
     if (listing?.whopPlanId && listing.userId !== userId) {
-      const recorded = await db.marketplaceSale.findFirst({ where: { listingId: day.spaceId, buyerUserId: userId, status: "ACTIVE" }, select: { id: true } });
+      const recorded = await hasActiveSale(db, day.spaceId, userId);
       if (!recorded) {
         checkedWhopPlan = listing.whopPlanId;
         try { whopOwned = await hasActiveWhopKit(userId, checkedWhopPlan); }
@@ -114,7 +144,7 @@ export async function claimFreeDay(userId: string, expectedDate?: string, now = 
     }
 
     const owned = pick.houseId === userId || (whopOwned && pick.listing?.whopPlanId === checkedWhopPlan)
-      || (pick.listing && await store.marketplaceSale.findFirst({ where: { listingId: pick.listing.id, buyerUserId: userId, status: "ACTIVE" }, select: { id: true } }));
+      || (pick.listing && await hasActiveSale(store, pick.listing.id, userId));
     if (owned) {
       const claim = await store.freeDayClaim.create({ data: { ...data, kind: "CREDIT" } });
       const credit = await mintFreeDaySlotCredit(store, userId, date, claim.id, now);
@@ -125,9 +155,10 @@ export async function claimFreeDay(userId: string, expectedDate?: string, now = 
       agentId: pick.catalogAgentId!, userId: pick.houseId!, slug: catalogListingSlug, name: HOUSE_SPACE.name,
       listingStatus: "CATALOG", skillsyncUrl: HOUSE_SPACE.skillsyncUrl, replicationManifest: JSON.stringify(HOUSE_SPACE.replicationManifest),
     } });
-    const kit = day.spaceId === catalogSpaceId
-      ? { kit: { files: [{ path: "BUILD.md", text: HOUSE_SPACE.buildPrompt! }] }, manifest: HOUSE_SPACE.replicationManifest, skillsyncUrl: HOUSE_SPACE.skillsyncUrl }
+    let kit = day.spaceId === catalogSpaceId
+      ? contentEngineKit()
       : await readMarketplaceKit(store, listing, { includePublicBuildPrompt: true });
+    if (!kit.kit && !kit.skillsyncUrl && listing.slug === HOUSE_SPACE.slug) kit = contentEngineKit();
     if (!kit.kit && !kit.skillsyncUrl) throw new MarketplaceError("Today's house Space has no published kit.", 409);
     const sale = await recordMarketplaceGrant(store, { listingId: listing.id, sellerUserId: listing.userId, buyerUserId: userId, grossCents: 0, rail: "FREE", source: FREE_DAY_SOURCE, createdAt: now });
     await grantMarketplaceBundle(store, userId, now);

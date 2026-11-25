@@ -8,6 +8,8 @@ import { publicUpdateTokenStatus, tokenKind } from "@/lib/update-token-core";
 import { BRIDGE_FREE_TOOLS, bridgeToolAllowedByTables, filterBridgeTools } from "@/lib/bridge-tool-policy";
 export { BRIDGE_FREE_TOOLS } from "@/lib/bridge-tool-policy";
 import { byokViewFromUnlockPayload, type BridgeByokView } from "@/lib/bridge-byok";
+import { claimFreeDay, getFreeDay, getFreeDayForUser } from "@/lib/free-day-server";
+import { MarketplaceError } from "@/lib/marketplace-server";
 export type { BridgeByokView } from "@/lib/bridge-byok";
 
 /**
@@ -655,6 +657,25 @@ export async function proxyToolCall(session: BridgeSession, name: string, args: 
     }
   }
 
+  if (name === "get_free_day" || name === "claim_free_day") {
+    const isClaim = name === "claim_free_day";
+    const { date } = args;
+    if (Object.keys(args).some((key) => !isClaim || key !== "date")) {
+      return toolError(isClaim ? "claim_free_day accepts only the optional date argument." : "get_free_day takes no arguments.");
+    }
+    if (date !== undefined && (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date))) {
+      return toolError("Expected a Free-Day date in YYYY-MM-DD format.");
+    }
+    try {
+      const payload = isClaim ? { claim: await claimFreeDay(session.user.id, date) } : { freeDay: await getFreeDay() };
+      return { reply: { result: { content: [{ type: "text", text: JSON.stringify(payload) }] } }, charged: 0 };
+    } catch (error) {
+      if (error instanceof MarketplaceError) return toolError(error.message);
+      console.error(`[free-day] ${name} failed:`, error);
+      return toolError(isClaim ? "Could not claim Free Day." : "Could not load Free Day.");
+    }
+  }
+
   const member = await getMemberEngineKey(session.user);
   const generating = Object.hasOwn(costs, name);
   const reserve = generating ? estimateToolCostForScope(session.scope, name, args) : 0;
@@ -777,24 +798,40 @@ export async function proxyToolCall(session: BridgeSession, name: string, args: 
   return { reply, charged };
 }
 
+const freeDayTools = [
+  {
+    name: "get_free_day",
+    description: "Free Space of the Day: one Space is free each Eastern Time (ET) day. Call this at the start of a session and tell the owner what's free today in one line. Claim only when the owner asks. Returns the ET date, Space, mode, end time and Space URL, or null if no Space is featured. Pass the returned date to claim_free_day.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "claim_free_day",
+    description: "Claim only on the owner's word. Pass the date from get_free_day; if the ET day has flipped, the claim is refused (409 semantics). Re-read get_free_day before trying again. KIT: the member gets the house Space kit free and keeps it forever. One claim per member per Space; repeating it returns the same grant. CREDIT: if the member already owns today's house Space, claim a free rotator placement credit instead. It expires at midnight ET seven calendar days after the featured day started. Redeem through POST /api/bridge/rotator/paid with {creditId, date, partner}, using the claim's grantId as creditId and the member's saved link for that partner. VISIT: today's member Space is doing a Handout. The claim books a visit so the member's agent can use that Space until midnight ET tonight; the kit is never given.",
+    inputSchema: { type: "object", properties: { date: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" } }, additionalProperties: false },
+  },
+];
+
 /** The member's tool list, filtered to the bridge allowlist. */
 export async function proxyToolsList(session: BridgeSession): Promise<unknown> {
-  const member = await getMemberEngineKey(session.user);
-  const reply = await mcpCall(member.key, "tools/list", {});
-  const tools = (reply.result as unknown as { tools?: Array<{ name?: string }> } | undefined)?.tools;
+  const isEngineTool = (name: string) => bridgeToolAllowedForScope(session.scope, name) && !freeDayTools.some((tool) => tool.name === name);
+  const tools = await (async () => {
+    const member = await getMemberEngineKey(session.user);
+    const reply = await mcpCall(member.key, "tools/list", {});
+    return (reply.result as { tools?: Array<{ name?: string }> } | undefined)?.tools;
+  })().catch(() => undefined);
   if (!Array.isArray(tools)) {
     // Upstream list unusable: synthesize the allowlist itself rather
     // than handing the member's agent an empty tool list.
     const names = [...BRIDGE_FREE_TOOLS, ...Object.keys(generatingCostsForScope(session.scope))];
     return {
-      tools: names.map((name) => ({
+      tools: [...names.filter(isEngineTool).map((name) => ({
         name,
         description: "Plunder & Riffle engine tool, available through the Muse bridge.",
         inputSchema: { type: "object", properties: {} },
-      })),
+      })), ...freeDayTools],
     };
   }
-  return { tools: filterBridgeTools(tools, (name) => bridgeToolAllowedForScope(session.scope, name)) };
+  return { tools: [...filterBridgeTools(tools, isEngineTool), ...freeDayTools] };
 }
 
 // ─── Member-facing account view ─────────────────────────────────────
@@ -816,6 +853,7 @@ export interface BridgeAccountView {
    * page then keeps its plain allowance presentation.
    */
   byok: BridgeByokView | null;
+  freeDay: Awaited<ReturnType<typeof getFreeDayForUser>>;
   brand: { name: string; website: string | null } | null;
   tokens: Array<{ id: string; budgetCredits: number; spentCredits: number; expiresAt: Date; active: boolean; scope: BridgeScope }>;
   weekBudgetCredits: number;
@@ -845,6 +883,7 @@ export async function getBridgeAccountView(user: User): Promise<BridgeAccountVie
     granted: 0,
     period: null,
     byok: null,
+    freeDay: await getFreeDayForUser(user.id).catch(() => null),
     brand: brand ?? null,
     tokens: tokens.map((t) => ({
       id: t.id,
