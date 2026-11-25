@@ -1,5 +1,8 @@
 export function plotRentDollars(plotNo: number): number {
-  return 10 * 2 ** (plotNo - 1);
+  // Flat $25/mo for every plot (Dave, 2026-11-25 — the $10-doubling
+  // ladder is retired: fill the town fast, occupancy is the asset).
+  void plotNo;
+  return 25;
 }
 
 /** Display scale only: this summarizes ledger activity and is not a traffic claim. */

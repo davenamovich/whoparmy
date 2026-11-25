@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { activityLevel, buildTownPlots, etDayPhase, mergeTicker, nextPlotRent, plotCta, plotRentDollars } from "./town.ts";
 
 describe("town core", () => {
-  it("uses a doubling dollar rent ladder", () => {
-    assert.deepEqual([1, 2, 3, 4].map(plotRentDollars), [10, 20, 40, 80]);
+  it("charges a flat $25 rent for every plot", () => {
+    assert.deepEqual([1, 2, 3, 4, 8].map(plotRentDollars), [25, 25, 25, 25, 25]);
   });
 
   it("maps activity thresholds to the display scale", () => {
@@ -18,9 +18,9 @@ describe("town core", () => {
     assert.ok(empty.every((plot) => plot.status === "OPEN"));
     const agents = ["a", "b", "c"].map((id) => ({ id, name: id, slug: id, ownerName: null }));
     const plots = buildTownPlots(agents, {});
-    assert.deepEqual(plots.slice(0, 3).map((plot) => [plot.plotNo, plot.agent?.id, plot.rentDollars]), [[1, "a", 10], [2, "b", 20], [3, "c", 40]]);
+    assert.deepEqual(plots.slice(0, 3).map((plot) => [plot.plotNo, plot.agent?.id, plot.rentDollars]), [[1, "a", 25], [2, "b", 25], [3, "c", 25]]);
     assert.equal(plots.slice(3).every((plot) => plot.status === "OPEN"), true);
-    assert.equal(nextPlotRent(plots), 80);
+    assert.equal(nextPlotRent(plots), 25);
   });
 
   it("shows a CTA only for open plots", () => {

@@ -126,7 +126,7 @@ describe("composeSetupPrompt — the one agent-creation prompt (2026-11-20)", ()
     assert.match(p, /My Muse is my shopkeeper/);
     assert.match(p, /\$20 per listing, one time/);
     assert.match(p, /70% to me, 15% to P&R, and 15% to my buyer's referrer/);
-    assert.match(p, /rising ladder from \$10 and doubles per plot/);
+    assert.match(p, /flat \$25 a month for every plot/);
     assert.match(p, /https:\/\/app\.skillsync\.com\/iammagicdave\/plunder-and-riffle/);
     assert.match(p, /Whop keeps all sales and splits/);
     assert.match(p, /Muse; I never leave Muse/);
