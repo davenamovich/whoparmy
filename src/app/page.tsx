@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { SiteHeader } from "@/components/shell/site-header";
 import { SiteFooter } from "@/components/shell/site-footer";
 import { stashRefFromUrl } from "@/lib/ref-stash";
+import { ReferralLinkCard } from "@/components/referral-link-card";
 
 /**
  * ─── / — Whop Army 2.0, Slice 1 (Dave's tap, 2026-11-21) ───────────
@@ -26,6 +27,10 @@ import { stashRefFromUrl } from "@/lib/ref-stash";
  * The session probe survives only so operators keep their /admin
  * door in the header. Member rooms and their APIs are untouched —
  * members live in their own agent, reached via /bridge.
+ *
+ * Referral link card (Dave, 2026-11-24): the main page also hands a
+ * connected member their referral link directly (components/
+ * referral-link-card.tsx, fed by GET /api/referrals).
  *
  * Design Engine redo (2026-11-24): shared shell, In→Out engine strip
  * as the signature, crew row, destination cards. Same destinations,
@@ -200,6 +205,13 @@ export default function Home() {
               </a>
             ))}
           </div>
+        </section>
+
+        <section aria-labelledby="referral-heading" className="border-t border-border/60 py-12">
+          <h2 id="referral-heading" className="sr-only">
+            Your referral link
+          </h2>
+          <ReferralLinkCard ready={session !== null} connected={Boolean(session?.connected)} />
         </section>
 
         <SiteFooter />
