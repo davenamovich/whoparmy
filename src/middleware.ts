@@ -134,6 +134,13 @@ export function middleware(req: NextRequest) {
   // fields with the same bearer token. The handler authenticates
   // (session OR bridge token) and 401s anything else.
   const bridgeAgentsMine = path === "/api/agents/mine" && req.method === "GET";
+  // POST /api/bridge/key-claim/exchange + /api/bridge/foundation/confirm
+  // (Foundation-first K2/K3, 2026-11-25) authenticate inside the handlers
+  // with the member's permanent update token (pru_…) as Bearer — the
+  // member's own Muse claiming its durable key / reporting Gate 1 proof.
+  // Only those exact method+paths; the handlers 401 anything else.
+  const bridgeKeyClaimPost = path === "/api/bridge/key-claim/exchange" && req.method === "POST";
+  const bridgeFoundationConfirmPost = path === "/api/bridge/foundation/confirm" && req.method === "POST";
   if (
     path.startsWith("/api/") &&
     process.env.ALLOW_OPERATOR_FALLBACK !== "1" &&
@@ -141,6 +148,8 @@ export function middleware(req: NextRequest) {
     !bridgeLinkSyncPost &&
     !bridgeAgentPatch &&
     !bridgeAgentsMine &&
+    !bridgeKeyClaimPost &&
+    !bridgeFoundationConfirmPost &&
     !PUBLIC_API_PREFIXES.some((p) => path.startsWith(p)) &&
     !req.cookies.get(SESSION_COOKIE_NAME)?.value
   ) {
