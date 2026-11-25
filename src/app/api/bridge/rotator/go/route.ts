@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getRotatorDestination } from "@/lib/rotator";
 import { recordLinkClick } from "@/lib/link-clicks";
 import { recordRotatorHop } from "@/lib/rotator-v2";
+import { appendRefToGameUrl, validRefCode } from "@/lib/rotator-house";
 
 /**
  * PUBLIC — the rotator itself. Every "no sign up link" CTA points
@@ -29,5 +30,10 @@ export async function GET(req: NextRequest) {
       meta: { ip, ua: req.headers.get("user-agent"), referer: req.headers.get("referer") },
     });
   }
-  return NextResponse.redirect(destination.url, 302);
+  // Referrer carry-through (Dave, 2026-11-24): a ?ref= on this door
+  // rides into the BTC Experiment game destination only, so the
+  // visitor's game session attributes to their referrer until they
+  // get their own links in Muse. Offer URLs pass through untouched.
+  const ref = validRefCode(req.nextUrl.searchParams.get("ref"));
+  return NextResponse.redirect(appendRefToGameUrl(destination.url, ref), 302);
 }

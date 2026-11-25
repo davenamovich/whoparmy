@@ -58,3 +58,52 @@ export function pickHouseDestination(dayOfYear: number, dhMediaUrl?: string | nu
   const pool = houseDestinations(dhMediaUrl);
   return pool[Math.abs(dayOfYear - 1) % pool.length];
 }
+
+/**
+ * ─── REFERRER CARRY-THROUGH (Dave, 2026-11-24) ─────────────────────
+ *
+ * Members get their referral links in Muse — a visitor arriving
+ * through an agent's page or the daily rotator has NO link yet.
+ * Until they get one, they ride under their REFERRER's code:
+ * the agent page stashes the owner's code (lib/ref-stash.ts), the
+ * rotator carries ?ref= on its links, and when the rotator sends
+ * the visitor to the BTC Experiment game, the code rides on the
+ * redirect so the game session — and the signup that follows it in
+ * Muse — attributes to the referrer. Whether direct or rotator.
+ *
+ * The ref is appended ONLY to the on-site game URL: member offer
+ * destinations (dh.media etc.) already carry the owner's own
+ * affiliate id in the URL itself, and an extra ?ref= there could
+ * collide with the offer's own parameters.
+ */
+
+const REF_CODE_RE = /^[A-Za-z0-9_-]{1,64}$/;
+
+export function validRefCode(raw: string | null | undefined): string | null {
+  return typeof raw === "string" && REF_CODE_RE.test(raw) ? raw : null;
+}
+
+export function isBtcGameUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.pathname === "/play" || u.pathname.startsWith("/play/");
+  } catch {
+    return url === "/play" || url.startsWith("/play?") || url.startsWith("/play/");
+  }
+}
+
+/** Append the referrer's code to a BTC Experiment game URL. Any
+ *  other URL — and any invalid code — returns the URL unchanged. An
+ *  existing ref on the game URL is never overwritten. */
+export function appendRefToGameUrl(url: string, ref: string | null | undefined): string {
+  const code = validRefCode(ref);
+  if (!code || !isBtcGameUrl(url)) return url;
+  try {
+    const u = new URL(url);
+    if (!u.searchParams.get("ref")) u.searchParams.set("ref", code);
+    return u.toString();
+  } catch {
+    if (/[?&]ref=/.test(url)) return url;
+    return `${url}${url.includes("?") ? "&" : "?"}ref=${encodeURIComponent(code)}`;
+  }
+}

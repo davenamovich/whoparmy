@@ -6,7 +6,7 @@ import { recordLinkClick } from "@/lib/link-clicks";
 import { getPaidSlotPrices, listPaidSlotsForDate, placedPaidSlot } from "@/lib/paid-slots-server";
 import { FREE_DAY_SOURCE } from "@/lib/free-day-core";
 import { partnerNameSync } from "@/lib/offer-catalog";
-import { BTC_EXPERIMENT_URL } from "@/lib/rotator-house";
+import { appendRefToGameUrl, BTC_EXPERIMENT_URL } from "@/lib/rotator-house";
 import {
   addDaysToEtDate,
   etDayEndsAt,
@@ -229,6 +229,7 @@ export async function recordMarketImpressions(
 export async function resolveMarketLaunch(
   partner: string,
   meta: { ip: string | null; ua: string | null; referer: string | null },
+  ref?: string | null,
 ): Promise<string | null> {
   const today = etDateString();
   let target: { url: string; userId: string | null; agentId: string | null; canonicalPartner?: string } | null = null;
@@ -259,7 +260,10 @@ export async function resolveMarketLaunch(
     meta,
   });
   await recordLinkClick({ ownerUserId: target.userId, partner: target.canonicalPartner ?? partner, source: "rotator" });
-  return target.url;
+  // Referrer carry-through (Dave, 2026-11-24): the visitor's ref
+  // rides ONLY into the on-site BTC Experiment game, so the game
+  // session attributes to their referrer; offer URLs are untouched.
+  return appendRefToGameUrl(target.url, ref);
 }
 
 // ─── Operator summary (shape lives in lib/rotator-market.ts) ───────

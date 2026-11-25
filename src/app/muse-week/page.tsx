@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { clearStashedRef, readStashedRef, stashRefFromUrl } from "@/lib/ref-stash";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -115,6 +116,25 @@ export default function MuseWeekPage() {
       // the command simply stays in its default language
     }
   }, []);
+
+  // Referrer carry-through (Dave, 2026-11-24): members get their
+  // links in Muse, so a referred visitor may connect HERE first —
+  // stash any ?ref= on arrival, and once connected apply it set-once
+  // (POST /api/referrals, same as /build) so their referrer is
+  // credited whether they arrived direct or through the rotator.
+  const attributedRef = useRef(false);
+  useEffect(() => {
+    stashRefFromUrl();
+  }, []);
+  useEffect(() => {
+    if (!session?.connected || attributedRef.current) return;
+    attributedRef.current = true;
+    const refCode = new URLSearchParams(window.location.search).get("ref") ?? readStashedRef();
+    if (!refCode) return;
+    void fetch("/api/referrals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: refCode }) })
+      .catch(() => undefined)
+      .finally(() => clearStashedRef());
+  }, [session]);
 
   useEffect(() => {
     (async () => {

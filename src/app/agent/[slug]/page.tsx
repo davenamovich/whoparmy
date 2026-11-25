@@ -12,6 +12,8 @@ import { AgentAvatar } from "@/components/agents/agent-avatar";
 import { PhoneFrame } from "@/components/phone-frame";
 import { isVideoFileUrl } from "@/lib/media-url";
 import { CopyBlock } from "@/components/agents/marketplace";
+import { RefStash } from "@/components/ref-stash";
+import { ensureRefCode } from "@/lib/referrals";
 
 export const dynamic = "force-dynamic";
 
@@ -47,10 +49,19 @@ export default async function AgentProfilePage({
   });
   if (!agent) notFound();
 
+  // Referrer carry-through (Dave, 2026-11-24): this page is the
+  // agent's own page to promote — a visitor coming through it is the
+  // owner's referral until they get their own links in Muse. The
+  // owner's code (lazily ensured so every public agent page carries
+  // one) is stashed client-side by <RefStash> and rides the page's
+  // own CTAs; an explicit ?ref= arrival always wins over the owner.
+  const ownerRefCode = agent.user.refCode ?? (await ensureRefCode(agent.userId).catch(() => null));
+  const effectiveRef = ref ?? ownerRefCode;
+
   const profile = serializePublicProfile(agent, agent.user);
   const capabilities = capabilitiesFromJson(agent.capabilitiesJson);
   const isBarry = slug === "btc-barry";
-  const tryUrl = isBarry ? "/build" : profile.demoUrl ?? profile.appUrl ?? "/build";
+  const tryUrl = isBarry ? (effectiveRef ? `/build?ref=${encodeURIComponent(effectiveRef)}` : "/build") : profile.demoUrl ?? profile.appUrl ?? "/build";
 
   // Counted stats + rotator access for this agent (lib/agent-stats.ts).
   const bundle = (await getPublicAgentBundles([agent.id])).get(agent.id);
@@ -80,6 +91,7 @@ export default async function AgentProfilePage({
 
   return (
     <main className="min-h-screen bg-background text-foreground">
+      <RefStash ownerCode={ownerRefCode} />
       <div className="mx-auto flex min-h-screen max-w-2xl flex-col px-5 py-10">
         <SiteHeader />
 
@@ -103,7 +115,7 @@ export default async function AgentProfilePage({
               <a href={tryUrl}>{isBarry ? "GRAB A ROTATOR SPOT" : "TRY AGENT"}</a>
             </Button>
             <Button asChild variant="outline">
-              <a href="/build">BUILD YOUR OWN</a>
+              <a href={effectiveRef ? `/build?ref=${encodeURIComponent(effectiveRef)}` : "/build"}>BUILD YOUR OWN</a>
             </Button>
             {profile.referralUrl ? (
               <Button asChild variant="outline">
@@ -161,7 +173,7 @@ export default async function AgentProfilePage({
           <div className="flex flex-wrap gap-3">
             {isBarry ? (
               <Button asChild>
-                <a href="/build">GET YOUR SPOT — BUILD YOUR AGENT</a>
+                <a href={effectiveRef ? `/build?ref=${encodeURIComponent(effectiveRef)}` : "/build"}>GET YOUR SPOT — BUILD YOUR AGENT</a>
               </Button>
             ) : (
               <>
@@ -204,7 +216,7 @@ export default async function AgentProfilePage({
                 )}
               </li>
               <li className="rounded-[10px] border border-border p-5">
-                <a href={access.dailyRotatorUrl} className="block space-y-1">
+                <a href={effectiveRef ? `${access.dailyRotatorUrl}?ref=${encodeURIComponent(effectiveRef)}` : access.dailyRotatorUrl} className="block space-y-1">
                   <span className="block font-black">Enter the daily rotator →</span>
                   <span className="block text-sm text-muted-foreground">
                     Today&apos;s featured destinations from every agent — one auction, won with Bid Points.

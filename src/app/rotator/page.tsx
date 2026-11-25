@@ -1,6 +1,8 @@
 import { headers } from "next/headers";
 import { loadMarketToday, recordMarketImpressions, MARKET_HOUSE_PARTNER } from "@/lib/rotator-market-server";
 import { RotatorCountdown } from "@/components/rotator-countdown";
+import { RefStash } from "@/components/ref-stash";
+import { validRefCode } from "@/lib/rotator-house";
 import { SiteHeader } from "@/components/shell/site-header";
 import { SiteFooter } from "@/components/shell/site-footer";
 
@@ -56,7 +58,17 @@ function timeLeftToday(dayEndsAt: string): string {
   return h > 0 ? `${h}h ${m}m left today` : `${m}m left today`;
 }
 
-export default async function RotatorMarketplacePage() {
+export default async function RotatorMarketplacePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ ref?: string | string[] }>;
+}) {
+  // Referrer carry-through (Dave, 2026-11-24): a visitor who came
+  // through an agent's page arrives with that owner's ?ref= — it is
+  // stashed for their later Muse connect (<RefStash>) and rides the
+  // launch links, so a launch into the BTC Experiment game carries
+  // their referrer into the game session.
+  const ref = validRefCode(typeof (await searchParams).ref === "string" ? ((await searchParams).ref as string) : null);
   const { view, internal } = await loadMarketToday();
 
   // Impressions: one hop per placement shown, best-effort — a
@@ -73,6 +85,7 @@ export default async function RotatorMarketplacePage() {
 
   return (
     <main className="min-h-screen bg-background text-foreground">
+      <RefStash />
       <div className="mx-auto flex min-h-screen max-w-2xl flex-col px-5 py-10">
         <SiteHeader />
 
@@ -111,7 +124,7 @@ export default async function RotatorMarketplacePage() {
                 </span>
                 <span className="block text-xs text-muted-foreground">{timeLeftToday(view.dayEndsAt)}</span>
                 <a
-                  href={`/api/rotator/launch?partner=${encodeURIComponent(placement.partner)}`}
+                  href={`/api/rotator/launch?partner=${encodeURIComponent(placement.partner)}${ref ? `&ref=${encodeURIComponent(ref)}` : ""}`}
                   className="inline-flex min-h-11 items-center justify-center rounded-full bg-primary px-5 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90"
                 >
                   TRY IT
