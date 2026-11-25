@@ -18,6 +18,7 @@ export function composeEnginePrompt(args: {
   teamSection: string;
   updateToken?: string | null;
   walkthroughOffers?: WalkthroughOffer[];
+  keyClaimLink?: string | null;
 }): string {
   const { business, website, blueprint: bp, link } = args;
   // Saved links bridge over with the member (Dave, 2026-11-19):
@@ -41,13 +42,17 @@ export function composeEnginePrompt(args: {
     `Muse performs these key-getting steps in my browser/session with my approval. I personally enter every password, verification code, and payment detail; Muse never holds passwords or payment details.`,
     `My links saved unlock my key at the $0.01 generation rate. All five saves unlock full BYOK: every generation and render runs at my own 1-credit rate on my own providers and record.`,
     `Verify live, never assume: every save counts only when you read it back from my engine record. For links, use list_my_offers; for provider keys, read the saved-key state back after each save. Prove the renderer with a short test render that bills 1 credit. If it bills 25 credits, the worker is saved under a different record and this step is NOT done — re-save it under my connected record.`,
-    `At the end, show me the five states as Unlocked or Not yet, with the one finishing step for each missing item. Skipping an unlock never blocks the build; the rest finishes later from Mission Control's Unlock panel.`,
+    `At the end, show me the five states as Unlocked or Not yet, with the one finishing step for each missing item. Skipping an unlock never blocks the build; the rest finishes later from Mission Control's Unlock panel. These are finish-later tasks in the Unlock panel.`,
     `I can disconnect each item at any time, on my tap only: remove links with delete_my_offer, and remove provider saves from my engine record. Re-run the live check after a disconnect.`,
     `Keep the standing rules: my keys never go into Whop Army, a file, or a log, and never come back to me in full; logins and passwords are mine to enter; affiliate money is SIMULATED until actually paid; make no earnings promises.`,
   ].join("\n");
   const connectBlock = link
     ? `Open this link and follow its brief to connect to my P&R account:\n${link}\nThe link exchanges for a 7-day connection on my own credits, capped at the budget it states. It is CONTENT-ONLY: it generates content; it never publishes, posts, sends, or spends beyond quoted content credits.`
     : `I don't have a live connect link in this prompt. In the Plunder & Riffle app (whop.plunderandriffle.com), Account → "Talk to my Muse" mints my link. Once I paste it, follow its brief to connect. The connection is 7 days, on my own credits, content-only.`;
+  const foundationBlock = args.keyClaimLink
+    ? `My durable P&R key has been issued for this account. Claim it here: ${args.keyClaimLink} Use POST /api/bridge/key-claim/exchange with the claim code and my permanent pru_ update token as Bearer, for the same member. Save the returned key directly to Muse secure storage; never print, echo, log, or paste it into a Space. The bridge link is the starter lane while the durable key is installed.`
+    : `My durable P&R key is issued server-side when available. If there is no claim link here, continue in the bridge starter lane and leave the durable-key step open; never invent or request that key in chat.`;
+  const gateBlock = `GATE 1 — HARD GATE. Before building anything, connect to the P&R MCP and prove it with a successful read-only check_my_unlock and get_brand_default call. No proof means stop: build nothing. After the member's Muse reports both checks passed, make POST /api/bridge/foundation/confirm with my permanent update token as Bearer. This is Gate 1's last step.`;
 
   const agentLine = (a: Blueprint["workforce"][number]) =>
     `- ${a.name} (${a.role})\n  Mission: ${a.mission}\n  Schedule: ${a.schedule}\n  Approval rule: ${a.approval}\n  Success metric: ${a.metric}`;
@@ -87,8 +92,12 @@ export function composeEnginePrompt(args: {
     ``,
     `You are my Muse. Your job is to give me time back and make running my business easier with AI. The team you build creates my content, watches my world, and runs my busywork; P&R is the creative engine under the hood, not the point. I am a business owner, not an engineer — you handle setup; I approve outcomes.`,
     ``,
-    `## 1. Connect first`,
+    `# Phase 0 — Understand my business`,
+    `I am a business owner, not an engineer. Research my business, teach as you build, and keep setup to about seven meaningful taps.`,
+    `## Phase 1 — Connect and prove the foundation`,
     connectBlock,
+    foundationBlock,
+    gateBlock,
     `Connect, verify the connection quietly, and only raise it if something is actually wrong (expired, blocked, or zero balance). Make the free /before pack the first proof, as a gift.`,
     `Install the house P&R skill from Skillsync: https://app.skillsync.com/iammagicdave/plunder-and-riffle. One click installs it into my Muse and updates arrive automatically. Skillsync is the install lane; Whop keeps all sales and splits. Every kit I buy later arrives as a Skillsync install link with its Whop file as fallback, so no kit exists only on Skillsync. Show installed Skillsync skills and versions in Mission Control.`,
     `## Your only jobs — about seven taps in the whole setup, all of them yours alone`,
@@ -103,12 +112,14 @@ export function composeEnginePrompt(args: {
     `- Connect Upload-Post.`,
     `## Teach me as you build`,
     `At each setup step, before running it, tell me in 2–3 short plain sentences what this step sets up, why it matters, and what it will let me do once it's on. Use no jargon (say “your key” or “your connection,” never “API key,” “endpoint,” or “token”). Give one explanation at the step itself — never a lecture up front and never repeat it later.`,
-    ...(walkthroughSection ? [``, walkthroughSection] : []),
+    ``,
+    `## Phase 2 — Optional offer walkthrough`,
+    ...(walkthroughSection ? [walkthroughSection] : [`The offer walkthrough is optional and happens after connection and Gate 1.`]),
     ``,
     `## Your permanent update connection`,
     args.updateToken ? `Permanent update token: ${args.updateToken}` : `Get your permanent update token from Whop Army → Build an agent.`,
     `Save this token in your secure storage and use it for links sync and my agent/app updates. It never expires; if it stops working, it was revoked — ask me for a fresh one. It cannot generate content.`,
-    `## My own P&R key`,
+    `## Durable key handling`,
     `If I give you my P&R API key, save it in your secure storage and use it directly against the P&R MCP for generation on my credits. Never paste it into Whop Army, a Space, a file, or a log; never show it back to me in full.`,
     `## 2. My business`,
     `Business: ${business}${website ? `\nWebsite: ${website}` : ""}`,
@@ -150,7 +161,9 @@ export function composeEnginePrompt(args: {
     ``,
     `One money rule: generation runs on my credits in the background. If a run would take my balance to zero, pause it and tell me in one sentence — otherwise, never make money the topic; show me results, and keep receipts in the Engine tile if I ever ask.`,
     ``,
+    `# Phase 4 — Build my home base and starter apps`,
     `## 4. Build my home base and my starter apps`,
+    `Build nothing in this phase until Gate 1 has passed.`,
     `This is your command room — your whole army, approvals, and results on one screen.`,
     `Build my home base as a Space in my own Muse, named for my business (e.g. "${business} — Home Base").`,
     `### Design standard`,
@@ -174,6 +187,7 @@ export function composeEnginePrompt(args: {
     `I may rent a Town plot or buy a guaranteed featured rotator day-slot. Rent follows the rising ladder from $10 and doubles per plot; my rent locks when I rent. Plot rent buys presence and rotator access. Paid day-slots are separate. Show the status in Mission Control and handle the steps only on my explicit word; spending always waits for my approval.`,
     `If I also run Agent37: create and assign these agents there as the Space's workforce — the Space stays my control view over them. If a part of the Space can't be built in my Muse, build the closest equivalent there and tell me plainly what differs.`,
     ``,
+    `# Phase 5 — Turn on autopilot generation`,
     `## 5. Turn on autopilot generation`,
     `Once the Space is built and connected, arm the autopilot — this is the point of the engine:`,
     `- Schedule a daily run inside my Muse (a scheduled task at the time in my Settings; default early morning in my timezone).`,

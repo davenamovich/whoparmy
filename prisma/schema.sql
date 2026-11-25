@@ -464,6 +464,19 @@ CREATE TABLE "BridgeCode" (
 );
 
 -- CreateTable
+CREATE TABLE "BridgeKeyClaim" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "codeHash" TEXT NOT NULL,
+    "expiresAt" DATETIME NOT NULL,
+    "usedAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "BridgeKeyClaim_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+CREATE UNIQUE INDEX "BridgeKeyClaim_codeHash_key" ON "BridgeKeyClaim"("codeHash");
+CREATE INDEX "BridgeKeyClaim_userId_idx" ON "BridgeKeyClaim"("userId");
+
+-- CreateTable
 CREATE TABLE "BridgeToken" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "userId" TEXT NOT NULL,

@@ -30,6 +30,7 @@ model User {
   usageRecords           UsageRecord[]
   bridgeConnection       BridgeConnection?
   bridgeCodes            BridgeCode[]
+  bridgeKeyClaims        BridgeKeyClaim[]
   telegramPairCodes      TelegramPairCode[]
   bridgeTokens           BridgeToken[]
   bridgeUpdateTokens     BridgeUpdateToken[]
@@ -883,6 +884,21 @@ model BridgeCode {
   expiresAt     DateTime
   usedAt        DateTime?
   createdAt     DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// One-time claim for handing the member's durable engine key to their Muse.
+// Only the SHA-256 code hash is stored; the key is never persisted here.
+model BridgeKeyClaim {
+  id        String   @id @default(cuid())
+  userId    String
+  codeHash  String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

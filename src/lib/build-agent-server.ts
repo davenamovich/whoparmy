@@ -69,7 +69,22 @@ export interface BuildFlowState {
   prompt?: string;
   promptCreatedAt?: string;
   bridgeEligible?: boolean;
+  foundation?: { lane: "bridge-only" | "durable-pending-proof" | "durable"; keyClaimedAt?: string; mcpProvenAt?: string };
   updatedAt: string;
+}
+
+export function foundationFromState(state: BuildFlowState | null | undefined) {
+  return state?.foundation ?? { lane: "bridge-only" as const };
+}
+
+export async function markFoundationClaimed(userId: string): Promise<void> {
+  const state = await getBuildFlow(userId);
+  await saveBuildFlow(userId, { ...(state ?? { updatedAt: "" }), foundation: { ...(state?.foundation ?? { lane: "bridge-only" }), lane: "durable-pending-proof", keyClaimedAt: new Date().toISOString() } });
+}
+
+export async function confirmFoundation(userId: string, provenAt?: string): Promise<BuildFlowState> {
+  const state = await getBuildFlow(userId);
+  return saveBuildFlow(userId, { ...(state ?? { updatedAt: "" }), foundation: { ...(state?.foundation ?? { lane: "bridge-only" }), lane: "durable", mcpProvenAt: provenAt && !Number.isNaN(Date.parse(provenAt)) ? provenAt : new Date().toISOString() } });
 }
 
 const keyFor = (userId: string) => `buildflow:${userId}`;
@@ -368,6 +383,7 @@ export async function createBuildAgent(user: User, options: { walkthrough?: bool
   // pattern); otherwise the prompt still crafts and says the one step.
   const blueprint = (await getBlueprint(user.id)) ?? (await draftBlueprint(user));
   let code: string | null = null;
+  let keyClaimLink: string | null = null;
   let link: string | null = null;
   let eligible = false;
   try {
@@ -377,6 +393,9 @@ export async function createBuildAgent(user: User, options: { walkthrough?: bool
     code = minted.code;
     link = `https://whop.plunderandriffle.com/connect/${code}`;
     eligible = true;
+    const { mintBridgeKeyClaim } = await import("@/lib/muse-bridge");
+    const claim = await mintBridgeKeyClaim(user.id);
+    keyClaimLink = `https://whop.plunderandriffle.com/key-claim/${claim.code}`;
   } catch (e) {
     if (!(e instanceof BridgeError)) throw e;
   }
@@ -394,6 +413,7 @@ export async function createBuildAgent(user: User, options: { walkthrough?: bool
     savedLinks: await getSavedOfferLinks(user.id).catch(() => []),
     languageLabel: (await getMemberLanguage(user.id).catch(() => null))?.label,
     walkthroughOffers,
+    keyClaimLink,
   });
   const addendum = composeBuildAgentAddendum({
     design,
@@ -402,6 +422,7 @@ export async function createBuildAgent(user: User, options: { walkthrough?: bool
     quiz,
     agentId: agent.id,
     connectLink: link,
+    keyClaimLink,
     bridgeCode: code,
     updateToken,
   });
@@ -431,6 +452,7 @@ export async function createBuildAgent(user: User, options: { walkthrough?: bool
       prompt,
       bridgeCode: code,
       connectLink: link,
+      keyClaimLink,
       bridgeEligible: eligible,
     },
   };

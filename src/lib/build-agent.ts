@@ -372,6 +372,7 @@ export function composeBuildAgentAddendum(args: {
   connectLink: string | null;
   bridgeCode: string | null;
   updateToken?: string | null;
+  keyClaimLink?: string | null;
 }): string {
   const { design } = args;
   const quizLines = quizAnswerLines(args.quiz)
@@ -413,6 +414,7 @@ export function composeBuildAgentAddendum(args: {
     ``,
     `## Connect + manage through the bridge`,
     connectBlock,
+    args.keyClaimLink ? `Durable key claim: ${args.keyClaimLink} — exchange it with the same member's pru_ update token, save the returned key in secure storage, and never print it. The bridge is the starter lane.` : `Durable key claim claim link was not minted; continue in the bridge starter lane.`,
     `Your permanent update connection: ${args.updateToken ?? "Create it from Whop Army → Build an agent."} Save it in your secure storage and use it for links sync and agent/app updates. It never expires; if it stops working, it was revoked — ask me for a fresh one. It cannot generate content.`,
     `My own P&R key: if I give you my P&R API key, save it in your secure storage and use it directly against the P&R MCP for generation on my credits. Never paste it into Whop Army, a Space, a file, or a log; never show it back to me in full.`,
     ``,

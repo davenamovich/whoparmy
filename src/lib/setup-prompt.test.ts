@@ -68,6 +68,28 @@ describe("composeSetupPrompt — the one agent-creation prompt (2026-11-20)", ()
     assert.match(p, /pause and tell me in one plain sentence/);
   });
 
+  it("keeps Gate 1 before starter apps and places the offer walkthrough after it", () => {
+    const p = composeSetupPrompt({ ...base, link: "https://whop.plunderandriffle.com/connect/CODE1", walkthroughOffers: [{ step: "salarium", name: "DH Media", signupUrl: "https://referrer.example/dh", signupSource: "referrer" }] });
+    const gate = p.indexOf("GATE 1 — HARD GATE");
+    const starter = p.indexOf("## 4. Build my home base and my starter apps");
+    const walkthrough = p.indexOf("## 0. Set me up first — walk me through my offers");
+    assert.ok(gate >= 0);
+    assert.ok(starter > gate);
+    assert.ok(walkthrough > gate);
+    assert.match(p, /successful read-only check_my_unlock and get_brand_default/);
+  });
+
+  it("includes the durable claim instructions and bridge starter lane", () => {
+    const link = "https://whop.plunderandriffle.com/key-claim/prk_fixture";
+    const p = composeSetupPrompt({ ...base, link: null, keyClaimLink: link });
+    assert.match(p, new RegExp(link.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.match(p, /POST \/api\/bridge\/key-claim\/exchange/);
+    assert.match(p, /permanent pru_ update token/);
+    assert.match(p, /bridge link is the starter lane/);
+    const fallback = composeSetupPrompt({ ...base, link: null });
+    assert.match(fallback, /no claim link here, continue in the bridge starter lane/);
+  });
+
   it("without a link, the prompt carries the get-your-link step instead", () => {
     const p = composeSetupPrompt({ ...base, link: null });
     assert.match(p, /I don't have a live connect link in this prompt/);

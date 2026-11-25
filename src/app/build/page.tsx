@@ -47,6 +47,7 @@ interface FlowState {
   prompt?: string;
   promptCreatedAt?: string;
   bridgeEligible?: boolean;
+  foundation?: { lane: "bridge-only" | "durable-pending-proof" | "durable"; keyClaimedAt?: string; mcpProvenAt?: string };
 }
 
 interface CreateResult {
@@ -55,6 +56,7 @@ interface CreateResult {
   bridgeCode: string | null;
   connectLink: string | null;
   bridgeEligible: boolean;
+  keyClaimLink?: string | null;
 }
 
 const step = "rounded-[10px] border border-border bg-card p-5 sm:p-6 space-y-3";
@@ -199,6 +201,7 @@ export default function BuildPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<CreateResult | null>(null);
+  const [foundation, setFoundation] = useState<{ keyState?: string; plan?: string | null; credits?: number | null; granted?: number | null; period?: string | null; lane?: string; foundationVerifiedAt?: string | null } | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadState = useCallback(async () => {
@@ -224,6 +227,7 @@ export default function BuildPage() {
       .then((s: Session) => {
         setSession(s);
         if (s.connected) void loadState();
+        if (s.connected) void fetch("/api/build-agent/foundation", { cache: "no-store" }).then((r) => r.json()).then(setFoundation).catch(() => undefined);
       })
       .catch(() => setSession({ connected: false, admin: false, user: null }));
   }, [loadState]);
@@ -338,6 +342,12 @@ export default function BuildPage() {
             <MuseStartCard />
 
             <UpdateTokenCard />
+            <section className={step} aria-label="Foundation">
+              <p className={label}>Foundation</p>
+              <p className="font-semibold">{foundation?.keyState === "issued" && foundation.foundationVerifiedAt ? "Foundation verified" : foundation?.keyState === "issued" ? "Durable key issued — prove it in Muse" : foundation?.keyState === "blocked" ? "Foundation blocked — contact support" : foundation?.keyState === "not_configured" ? "Engine not configured" : foundation?.lane === "bridge-only" ? "Bridge-only — 7-day lane" : "Foundation status unavailable"}</p>
+              {foundation?.plan ? <p className="text-sm text-muted-foreground">Plan: {foundation.plan} · Credits: {foundation.credits ?? "—"} / {foundation.granted ?? "—"} · Period: {foundation.period ?? "—"}</p> : null}
+              <p className="text-sm text-muted-foreground">Next step: use the claim link in your build prompt, then prove Gate 1 in Muse.</p>
+            </section>
 
             {/* ─── Step 1 · Research ─────────────────────────────── */}
             <section className={step} aria-label="Step 1: research">

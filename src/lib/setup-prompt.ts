@@ -57,6 +57,7 @@ export function composeSetupPrompt(args: {
   savedLinks?: SavedOfferLink[];
   languageLabel?: string;
   walkthroughOffers?: WalkthroughOffer[];
+  keyClaimLink?: string | null;
 }): string {
   return composeEnginePrompt({
     ...args,

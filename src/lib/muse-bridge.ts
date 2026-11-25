@@ -1,5 +1,7 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
+import { hashKeyClaimCode, isKeyClaimCode, isUsableKeyClaim } from "./key-claim-core";
+export { hashKeyClaimCode, isKeyClaimCode, isUsableKeyClaim } from "./key-claim-core";
 import type { User } from "@prisma/client";
 import { db } from "@/lib/db";
 import { isDesignatedOperator } from "@/lib/auth";
@@ -62,6 +64,8 @@ export const BRIDGE_TOKEN_PREFIX = "prb_";
 export const UPDATE_TOKEN_PREFIX = "pru_";
 export const BRIDGE_TOKEN_TTL_MS = 7 * 24 * 60 * 60_000; // one pairing = one week
 export const BRIDGE_CODE_TTL_MS = 24 * 60 * 60_000; // 24 hours to paste (Dave, 2026-11-23; was 15 minutes)
+export const BRIDGE_KEY_CLAIM_TTL_MS = 24 * 60 * 60_000;
+export const KEY_CLAIM_PREFIX = "prk_";
 /** The week at list prices: 7 × create_demo_pack (115). The member sees
  *  this number and the bot-quoted balance before anything spends. */
 export const WEEK_BUDGET_CREDITS = 7 * 115;
@@ -446,6 +450,38 @@ const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 function newBridgeCode(): string {
   const raw = randomBytes(8).toString("hex").toUpperCase(); // 16 chars
   return `${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 12)}-${raw.slice(12, 16)}`;
+}
+
+function newKeyClaimCode(): string {
+  return KEY_CLAIM_PREFIX + randomBytes(32).toString("base64url");
+}
+
+export async function mintBridgeKeyClaim(userId: string): Promise<{ code: string; expiresAt: Date }> {
+  const code = newKeyClaimCode();
+  const expiresAt = new Date(Date.now() + BRIDGE_KEY_CLAIM_TTL_MS);
+  await db.$transaction(async (tx) => {
+    await (tx as any).bridgeKeyClaim.updateMany({ where: { userId, usedAt: null }, data: { usedAt: new Date() } });
+    await (tx as any).bridgeKeyClaim.create({ data: { userId, codeHash: hashKeyClaimCode(code), expiresAt } });
+  });
+  return { code, expiresAt };
+}
+
+const KEY_CLAIM_REFUSAL = "That key claim is not valid.";
+
+export async function exchangeBridgeKeyClaim(rawCode: string, updateToken: string | null): Promise<{ key: string; plan: BotPlan; credits: number; period: string; userId: string }> {
+  const code = (rawCode ?? "").trim();
+  const verified = await verifyUpdateToken(updateToken);
+  if (!code || !verified || !isKeyClaimCode(code)) throw new BridgeError(400, "BAD_KEY_CLAIM", KEY_CLAIM_REFUSAL);
+  const row = await (db as any).bridgeKeyClaim.findUnique({ where: { codeHash: hashKeyClaimCode(code) } });
+  if (!row || !isUsableKeyClaim(row, verified.userId)) throw new BridgeError(400, "BAD_KEY_CLAIM", KEY_CLAIM_REFUSAL);
+  const owner = await db.user.findUnique({ where: { id: row.userId } });
+  if (!owner) throw new BridgeError(400, "BAD_KEY_CLAIM", KEY_CLAIM_REFUSAL);
+  let member: MemberKeyResult;
+  try { member = await getMemberEngineKey(owner, { fresh: true }); }
+  catch { throw new BridgeError(400, "BAD_KEY_CLAIM", KEY_CLAIM_REFUSAL); }
+  const claimed = await (db as any).bridgeKeyClaim.updateMany({ where: { id: row.id, userId: verified.userId, usedAt: null }, data: { usedAt: new Date() } });
+  if (claimed.count !== 1) throw new BridgeError(400, "BAD_KEY_CLAIM", KEY_CLAIM_REFUSAL);
+  return { key: member.key, plan: member.plan, credits: member.credits, period: member.period, userId: row.userId };
 }
 
 export async function mintBridgeCode(
