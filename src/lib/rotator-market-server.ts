@@ -6,6 +6,7 @@ import { recordLinkClick } from "@/lib/link-clicks";
 import { getPaidSlotPrices, listPaidSlotsForDate, placedPaidSlot } from "@/lib/paid-slots-server";
 import { FREE_DAY_SOURCE } from "@/lib/free-day-core";
 import { partnerNameSync } from "@/lib/offer-catalog";
+import { BTC_EXPERIMENT_URL } from "@/lib/rotator-house";
 import {
   addDaysToEtDate,
   etDayEndsAt,
@@ -32,10 +33,12 @@ import {
  * HOUSE DESTINATION ON THE NEW SURFACES (Dave, 2026-11-21): "Enter
  * the rotator is sending users directly to DH Media — it should go
  * to www.thebtcexperiment.com." When no placement is live, the
- * marketplace's house entry is The BTC Experiment itself. The LEGACY
- * house pool in lib/rotator.ts (and /api/bridge/rotator/go, which
- * other surfaces depend on) is deliberately untouched — only the
- * Slice 5 surfaces resolve house → the BTC Experiment.
+ * marketplace's house entry is The BTC Experiment itself. The legacy
+ * house pool in lib/rotator.ts originally rotated the whole offer
+ * catalog; Dave closed that on 2026-11-24 ("we should be sending
+ * users to dh.media or the btc experiment") — the legacy fallback
+ * now alternates DH Media / BTC Experiment only (lib/rotator-house.ts),
+ * and this surface's house entry stays the BTC Experiment.
  *
  * ON-SITE (Dave, 2026-11-24, supersedes the off-site half of the
  * above): the game now lives on-site at /play (site reorg R1 — "keep
@@ -62,7 +65,7 @@ import {
 export const MARKET_SURFACE = "ROTATOR_PAGE";
 export const MARKET_HOUSE_PARTNER = "the-btc-experiment";
 export const MARKET_HOUSE_NAME = "The BTC Experiment";
-export const MARKET_HOUSE_URL = "https://whop.plunderandriffle.com/play";
+export const MARKET_HOUSE_URL = BTC_EXPERIMENT_URL;
 
 const impLinkId = (partner: string) => `market-imp:${partner}`;
 const clickLinkId = (partner: string) => `market-click:${partner}`;

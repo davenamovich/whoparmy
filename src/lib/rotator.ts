@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { getActiveCatalog, partnerNameSync } from "@/lib/offer-catalog";
+import { DH_MEDIA_PARTNER, pickHouseDestination } from "@/lib/rotator-house";
 import { filterPlacementsByTrafficPool, getPlacementAgentAttribution } from "@/lib/traffic-pool";
 import { pickGroupedDestination, rotatorV2Enabled } from "@/lib/rotator-v2-core";
 import { getForfeitedAgentIds, resolveAgentRotatorDestination } from "@/lib/rotator-v2";
@@ -31,9 +32,13 @@ import { pointsBalance } from "@/lib/doors/points";
  *   still refunds free generations, so nobody is refunded in the
  *   wrong currency.
  * - Resolution for a day: a CONFIRMED auction wins. Otherwise the
- *   house fallback rotates Dave's own partner links deterministically
- *   by day-of-year, so unsold days still land somewhere exact and the
- *   pick is recomputable from the date alone.
+ *   house fallback sends users to DH Media or the BTC Experiment
+ *   ONLY (Dave, 2026-11-24 — "we should be sending users to
+ *   dh.media or the btc experiment"), alternating deterministically
+ *   by day-of-year, so unsold days still land somewhere exact and
+ *   the pick is recomputable from the date alone. The destination
+ *   rule lives in lib/rotator-house.ts. (Before this fix the house
+ *   pool rotated the whole offer catalog — /go landed on Temu.)
  *
  * Attribution: the day record IS the attribution. Every no-ref click
  * through /api/bridge/rotator/go on a given ET date went to the URL
@@ -62,13 +67,15 @@ function dayOfYearET(dateStr: string): number {
   return Math.floor((cur - start) / 86400000) + 1;
 }
 
-/** House fallback pool: Dave's own partner links (real URLs only),
- *  read from the active offer catalog (P&R MCP steps) per call so a
- *  catalog refresh lands without a restart. */
-function housePool() {
-  return getActiveCatalog()
-    .filter((p) => p.example.startsWith("http"))
-    .map((p) => ({ partner: p.key, name: p.name, url: p.example }));
+/** Dave's current DH Media link from the active offer catalog
+ *  (P&R MCP steps), read per call so a catalog refresh lands without
+ *  a restart. Null when the catalog has no DH Media entry — the
+ *  house rule in lib/rotator-house.ts then uses the saved house
+ *  link. NOT the whole catalog: the catalog is the offer list Muse
+ *  presents, never a traffic destination list (Dave, 2026-11-24). */
+function catalogDhMediaUrl(): string | null {
+  const dh = getActiveCatalog().find((p) => p.key === DH_MEDIA_PARTNER);
+  return dh?.example ?? null;
 }
 
 export interface RotatorPoolEntry {
@@ -203,8 +210,7 @@ export async function getRotatorDestination(date = etDateString()): Promise<Rota
         : {}),
     };
   }
-  const pool0 = housePool();
-  const pick = pool0[(dayOfYearET(date) - 1) % pool0.length];
+  const pick = pickHouseDestination(dayOfYearET(date), catalogDhMediaUrl());
   return {
     date,
     url: pick.url,
