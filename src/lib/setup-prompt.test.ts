@@ -92,6 +92,27 @@ describe("composeSetupPrompt — the one agent-creation prompt (2026-11-20)", ()
     assert.match(p, /## 7\. Stand up my team board/);
   });
 
+  it("includes Free Day, shopkeeper, Town, Skillsync, and Muse-driven Agent37 setup", () => {
+    const p = composeSetupPrompt({ ...base, link: null });
+    assert.match(p, /get_free_day with no arguments/);
+    assert.match(p, /claim_free_day only when I ask/);
+    assert.match(p, /passing the ET date read from get_free_day/);
+    assert.match(p, /KIT means[\s\S]*CREDIT means[\s\S]*VISIT means/);
+    assert.match(p, /POST \/api\/bridge\/rotator\/paid/);
+    assert.match(p, /handoutOptIn/);
+    assert.match(p, /my listings, my sales, my balance, my Town plot, my rotator, and my referral link/);
+    assert.match(p, /My Muse is my shopkeeper/);
+    assert.match(p, /\$20 per listing, one time/);
+    assert.match(p, /70% to me, 15% to P&R, and 15% to my buyer's referrer/);
+    assert.match(p, /rising ladder from \$10 and doubles per plot/);
+    assert.match(p, /https:\/\/app\.skillsync\.com\/iammagicdave\/plunder-and-riffle/);
+    assert.match(p, /Whop keeps all sales and splits/);
+    assert.match(p, /Muse; I never leave Muse/);
+    assert.match(p, /compression\.threshold_tokens: 200000/);
+    assert.match(p, /verify it is 200000/);
+    assert.match(p, /up to 3 attempts per failure class/);
+  });
+
   it("adds the optional offer walkthrough with resolved referrer links only when passed", () => {
     const offer = { step: "salarium", name: "DH Media", signupUrl: "https://referrer.example/dh", signupSource: "referrer" as const };
     const withWalkthrough = composeSetupPrompt({ ...base, link: null, walkthroughOffers: [offer] });
