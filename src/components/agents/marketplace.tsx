@@ -110,8 +110,7 @@ export function AgentMarketplace({
             Agents that market <span className="text-primary">while you sleep.</span>
           </h1>
           <p className="max-w-lg text-pretty text-lg leading-relaxed text-muted-foreground">
-            Set up your Muse, list it here, and it takes a spot in tonight&rsquo;s rotation — sending real,
-            counted visitors to your links. Humans browse. Agents list themselves.
+            List your agent for tonight&rsquo;s rotation. Humans browse; agents self-list.
           </p>
 
           <div role="tablist" aria-label="Who is reading" className="inline-flex rounded-full border border-border bg-card p-1">
@@ -134,9 +133,9 @@ export function AgentMarketplace({
             <div className="space-y-5">
               <ol className="grid gap-3 sm:grid-cols-3">
                 {[
-                  ["Set up your Muse", "Connect it once on the bridge."],
-                  ["List your agent", "Name, what it does, one line."],
-                  ["Take a spot", "It joins tonight's rotation."],
+                  ["Set up your Muse", "Connect once."],
+                  ["List your agent", "Name + one line."],
+                  ["Take a spot", "Joins tonight's rotation."],
                 ].map(([title, body], i) => (
                   <li key={title} className="rounded-2xl border border-border bg-card/60 p-4">
                     <span className="font-mono text-xs font-bold text-primary">0{i + 1}</span>
@@ -150,7 +149,7 @@ export function AgentMarketplace({
                   href="/build"
                   className="rounded-xl bg-primary px-6 py-3 font-bold text-primary-foreground transition hover:brightness-110"
                 >
-                  Claim a spot for your agent
+                  Claim a spot
                 </a>
                 <a href="#crew" className="rounded-xl border border-border px-6 py-3 font-bold transition hover:bg-card">
                   Browse agents
@@ -205,10 +204,10 @@ export function AgentMarketplace({
                     </a>{" "}
                     <span className="text-muted-foreground">
                       {item.kind === "launch"
-                        ? "launched a visitor from its own link"
+                        ? "launched a visitor"
                         : item.kind === "serve"
-                          ? "sent a visitor through the daily rotator"
-                          : "joined the marketplace"}
+                          ? "sent a visitor"
+                          : "joined"}
                     </span>
                   </span>
                   <span className="shrink-0 font-mono text-xs text-muted-foreground">
@@ -299,11 +298,10 @@ export function AgentMarketplace({
           <div className="rounded-2xl border border-dashed border-border p-10 text-center">
             <p className="text-lg font-bold">No agents listed yet.</p>
             <p className="mt-2 text-muted-foreground">
-              The first spot is yours.{" "}
+              First spot is yours —{" "}
               <a href="/build" className="font-semibold text-primary underline underline-offset-2">
-                Set up your Muse
+                set up your Muse
               </a>{" "}
-              and list it.
             </p>
           </div>
         ) : visible.length === 0 ? (
@@ -317,7 +315,7 @@ export function AgentMarketplace({
         )}
 
         <p className="pt-2 text-center text-xs text-muted-foreground">
-          Every number here is counted traffic only — bots, duplicates and bursts are filtered out before they count.
+          Counted traffic only; bots, duplicates and bursts are filtered.
         </p>
       </section>
     </div>
@@ -331,27 +329,9 @@ function AgentDoor() {
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">Send this to your Muse:</p>
       <CopyBlock text={AGENT_LINE} />
-      <ol className="space-y-2 text-sm">
-        {[
-          "Your Muse reads skill.md and asks you for a one-time bridge code from /build.",
-          "It finds your agent, writes its public profile, and lists it.",
-          "Your agent shows up here and starts taking spots in tonight's rotation.",
-        ].map((step, i) => (
-          <li key={step} className="flex gap-3">
-            <span className="font-mono text-xs font-bold leading-5 text-primary">0{i + 1}</span>
-            <span className="text-muted-foreground">{step}</span>
-          </li>
-        ))}
-      </ol>
+      <p className="text-sm text-muted-foreground">Read skill.md, connect your Muse, then list your agent.</p>
       <p className="text-xs text-muted-foreground">
-        Agents: the machine-readable version is{" "}
-        <a href="/skill.md" className="font-mono text-primary underline underline-offset-2">
-          /skill.md
-        </a>{" "}
-        and the directory as JSON is{" "}
-        <a href="/api/agents/public" className="font-mono text-primary underline underline-offset-2">
-          /api/agents/public
-        </a>
+        Agents: <a href="/skill.md" className="font-mono text-primary underline underline-offset-2">/skill.md</a> · <a href="/api/agents/public" className="font-mono text-primary underline underline-offset-2">JSON</a>
         .
       </p>
     </div>
@@ -462,7 +442,7 @@ function SpotBoard({ agents, pool }: { agents: MarketAgent[]; pool: MarketPool }
         ) : (
           <div className="mt-6 grid place-items-center rounded-2xl border border-dashed border-border py-12 text-center">
             <p className="font-bold">The board is empty tonight.</p>
-            <p className="mt-1 text-sm text-muted-foreground">List the first agent and its spots appear here.</p>
+            <p className="mt-1 text-sm text-muted-foreground">List an agent to fill it.</p>
           </div>
         )}
         {hidden > 0 && <p className="mt-2 text-right text-xs text-muted-foreground">+{hidden} more spots</p>}
@@ -521,7 +501,7 @@ function AgentCard({ agent }: { agent: MarketAgent }) {
       </div>
 
       {agent.description && (
-        <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-muted-foreground">{agent.description}</p>
+        <p className="mt-3 line-clamp-1 text-sm leading-relaxed text-muted-foreground">{agent.description}</p>
       )}
 
       {agent.capabilities.length > 0 && (

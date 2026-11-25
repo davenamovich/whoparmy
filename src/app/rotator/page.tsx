@@ -93,15 +93,13 @@ export default async function RotatorMarketplacePage({
           <p className={label}>The Daily Rotator</p>
           <h1 className="font-display text-4xl font-black leading-tight tracking-tight sm:text-5xl">Today&apos;s featured destinations.</h1>
           <p className="max-w-md leading-relaxed text-muted-foreground">
-            One featured auction a day, won with Bid Points — plus paid slots you can buy outright for USDC on Base. Winners and paid placements rotate here until midnight ET.
+            One Bid Points auction and paid slots in USDC on Base; placements rotate until midnight ET.
           </p>
           <p className="text-sm font-semibold text-primary">
             <RotatorCountdown closesAt={view.closesAt} />
           </p>
           <p className="text-xs text-muted-foreground">
-            Today so far: {view.stats.countedImpressions} counted impressions · {view.stats.countedLaunches} counted
-            launches. Counted means the hop ledger&apos;s bot and duplicate filtering let it through — this is not
-            verified human traffic.
+            Today: {view.stats.countedImpressions} counted impressions · {view.stats.countedLaunches} counted launches. Not verified human traffic.
           </p>
         </section>
 
@@ -131,7 +129,7 @@ export default async function RotatorMarketplacePage({
                 </a>
                 {placement.partner === MARKET_HOUSE_PARTNER ? (
                   <span className="block text-xs leading-relaxed text-muted-foreground">
-                    The house destination: play the game, pick an agent, come back once for its bridge code.
+                    House destination: play, pick an agent, return for its bridge code.
                   </span>
                 ) : null}
               </div>
@@ -148,7 +146,7 @@ export default async function RotatorMarketplacePage({
                 <span className="block text-xs text-muted-foreground">{day.date}</span>
                 <span className="mt-2 block text-sm font-semibold">{day.paid ? "Paid slot sold" : STATE_LABEL[day.state] ?? day.state}</span>
                 <span className="block text-xs text-muted-foreground">
-                  {day.bidCount} {day.bidCount === 1 ? "bid" : "bids"} in Bid Points
+                  {day.bidCount} {day.bidCount === 1 ? "bid" : "bids"}
                 </span>
                 <span className="mt-2 block text-sm font-semibold">${(day.priceCents / 100).toFixed(2)} USDC</span>
                 <a className="mt-2 inline-flex text-sm text-primary underline" href={`/build?tab=rotator&date=${encodeURIComponent(day.date)}`}>Buy this slot</a>
@@ -156,7 +154,7 @@ export default async function RotatorMarketplacePage({
             ))}
           </ul>
           <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
-            Want in? <strong className="text-foreground">Buy a slot</strong> for a day and your saved link rotates here — paid in USDC on Base through Bankr, split 25% Plunder &amp; Riffle / 25% your referrer / 50% the agent owner. Or bid Bid Points (earned from referrals) for the one featured auction slot.{" "}
+            Buy a day in USDC on Base via Bankr — 25% Plunder &amp; Riffle / 25% referrer / 50% agent owner. Or bid Bid Points, earned from referrals.{" "}
             <a className="text-primary underline underline-offset-2" href="/build?tab=rotator">Buy a slot</a> · <a className="text-primary underline underline-offset-2" href="/build">Bid on the bridge</a>.
           </p>
         </section>

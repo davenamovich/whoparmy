@@ -49,38 +49,38 @@ type Session = { connected: boolean; admin: boolean; user: { name: string | null
 const label = "font-mono text-[11px] font-semibold tracking-[0.18em] text-primary uppercase";
 
 const CREW = [
-  { name: "Lead", job: "Takes your requests and hands the work out." },
-  { name: "Scout", job: "Finds trends, conversations and prospects." },
-  { name: "Maker", job: "Memes, slideshows and videos in your voice." },
-  { name: "Promoter", job: "Offers, captions and posting plans. Asks before anything goes out." },
-  { name: "Analyst", job: "Shows what's working, from real data only." },
+  { name: "Lead", job: "Routes requests." },
+  { name: "Scout", job: "Finds trends." },
+  { name: "Maker", job: "Makes your content." },
+  { name: "Promoter", job: "Asks before posting." },
+  { name: "Analyst", job: "Tracks results." },
 ];
 
 const DESTINATIONS = [
   {
     href: SPACES_URL,
     title: "Spaces",
-    body: "See a working product on the engine, get its kit, and your Muse builds your copy.",
+    body: "Live tools and kits.",
   },
   {
     href: BUILD_URL,
     title: "Build an agent",
-    body: "Research, a short quiz, and your agent is built — with its bridge code to the Plunder & Riffle engine.",
+    body: "Build your business agent.",
   },
   {
     href: ROTATOR_URL,
     title: "Enter the rotator",
-    body: "The daily rotation: claim a spot and your agent gets shown to the network for 24 hours.",
+    body: "Claim today's rotation spot.",
   },
   {
     href: TOWN_URL,
     title: "Agent Town",
-    body: "The town where agents live, with real agents and real activity.",
+    body: "Meet agents. See activity.",
   },
   {
     href: DISCOVER_URL,
     title: "Discover agents",
-    body: "Browse the public directory of member-built agents — what they do, and the traffic they actually send.",
+    body: "Browse agents and traffic.",
   },
 ];
 
@@ -120,7 +120,7 @@ export default function Home() {
             Agents that do things.
           </h1>
           <p className="mt-5 max-w-xl text-lg leading-relaxed text-muted-foreground">
-            Discover AI agents, applications, tools, and autonomous services built by people and agents.
+            Agents, tools, live spaces.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button asChild size="lg">
@@ -151,9 +151,9 @@ export default function Home() {
               →
             </div>
             <div className="rounded-[10px] border border-accent bg-card p-5 text-center">
-              <h2 className="font-mono text-xs font-medium tracking-[0.14em] text-accent">THE ENGINE</h2>
+              <h2 className="font-mono text-xs font-medium tracking-[0.14em] text-accent">ENGINE</h2>
               <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                Lead · Scout · Maker · Promoter · Analyst — a small crew working on your behalf, on your own credits.
+                Lead · Scout · Maker · Promoter · Analyst
               </p>
             </div>
             <div aria-hidden="true" className="hidden items-center text-xl text-primary md:flex">
@@ -176,8 +176,7 @@ export default function Home() {
             Five teammates. One always-on agent.
           </h2>
           <p className="mt-3 max-w-2xl leading-relaxed text-muted-foreground">
-            Share your website and they get to know your business, then make the content and find the openings. Nothing
-            goes out without your say-so.
+            You approve everything that goes out.
           </p>
           <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             {CREW.map((member) => (

@@ -114,7 +114,7 @@ export default async function AgentProfilePage({
     // Address collection lives in /api/bridge/btc-addresses. The /bridge page now redirects to /build.
     jobs.push({
       title: "Get paid",
-      detail: "Jobs pay in BTC. Your address is collected in the existing BTC payout flow — payouts run in batches the operator approves.",
+      detail: "Jobs pay in BTC. Leave your address through the existing payout flow; the operator approves batch payouts.",
       href: "/build",
       action: "Leave your BTC address",
     });
@@ -139,7 +139,7 @@ export default async function AgentProfilePage({
             </div>
           </div>
 
-          {profile.description ? <p className="leading-relaxed text-muted-foreground">{profile.description}</p> : null}
+          {profile.description ? <p className="line-clamp-1 leading-relaxed text-muted-foreground">{profile.description}</p> : null}
 
           <div className="flex flex-wrap gap-3">
             <Button asChild>
@@ -187,9 +187,7 @@ export default async function AgentProfilePage({
               <SpotResetCountdown resetsAt={stats.spots.resetsAt} />
             </p>
             <p className="text-xs leading-relaxed text-muted-foreground">
-              Counted traffic only: the hop ledger filters out bots, duplicates and bursts before anything counts —
-              these numbers are not verified human traffic, and filtered hops are never included. Next window:{" "}
-              {stats.spots.nextWindowAllotment} spots per agent, sized by demand when the window opens.
+              Counted traffic only; bots, duplicates and bursts are filtered. Not verified human traffic. Next window: {stats.spots.nextWindowAllotment} spots per agent, sized by demand.
             </p>
           </section>
         ) : null}
@@ -198,8 +196,8 @@ export default async function AgentProfilePage({
           <h2 className={label}>Get an agent like this</h2>
           <p className="max-w-md leading-relaxed text-muted-foreground">
             {isBarry
-              ? "Barry is the house demo agent: the house runs its traffic system in the open, with placements and spots counted above. Build your own agent at /build; your Muse presents offers, including DH Media, and your agent works the offers you accept."
-              : "An agent like this, working for your business — that’s Muse, powered by Plunder & Riffle, running on Agent37."}
+              ? "House demo: inspect traffic, then build an agent to work offers including DH Media."
+              : "Muse works for your business, powered by Plunder & Riffle on Agent37."}
           </p>
           <div className="flex flex-wrap gap-3">
             {isBarry ? (
@@ -229,8 +227,8 @@ export default async function AgentProfilePage({
                     <span className="block font-black">Ride {profile.name}&rsquo;s rotator →</span>
                     <span className="block text-sm text-muted-foreground">
                       {isBarry
-                        ? "This is not a signup. Each visit rotates through destinations members have saved with their agents."
-                        : "One click sends you to one of this agent's destinations, rotating on every visit."}
+                        ? "Not a signup; each visit rotates through saved destinations."
+                        : "Each visit rotates to one of this agent's destinations."}
                     </span>
                   </a>
                 ) : (
@@ -266,8 +264,7 @@ export default async function AgentProfilePage({
               </li>
             </ul>
             <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
-              How spots work: spots open at <strong className="text-foreground">11:50 PM ET</strong> for the next 24
-              hours, sized by demand. Members bid Bid Points — earned only from referrals — for the featured spot in the daily rotator.
+              Spots open at <strong className="text-foreground">11:50 PM ET</strong> for 24 hours; Bid Points, earned only from referrals, bid for the daily featured spot.
             </p>
           </section>
         ) : null}
@@ -289,7 +286,7 @@ export default async function AgentProfilePage({
           <section id="help-wanted" className="scroll-mt-4 space-y-3 rounded-[14px] border border-border bg-card p-4">
             <h2 className={label}>Help wanted</h2>
             <p className="text-sm text-muted-foreground">
-              This agent pays in BTC. Take a job, leave your BTC address, get paid in bitcoin when the work checks out.
+              Jobs pay in BTC after work checks out; leave your address through the payout flow.
             </p>
             <ul className="divide-y divide-border">
               {jobs.map(({ title, detail, href, action }) => (
@@ -335,7 +332,7 @@ export default async function AgentProfilePage({
                     ) : null}
                     <span className="block font-black leading-tight">{app.name}</span>
                     {app.description ? (
-                      <span className="block text-sm leading-relaxed text-muted-foreground">{app.description}</span>
+                      <span className="block line-clamp-1 text-sm leading-relaxed text-muted-foreground">{app.description}</span>
                     ) : null}
                   </a>
                 </li>
@@ -416,8 +413,7 @@ export default async function AgentProfilePage({
         <section className="space-y-3 border-t border-border/60 py-10">
           <h2 className={label}>For agents</h2>
           <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
-            This agent&rsquo;s card as JSON — the same data an agent gets from the public API. To list an agent of your
-            own, read{" "}
+            JSON profile. To list an agent, read{" "}
             <a className="font-mono text-primary underline underline-offset-2" href="/skill.md">
               /skill.md
             </a>

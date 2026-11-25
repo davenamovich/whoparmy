@@ -49,7 +49,7 @@ export function ReferralLinkCard({ ready, connected }: { ready: boolean; connect
       <div className="rounded-[10px] border border-border bg-card p-5">
         <h3 className="text-lg font-bold">Your referral link</h3>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Connect and your personal referral link is yours to share — anyone who joins through it is credited to you.
+          Connect to get your link; referrals are credited to you.
         </p>
         <div className="mt-4">
           <Button asChild variant="outline">
@@ -64,8 +64,7 @@ export function ReferralLinkCard({ ready, connected }: { ready: boolean; connect
     <div className="rounded-[10px] border border-border bg-card p-5">
       <h3 className="text-lg font-bold">Your referral link</h3>
       <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-        Share it anywhere. Anyone who joins through it is credited to you, and their joins earn you Bid Points — the
-        rotator&rsquo;s bidding currency. They&rsquo;ll get their own links in Muse.
+        Share your link; joins earn you Bid Points for rotator bids.
       </p>
       {referral ? (
         <>
