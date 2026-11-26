@@ -56,8 +56,8 @@ export function museWeekCommand(code: string, businessUrl: string, budget: numbe
 
 ${intro}
 3. Quote me the Taste before you spend anything: my /before (create_before_pitch — Joe's video about my business, then the phones: two memes, a reply meme, an iMessage and a Top 10) built from the research, for my main offer. The Taste is approved for up to ${budget} credits. Tell me the exact credit cost and my remaining balance (get_account through the bridge), and wait for my "go". No go, no spend.
-4. On my "go", make the /before through the bridge MCP, polling get_job_status until it's done. A failed piece refunds — if the whole pack fails, tell me and retry it once.
-5. Deliver the /before's share-page link and what's in it. End with the receipt: credits spent, credits remaining. Do not publish anything and do not render MP4s — I'll approve the pieces I want first.
+4. On my "go", write Joe's words first, from the research only: a short script for the video at the top of my /before — Joe introducing what he made for my business, conversational, first person, one sentence per line, about 100 words and under 800 characters, only facts the research actually found, no promises about views, sales or growth, ending by pointing at the pieces below the video. Then make the /before through the bridge MCP, passing the script as script to create_before_pitch, polling get_job_status until it's done. A failed piece refunds — if the whole pack fails, tell me and retry it once.
+5. Deliver the /before's share-page link, what's in it, and the script you wrote for Joe's video. End with the receipt: credits spent, credits remaining. Do not publish anything and do not render MP4s — I'll approve the pieces I want first.
 6. When the Taste is delivered or my token expires, stop. Next time I'll get a fresh code from whop.plunderandriffle.com/muse-week.`;
   }
 
