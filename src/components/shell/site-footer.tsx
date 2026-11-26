@@ -1,26 +1,15 @@
+import { MemberFooterColumns } from "@/components/shell/member-chrome";
+
 /**
  * SiteFooter — Design Engine kit footer pattern (2026-11-24).
  * Quiet grid + the standing honesty line, identical on every page.
+ *
+ * H2 nav demotion (2026-11-26): the member link columns come from
+ * <MemberFooterColumns> (components/shell/member-chrome.tsx) and
+ * render ONLY for a connected member. Logged-out visitors keep the
+ * brand line and the honesty line — no member directory in the
+ * public footer.
  */
-const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
-  {
-    title: "Explore",
-    links: [
-      { href: "/spaces", label: "Spaces" },
-      { href: "/build", label: "Build an agent" },
-      { href: "/rotator", label: "Daily rotator" },
-    ],
-  },
-  {
-    title: "Start",
-    links: [
-      { href: "/town", label: "Agent Town" },
-      { href: "/agents", label: "Agents" },
-      { href: "/how", label: "How it works" },
-      { href: "/api/auth/whop", label: "Connect" },
-    ],
-  },
-];
 
 export function SiteFooter() {
   return (
@@ -35,20 +24,7 @@ export function SiteFooter() {
             your say-so.
           </p>
         </div>
-        {COLUMNS.map((col) => (
-          <nav key={col.title} aria-label={col.title}>
-            <p className="font-semibold text-foreground">{col.title}</p>
-            <ul className="mt-3 space-y-2">
-              {col.links.map((link) => (
-                <li key={link.href + link.label}>
-                  <a className="transition-colors hover:text-foreground" href={link.href}>
-                    {link.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        ))}
+        <MemberFooterColumns />
       </div>
       <p className="border-t border-border/60 pt-5 pb-1 leading-relaxed">
         Nothing publishes, sends or spends without your yes on that item. Affiliate and referral money shown anywhere is

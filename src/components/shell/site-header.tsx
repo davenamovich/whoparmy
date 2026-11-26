@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { WhopConnect } from "@/components/shell/whop-connect";
+import { MemberNavLinks } from "@/components/shell/member-chrome";
 
 /**
  * SiteHeader — Design Engine kit nav pattern (2026-11-24).
@@ -13,14 +14,12 @@ import { WhopConnect } from "@/components/shell/whop-connect";
  * members see the amber Connect CTA; connected members see GREEN +
  * "Welcome, <First Name>" + a Disconnect button — the OAuth state is
  * visible on every page that carries this header, not just /muse-week.
+ *
+ * H2 nav demotion (2026-11-26): the member links themselves now come
+ * from <MemberNavLinks> (components/shell/member-chrome.tsx) and
+ * render ONLY for a connected member — logged-out visitors get the
+ * public chrome: logo + Connect. The routes are unchanged.
  */
-const NAV = [
-  { href: "/spaces", label: "Spaces" },
-  { href: "/build", label: "Build" },
-  { href: "/rotator", label: "Rotator" },
-  { href: "/town", label: "Town" },
-  { href: "/agents", label: "Agents" },
-];
 
 export function SiteHeader({
   ctaHref = "/api/auth/whop",
@@ -37,11 +36,7 @@ export function SiteHeader({
         PLUNDER <span className="text-primary">&amp;</span> RIFFLE
       </a>
       <nav aria-label="Main" className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm font-medium">
-        {NAV.map((item) => (
-          <a key={item.href} className="hidden text-muted-foreground transition-colors hover:text-foreground md:inline" href={item.href}>
-            {item.label}
-          </a>
-        ))}
+        <MemberNavLinks />
         {extra}
         <WhopConnect ctaHref={ctaHref} ctaLabel={ctaLabel} />
       </nav>
