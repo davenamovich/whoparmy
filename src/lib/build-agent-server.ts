@@ -7,6 +7,7 @@ import { capabilitiesToJson, uniqueSlug } from "@/lib/agent-profile";
 import { getResearchJob, startResearchJob } from "@/lib/research-jobs";
 import { draftBlueprint, getBlueprint } from "@/lib/blueprint";
 import { composeSetupPrompt } from "@/lib/setup-prompt";
+import { HOUSE_ACCOUNT_EMAIL } from "@/lib/upload-post";
 import {
   BridgeError,
   assertBridgeEligible,
@@ -414,8 +415,15 @@ export async function createBuildAgent(user: User, options: { walkthrough?: bool
     languageLabel: (await getMemberLanguage(user.id).catch(() => null))?.label,
     walkthroughOffers,
     keyClaimLink,
+    houseAccount: user.email?.toLowerCase() === HOUSE_ACCOUNT_EMAIL,
+    offer: state.research?.offer ?? design.description,
+    audience: quiz.audience ?? state.research?.audience,
+    firstResult: blueprint.objective,
+    neverDo: quiz.neverDo,
   });
-  const addendum = composeBuildAgentAddendum({
+  const websiteHost = (() => { try { return new URL(state.website ?? "").hostname.toLowerCase(); } catch { return ""; } })();
+  const guardedBusiness = websiteHost === "plunderandriffle.com" || websiteHost === "whop.plunderandriffle.com";
+  const addendum = guardedBusiness && user.email?.toLowerCase() !== HOUSE_ACCOUNT_EMAIL ? "" : composeBuildAgentAddendum({
     design,
     website: state.website ?? null,
     researchText,
@@ -426,7 +434,7 @@ export async function createBuildAgent(user: User, options: { walkthrough?: bool
     bridgeCode: code,
     updateToken,
   });
-  const prompt = `${base}\n\n${addendum}`;
+  const prompt = addendum ? `${base}\n\n${addendum}` : base;
 
   const next = await saveBuildFlow(user.id, {
     ...state,

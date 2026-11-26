@@ -15,6 +15,7 @@ import { getMemberLanguage } from "@/lib/member-language";
 import type { SavedOfferLink } from "@/lib/muse-week-command";
 import { composeEnginePrompt } from "@/lib/setup-prompt-compose";
 import type { WalkthroughOffer } from "@/lib/build-walkthrough-core";
+import { HOUSE_ACCOUNT_EMAIL } from "@/lib/upload-post";
 
 /**
  * ─── THE ONE AGENT-CREATION PROMPT (Dave, 2026-11-19; consolidated
@@ -39,7 +40,7 @@ import type { WalkthroughOffer } from "@/lib/build-walkthrough-core";
  * the blueprint, mints the link, and injects the team board.
  */
 
-type Actor = { id: string; plan: string; whopId: string | null };
+type Actor = { id: string; plan: string; whopId: string | null; email?: string | null };
 
 export interface SetupPromptResult {
   eligible: boolean;
@@ -58,10 +59,16 @@ export function composeSetupPrompt(args: {
   languageLabel?: string;
   walkthroughOffers?: WalkthroughOffer[];
   keyClaimLink?: string | null;
+  houseAccount?: boolean;
+  offer?: string;
+  audience?: string;
+  firstResult?: string;
+  neverDo?: string;
 }): string {
   return composeEnginePrompt({
     ...args,
     teamSection: teamBoardSection(args.blueprint, args.business, "## 7. Stand up my team board"),
+    houseAccount: args.houseAccount,
   });
 }
 
@@ -77,6 +84,8 @@ export async function craftSetupPrompt(user: Actor): Promise<SetupPromptResult> 
   let link: string | null = null;
   const updateToken = (await mintUpdateToken(user.id)).token;
   let eligible = false;
+  const accountRecord = await db.user.findUnique({ where: { id: user.id }, select: { email: true } });
+  const houseAccount = (user.email ?? accountRecord?.email)?.toLowerCase() === HOUSE_ACCOUNT_EMAIL;
   try {
     const full = await db.user.findUnique({ where: { id: user.id } });
     if (full) {
@@ -104,6 +113,7 @@ export async function craftSetupPrompt(user: Actor): Promise<SetupPromptResult> 
       updateToken,
       savedLinks: await getSavedOfferLinks(user.id).catch(() => []),
       languageLabel: (await getMemberLanguage(user.id).catch(() => null))?.label,
+      houseAccount,
     }),
     blueprintStatus: bp.status,
   };

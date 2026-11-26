@@ -200,9 +200,10 @@ describe("composeBuildAgentAddendum", () => {
 
   it("carries the bridge code + connect link, and the approval rule", () => {
     const text = composeBuildAgentAddendum({ ...base, connectLink: "https://whop.plunderandriffle.com/connect/ABCD", bridgeCode: "ABCD-1234" });
-    assert.match(text, /Bridge code: ABCD-1234/);
-    assert.match(text, /CONTENT-ONLY/);
-    assert.match(text, /content still publishes only after my tap/);
+    assert.match(text, /My connect link: https:\/\/whop\.plunderandriffle\.com\/connect\/ABCD/);
+    assert.match(text, /complete brief[\s\S]*cap, and expiry are the truth/);
+    assert.doesNotMatch(text, /ABCD-1234|7-day connection|CONTENT-ONLY/);
+    assert.match(text, /Nothing publishes without my approval/);
   });
 
   it("is honest when no bridge code was minted", () => {
@@ -211,14 +212,10 @@ describe("composeBuildAgentAddendum", () => {
     assert.doesNotMatch(text, /Bridge code: \(in the link\)/);
   });
 
-  it("teaches bridge-token profile management for THIS agent only", () => {
+  it("does not add credential exchange or agent record PATCH instructions", () => {
     const text = composeBuildAgentAddendum({ ...base, connectLink: null, bridgeCode: null });
-    assert.match(text, /PATCH https:\/\/whop\.plunderandriffle\.com\/api\/agents\/agent_123/);
-    assert.match(text, /Authorization: Bearer <your prb_ token>/);
-    assert.match(text, /publicProfile/);
-    assert.match(text, /spaceUrl/);
-    assert.match(text, /checked against ownership on every call/);
-    assert.match(text, /not a posting channel/);
+    assert.match(text, /actions offered by the connection page/);
+    assert.doesNotMatch(text, /PATCH https:\/\/whop\.plunderandriffle\.com\/api\/agents|Authorization: Bearer|permanent update|key-claim/);
   });
 
   it("quizAnswerLines renders labels, not ids", () => {
