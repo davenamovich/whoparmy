@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getWhopUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { loadTown } from "@/lib/town-server";
+import { WhopConnect } from "@/components/shell/whop-connect";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +67,10 @@ export default async function Town() {
             <span aria-hidden="true" className="text-[#2E7D4F]">●</span> LIVE · {town.phase.toUpperCase()} ET
           </p>
         </header>
+        {/* Whop OAuth status (Dave, 2026-11-26): green + Welcome, First Name + Disconnect when connected */}
+        <div className="flex justify-end px-[18px] pb-1">
+          <WhopConnect compact />
+        </div>
 
         <div className="space-y-3.5 px-[18px] pb-4 pt-2.5">
           <section>

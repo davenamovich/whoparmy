@@ -9,6 +9,7 @@ import { Bot, CheckCircle2, Coins, Copy, Download, KeyRound, Loader2, Lock, Refr
 import { museWeekCommand } from "@/lib/muse-week-command";
 import { TelegramLinkCard } from "@/components/factory/telegram-link";
 import { deriveWhopConnection, type WhopConnectionTone } from "@/lib/whop-connection";
+import { deriveWhopHeader } from "@/lib/whop-header";
 import { deriveCreditsDisplay, type BridgeByokView } from "@/lib/bridge-byok";
 
 /**
@@ -60,13 +61,35 @@ const WHOP_DOT_CLASS: Record<WhopConnectionTone, string> = {
  */
 function WhopConnectionPill({ session, account }: { session: SessionState | null; account: BridgeAccount | null }) {
   const state = deriveWhopConnection(session, account);
+  const [signingOut, setSigningOut] = useState(false);
+  // Dave, 2026-11-26: green when connected, greeted by first name,
+  // with a Disconnect button — same contract as the site header.
+  const welcome = session?.connected ? deriveWhopHeader(session).welcomeText : null;
   return (
-    <div className="flex items-center gap-2 text-sm">
+    <div className="flex flex-wrap items-center gap-2 text-sm">
       <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${WHOP_DOT_CLASS[state.tone]}`} aria-hidden />
       <span className="font-medium">{state.text}</span>
+      {welcome && <span className="font-semibold text-emerald-400">{welcome}</span>}
       {state.tone === "disconnected" && (
         <Button size="sm" variant="outline" asChild>
           <a href="/api/auth/whop">Connect with Whop</a>
+        </Button>
+      )}
+      {session?.connected && (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={signingOut}
+          onClick={async () => {
+            setSigningOut(true);
+            try {
+              await fetch("/api/auth/whop/logout", { method: "POST" });
+            } finally {
+              window.location.reload();
+            }
+          }}
+        >
+          {signingOut ? "Disconnecting…" : "Disconnect"}
         </Button>
       )}
     </div>

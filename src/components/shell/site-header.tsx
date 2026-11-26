@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { WhopConnect } from "@/components/shell/whop-connect";
 
 /**
  * SiteHeader — Design Engine kit nav pattern (2026-11-24).
@@ -7,6 +8,11 @@ import type { ReactNode } from "react";
  * `extra` renders page-specific links (admin door, skill.md) before
  * the CTA; ctaHref/ctaLabel preserve pages whose sign-in link
  * differed (e.g. ?next=/build).
+ *
+ * The action slot is <WhopConnect> (Dave, 2026-11-26): disconnected
+ * members see the amber Connect CTA; connected members see GREEN +
+ * "Welcome, <First Name>" + a Disconnect button — the OAuth state is
+ * visible on every page that carries this header, not just /muse-week.
  */
 const NAV = [
   { href: "/spaces", label: "Spaces" },
@@ -37,12 +43,7 @@ export function SiteHeader({
           </a>
         ))}
         {extra}
-        <a
-          className="rounded-[8px] bg-primary px-3.5 py-2 font-semibold text-primary-foreground transition-opacity hover:opacity-90"
-          href={ctaHref}
-        >
-          {ctaLabel}
-        </a>
+        <WhopConnect ctaHref={ctaHref} ctaLabel={ctaLabel} />
       </nav>
     </header>
   );
