@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({})) as { walkthrough?: unknown };
     const out = await createBuildAgent(user, { walkthrough: body.walkthrough === true });
     if ("error" in out) return NextResponse.json({ error: out.error }, { status: out.status });
-    return NextResponse.json(out.result, { status: 201 });
+    return NextResponse.json(out.result, { status: 201, headers: { "Cache-Control": "no-store" } });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Could not build your agent." },

@@ -6,7 +6,6 @@ import {
   bridgeOffer,
   getMemberEngineKey,
   mintBridgeCode,
-  mintUpdateToken,
   BridgeError,
 } from "@/lib/muse-bridge";
 import { teamBoardSection } from "@/lib/team-board";
@@ -82,7 +81,6 @@ export async function craftSetupPrompt(user: Actor): Promise<SetupPromptResult> 
   });
 
   let link: string | null = null;
-  const updateToken = (await mintUpdateToken(user.id)).token;
   let eligible = false;
   const accountRecord = await db.user.findUnique({ where: { id: user.id }, select: { email: true } });
   const houseAccount = (user.email ?? accountRecord?.email)?.toLowerCase() === HOUSE_ACCOUNT_EMAIL;
@@ -110,7 +108,6 @@ export async function craftSetupPrompt(user: Actor): Promise<SetupPromptResult> 
       website: brand?.website ?? null,
       blueprint: bp,
       link,
-      updateToken,
       savedLinks: await getSavedOfferLinks(user.id).catch(() => []),
       languageLabel: (await getMemberLanguage(user.id).catch(() => null))?.label,
       houseAccount,

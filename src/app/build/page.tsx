@@ -57,6 +57,7 @@ interface CreateResult {
   connectLink: string | null;
   bridgeEligible: boolean;
   keyClaimLink?: string | null;
+  updateToken?: string | null;
 }
 
 const step = "rounded-[10px] border border-border bg-card p-5 sm:p-6 space-y-3";
@@ -346,7 +347,7 @@ export default function BuildPage() {
               <p className={label}>Foundation</p>
               <p className="font-semibold">{foundation?.keyState === "issued" && foundation.foundationVerifiedAt ? "Foundation verified" : foundation?.keyState === "issued" ? "Durable key issued — prove it in Muse" : foundation?.keyState === "blocked" ? "Foundation blocked — contact support" : foundation?.keyState === "not_configured" ? "Engine not configured" : foundation?.lane === "bridge-only" ? "Bridge-only — 7-day lane" : "Foundation status unavailable"}</p>
               {foundation?.plan ? <p className="text-sm text-muted-foreground">Plan: {foundation.plan} · Credits: {foundation.credits ?? "—"} / {foundation.granted ?? "—"} · Period: {foundation.period ?? "—"}</p> : null}
-              <p className="text-sm text-muted-foreground">Next step: use the claim link in your build prompt, then prove Gate 1 in Muse.</p>
+              <p className="text-sm text-muted-foreground">When your build prompt is ready, copy the separate durable key claim into Muse to prove Gate 1.</p>
             </section>
 
             {/* ─── Step 1 · Research ─────────────────────────────── */}
@@ -497,6 +498,11 @@ export default function BuildPage() {
                           “Rebuild prompt + fresh code” above for a fresh one.
                         </p>
                       )}
+                      {created?.keyClaimLink && created.updateToken ? (
+                        <CopyButton text={`Durable key claim code: ${created.keyClaimLink.split("/").pop()}\nUpdate token: ${created.updateToken}`}>
+                          Copy durable key claim for Muse
+                        </CopyButton>
+                      ) : null}
                     </CardContent>
                   </Card>
 
@@ -544,8 +550,8 @@ function UpdateTokenCard() {
     <p className={label}>Permanent update connection</p>
     <p className="text-sm">Your agent uses this to keep your links and agent updated. It can&apos;t spend credits.</p>
     <p className="text-sm text-muted-foreground">{status?.active ? `Active since ${new Date(status.createdAt!).toLocaleString()} · Last used ${status.lastUsedAt ? new Date(status.lastUsedAt).toLocaleString() : "never"}` : status ? "No active update token" : "Loading status…"}</p>
-    <div className="flex gap-2"><Button disabled={busy} onClick={() => void act("POST")}>{status?.active ? "Create / Rotate" : "Create"}</Button>{status?.active ? <Button variant="outline" disabled={busy} onClick={() => void act("DELETE")}>Revoke</Button> : null}</div>
-    {raw ? <div className="break-all rounded bg-muted p-3 text-sm"><code>{raw}</code> <CopyButton text={raw}>Copy token</CopyButton><p className="mt-2 text-xs">Copy now; it is shown only once.</p></div> : null}
+    <div className="flex gap-2"><Button disabled={busy} onClick={() => void act("POST")}>{status?.active ? "Get token" : "Create"}</Button>{status?.active ? <Button variant="outline" disabled={busy} onClick={() => void act("DELETE")}>Revoke</Button> : null}</div>
+    {raw ? <div className="break-all rounded bg-muted p-3 text-sm"><code>{raw}</code> <CopyButton text={raw}>Copy token</CopyButton><p className="mt-2 text-xs">To rotate your token, revoke it first. Revoking also invalidates any pending durable key claim.</p></div> : null}
     {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
   </section>;
 }

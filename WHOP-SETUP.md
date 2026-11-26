@@ -92,6 +92,14 @@ configured" state — buttons never pretend.
 `SESSION_SECRET` — any long random string. Required in production (the dev
 fallback derives a stable local secret).
 
+Set the same `SESSION_SECRET` on every app instance that hands out durable key
+claims or update tokens. That handout requires an explicit secret even in dev:
+it recreates the same live credentials without storing their raw values. The
+first handout after upgrading from the old random-token format (or after a
+secret rotation) replaces any older credentials it cannot recreate. For an
+intentional token rotation in `/build`, revoke the token first; this also
+invalidates any pending durable key claim.
+
 ## 7. Muse bridge connector (member's own Muse → MCP, their credits)
 
 Powers /muse-week and `POST /api/bridge/mcp`. Two sides must agree:

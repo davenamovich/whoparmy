@@ -12,9 +12,9 @@ import {
   BridgeError,
   assertBridgeEligible,
   bridgeOffer,
+  getOrCreateBridgeKeyClaim,
   getMemberEngineKey,
   mintBridgeCode,
-  mintUpdateToken,
 } from "@/lib/muse-bridge";
 import { getBridgeState, getSavedOfferLinks } from "@/lib/bridge";
 import { selectWalkthroughOffers, shouldSuggestWalkthrough } from "@/lib/build-walkthrough-core";
@@ -323,6 +323,8 @@ export interface BuildCreateResult {
   prompt: string;
   bridgeCode: string | null;
   connectLink: string | null;
+  keyClaimLink: string | null;
+  updateToken: string | null;
   bridgeEligible: boolean;
 }
 
@@ -385,6 +387,7 @@ export async function createBuildAgent(user: User, options: { walkthrough?: bool
   const blueprint = (await getBlueprint(user.id)) ?? (await draftBlueprint(user));
   let code: string | null = null;
   let keyClaimLink: string | null = null;
+  let updateToken: string | null = null;
   let link: string | null = null;
   let eligible = false;
   try {
@@ -394,14 +397,13 @@ export async function createBuildAgent(user: User, options: { walkthrough?: bool
     code = minted.code;
     link = `https://whop.plunderandriffle.com/connect/${code}`;
     eligible = true;
-    const { mintBridgeKeyClaim } = await import("@/lib/muse-bridge");
-    const claim = await mintBridgeKeyClaim(user.id);
+    const claim = await getOrCreateBridgeKeyClaim(user.id);
     keyClaimLink = `https://whop.plunderandriffle.com/key-claim/${claim.code}`;
+    updateToken = claim.token;
   } catch (e) {
     if (!(e instanceof BridgeError)) throw e;
   }
 
-  const updateToken = (await mintUpdateToken(user.id)).token;
   const walkthroughOffers = options.walkthrough
     ? selectWalkthroughOffers((await getBridgeState(user.id)).partners)
     : undefined;
@@ -410,11 +412,9 @@ export async function createBuildAgent(user: User, options: { walkthrough?: bool
     website: state.website ?? null,
     blueprint,
     link,
-    updateToken,
     savedLinks: await getSavedOfferLinks(user.id).catch(() => []),
     languageLabel: (await getMemberLanguage(user.id).catch(() => null))?.label,
     walkthroughOffers,
-    keyClaimLink,
     houseAccount: user.email?.toLowerCase() === HOUSE_ACCOUNT_EMAIL,
     offer: state.research?.offer ?? design.description,
     audience: quiz.audience ?? state.research?.audience,
@@ -430,9 +430,7 @@ export async function createBuildAgent(user: User, options: { walkthrough?: bool
     quiz,
     agentId: agent.id,
     connectLink: link,
-    keyClaimLink,
     bridgeCode: code,
-    updateToken,
   });
   const prompt = addendum ? `${base}\n\n${addendum}` : base;
 
@@ -461,6 +459,7 @@ export async function createBuildAgent(user: User, options: { walkthrough?: bool
       bridgeCode: code,
       connectLink: link,
       keyClaimLink,
+      updateToken,
       bridgeEligible: eligible,
     },
   };

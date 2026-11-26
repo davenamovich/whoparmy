@@ -1,8 +1,8 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
-import { hashKeyClaimCode, isKeyClaimCode, isUsableKeyClaim } from "./key-claim-core";
-export { hashKeyClaimCode, isKeyClaimCode, isUsableKeyClaim } from "./key-claim-core";
-import type { User } from "@prisma/client";
+import { exchangeKeyClaim, handOutKeyClaim, handOutUpdateToken, revokeKeyClaimCredentials, UPDATE_TOKEN_PREFIX } from "./key-claim-core";
+export { BRIDGE_KEY_CLAIM_TTL_MS, KEY_CLAIM_PREFIX, UPDATE_TOKEN_PREFIX, hashKeyClaimCode, isKeyClaimCode, isUsableKeyClaim } from "./key-claim-core";
+import type { Prisma, User } from "@prisma/client";
 import { db } from "@/lib/db";
 import { isDesignatedOperator } from "@/lib/auth";
 import { EXPERIMENT_GENERATING_COSTS, codeTtlMsForScope } from "@/lib/experiment-scope";
@@ -61,11 +61,8 @@ export function bridgeSharedKey(): string | null {
 }
 
 export const BRIDGE_TOKEN_PREFIX = "prb_";
-export const UPDATE_TOKEN_PREFIX = "pru_";
 export const BRIDGE_TOKEN_TTL_MS = 7 * 24 * 60 * 60_000; // one pairing = one week
 export const BRIDGE_CODE_TTL_MS = 24 * 60 * 60_000; // 24 hours to paste (Dave, 2026-11-23; was 15 minutes)
-export const BRIDGE_KEY_CLAIM_TTL_MS = 24 * 60 * 60_000;
-export const KEY_CLAIM_PREFIX = "prk_";
 /** The week at list prices: 7 × create_demo_pack (115). The member sees
  *  this number and the bot-quoted balance before anything spends. */
 export const WEEK_BUDGET_CREDITS = 7 * 115;
@@ -452,36 +449,58 @@ function newBridgeCode(): string {
   return `${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 12)}-${raw.slice(12, 16)}`;
 }
 
-function newKeyClaimCode(): string {
-  return KEY_CLAIM_PREFIX + randomBytes(32).toString("base64url");
+function keyHandoutSecret(): string {
+  const secret = process.env.SESSION_SECRET?.trim();
+  if (!secret) throw new BridgeError(503, "NOT_CONFIGURED", "Durable key handout is not configured.");
+  return secret;
 }
 
-export async function mintBridgeKeyClaim(userId: string): Promise<{ code: string; expiresAt: Date }> {
-  const code = newKeyClaimCode();
-  const expiresAt = new Date(Date.now() + BRIDGE_KEY_CLAIM_TTL_MS);
-  await db.$transaction(async (tx) => {
-    await (tx as any).bridgeKeyClaim.updateMany({ where: { userId, usedAt: null }, data: { usedAt: new Date() } });
-    await (tx as any).bridgeKeyClaim.create({ data: { userId, codeHash: hashKeyClaimCode(code), expiresAt } });
-  });
-  return { code, expiresAt };
+let sqliteKeyClaimWriteQueue: Promise<unknown> = Promise.resolve();
+
+function keyClaimTransaction<Result>(write: (tx: Prisma.TransactionClient) => Promise<Result>): Promise<Result> {
+  const result = sqliteKeyClaimWriteQueue.then(() => db.$transaction(write));
+  sqliteKeyClaimWriteQueue = result.catch(() => undefined);
+  return result;
 }
 
-const KEY_CLAIM_REFUSAL = "That key claim is not valid.";
+function keyHandoutStore(tx: Prisma.TransactionClient): Parameters<typeof handOutKeyClaim>[0] {
+  return {
+    findLiveToken: (userId) => tx.bridgeUpdateToken.findFirst({ where: { userId, revokedAt: null }, orderBy: { createdAt: "desc" } }),
+    findLiveClaim: (userId, now) => tx.bridgeKeyClaim.findFirst({ where: { userId, usedAt: null, expiresAt: { gt: now } }, orderBy: { createdAt: "desc" } }),
+    revokeTokens: async (userId, now) => (await tx.bridgeUpdateToken.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: now } })).count,
+    retireClaims: async (userId, now) => { await tx.bridgeKeyClaim.updateMany({ where: { userId, usedAt: null, expiresAt: { gt: now } }, data: { usedAt: now } }); },
+    createToken: async (data) => { await tx.bridgeUpdateToken.create({ data }); },
+    createClaim: async (data) => { await tx.bridgeKeyClaim.create({ data }); },
+  };
+}
+
+export async function getOrCreateBridgeKeyClaim(userId: string): Promise<{ code: string; expiresAt: Date; token: string }> {
+  const secret = keyHandoutSecret();
+  return keyClaimTransaction((tx) => handOutKeyClaim(keyHandoutStore(tx), userId, secret, new Date()));
+}
 
 export async function exchangeBridgeKeyClaim(rawCode: string, updateToken: string | null): Promise<{ key: string; plan: BotPlan; credits: number; period: string; userId: string }> {
-  const code = (rawCode ?? "").trim();
-  const verified = await verifyUpdateToken(updateToken);
-  if (!code || !verified || !isKeyClaimCode(code)) throw new BridgeError(400, "BAD_KEY_CLAIM", KEY_CLAIM_REFUSAL);
-  const row = await (db as any).bridgeKeyClaim.findUnique({ where: { codeHash: hashKeyClaimCode(code) } });
-  if (!row || !isUsableKeyClaim(row, verified.userId)) throw new BridgeError(400, "BAD_KEY_CLAIM", KEY_CLAIM_REFUSAL);
-  const owner = await db.user.findUnique({ where: { id: row.userId } });
-  if (!owner) throw new BridgeError(400, "BAD_KEY_CLAIM", KEY_CLAIM_REFUSAL);
-  let member: MemberKeyResult;
-  try { member = await getMemberEngineKey(owner, { fresh: true }); }
-  catch { throw new BridgeError(400, "BAD_KEY_CLAIM", KEY_CLAIM_REFUSAL); }
-  const claimed = await (db as any).bridgeKeyClaim.updateMany({ where: { id: row.id, userId: verified.userId, usedAt: null }, data: { usedAt: new Date() } });
-  if (claimed.count !== 1) throw new BridgeError(400, "BAD_KEY_CLAIM", KEY_CLAIM_REFUSAL);
-  return { key: member.key, plan: member.plan, credits: member.credits, period: member.period, userId: row.userId };
+  const { member, userId } = await exchangeKeyClaim({
+    findToken: (tokenHash) => db.bridgeUpdateToken.findUnique({ where: { tokenHash } }),
+    findClaim: (codeHash) => db.bridgeKeyClaim.findUnique({ where: { codeHash } }),
+    findMember: (id) => db.user.findUnique({ where: { id } }),
+    fetchEngineKey: (owner) => getMemberEngineKey(owner, { fresh: true }),
+    consume: (claimId, tokenId, userId) => keyClaimTransaction(async (tx) => {
+      const token = await tx.bridgeUpdateToken.findFirst({ where: { id: tokenId, userId, revokedAt: null }, select: { id: true } });
+      if (!token) return "token_revoked";
+      const now = new Date();
+      const claimed = await tx.bridgeKeyClaim.updateMany({
+        where: { id: claimId, userId, usedAt: null, expiresAt: { gt: now } }, data: { usedAt: now },
+      });
+      if (claimed.count !== 1) {
+        const expired = await tx.bridgeKeyClaim.findFirst({ where: { id: claimId, userId, usedAt: null, expiresAt: { lte: now } }, select: { id: true } });
+        return expired ? "claim_expired" : "claim_race_lost";
+      }
+      await tx.bridgeUpdateToken.update({ where: { id: tokenId }, data: { lastUsedAt: now } });
+      return "claimed";
+    }),
+  }, rawCode, updateToken);
+  return { key: member.key, plan: member.plan, credits: member.credits, period: member.period, userId };
 }
 
 export async function mintBridgeCode(
@@ -623,19 +642,13 @@ export function bridgeTokenCanSpend(token: AnyBridgeToken | null): token is Extr
   return token?.kind === "spend";
 }
 
-export async function mintUpdateToken(userId: string): Promise<{ token: string; createdAt: Date }> {
-  const token = UPDATE_TOKEN_PREFIX + randomBytes(32).toString("base64url");
-  const createdAt = new Date();
-  await db.$transaction(async (tx) => {
-    await (tx as any).bridgeUpdateToken.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: createdAt } });
-    await (tx as any).bridgeUpdateToken.create({ data: { userId, tokenHash: sha256(token), createdAt } });
-  });
-  return { token, createdAt };
+export async function getOrCreateUpdateToken(userId: string): Promise<{ token: string; createdAt: Date }> {
+  const secret = keyHandoutSecret();
+  return keyClaimTransaction((tx) => handOutUpdateToken(keyHandoutStore(tx), userId, secret, new Date()));
 }
 
 export async function revokeUpdateTokens(userId: string): Promise<number> {
-  const out = await (db as any).bridgeUpdateToken.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } });
-  return out.count;
+  return keyClaimTransaction((tx) => revokeKeyClaimCredentials(keyHandoutStore(tx), userId, new Date()));
 }
 
 export async function getUpdateTokenStatus(userId: string): Promise<{ active: boolean; createdAt: Date | null; lastUsedAt: Date | null }> {
