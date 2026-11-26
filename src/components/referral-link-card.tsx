@@ -15,13 +15,24 @@ import { Button } from "@/components/ui/button";
  * figures here: commissions are SIMULATED until a real rail exists,
  * so the card promises attribution + Bid Points only (both real:
  * referredById is set-once, and referral joins fire BidPointEvents,
- * lib/doors/points.ts).
+ * lib/doors/points.ts). Dave's 2026-11-26 extension: show the recruits
+ * list and conversion count too, still with no earnings figures.
  */
+
+interface ReferralRecruit {
+  name: string | null;
+  whopUsername: string | null;
+  plan: string;
+  createdAt: string;
+  converted: boolean;
+}
 
 interface ReferralState {
   link: string;
   code: string;
   recruitsCount: number;
+  recruits: ReferralRecruit[];
+  conversions: number;
 }
 
 export function ReferralLinkCard({ ready, connected }: { ready: boolean; connected: boolean }) {
@@ -85,10 +96,33 @@ export function ReferralLinkCard({ ready, connected }: { ready: boolean; connect
             </Button>
           </div>
           {referral.recruitsCount > 0 ? (
-            <p className="mt-3 text-sm text-muted-foreground">
-              {referral.recruitsCount} {referral.recruitsCount === 1 ? "person has" : "people have"} joined through your
-              link so far.
-            </p>
+            <div className="mt-3 text-sm text-muted-foreground">
+              <p>
+                {referral.recruitsCount} {referral.recruitsCount === 1 ? "person has" : "people have"} joined through
+                your link so far.
+              </p>
+              <ul className="mt-2 space-y-1">
+                {referral.recruits.slice(0, 10).map((recruit, index) => {
+                  const displayName = recruit.name || (recruit.whopUsername ? `@${recruit.whopUsername}` : "Member");
+                  const joinedDate = new Date(recruit.createdAt).toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  });
+                  return (
+                    <li key={`${recruit.createdAt}-${recruit.whopUsername ?? index}`} className="flex flex-wrap gap-x-2">
+                      <span>{displayName}</span>
+                      <span>Joined {joinedDate}</span>
+                      {recruit.converted ? <span>Converted</span> : null}
+                    </li>
+                  );
+                })}
+              </ul>
+              {referral.recruits.length > 10 ? (
+                <p className="mt-1">+{referral.recruits.length - 10} more</p>
+              ) : null}
+              {referral.conversions > 0 ? <p className="mt-2">{referral.conversions} converted.</p> : null}
+            </div>
           ) : null}
         </>
       ) : (
