@@ -55,16 +55,26 @@ describe("composeEnginePrompt v3", () => {
     assert.match(p, /Secure entry is the secure entry card Muse presents; you type or paste your key on that card only; it goes to secure storage and is never shown back\./);
   });
 
-  it("names the signup-link source and forbids searching or inventing links", () => {
+  it("puts Unlock 1 through the referrer, own-link, house-link, then paste fallback ladder", () => {
     const p = composeEnginePrompt({ ...base, link: null });
-    for (const sectionName of ["### 1. Your links", "### 5. Fish Audio"]) {
-      const start = p.indexOf(sectionName);
-      const end = p.indexOf("\n### ", start + sectionName.length);
-      const section = p.slice(start, end < 0 ? undefined : end);
-      assert.match(section, /my own saved offers \(list_my_offers\) or my referrer's link already on file/i);
-      assert.match(section, /ask me for that one signup link in a single line, or I can skip/i);
-      assert.match(section, /Never search for a signup link or invent one/i);
-    }
+    const start = p.indexOf("### 1. Your links");
+    const end = p.indexOf("\n### ", start + 8);
+    const section = p.slice(start, end);
+    assert.match(section, /read this connection's account view and my saved offers/i);
+    assert.match(section, /if a referrer is on my record, open with ‘you came in under <referrer>’; never ask who sent me/i);
+    assert.match(section, /my own signup\/referral link.*my-refCode/i);
+    assert.match(section, /house default signup link.*mark the links pending.*complete this unlock now/i);
+    assert.match(section, /last resort after those sources are unavailable/i);
+    assert.match(section, /Skip is also a choice/i);
+    assert.match(section, /Never search for a signup link or invent a member link/i);
+  });
+
+  it("labels connect-page figures when this connection has no balance tool", () => {
+    const p = composeEnginePrompt({ ...base, link: null });
+    const step5 = p.slice(p.indexOf("## Step 7 — First proof"), p.indexOf("## Step 8"));
+    assert.match(step5, /exact credit cost and balance only when a balance tool is present in THIS connection's tool list/i);
+    assert.match(step5, /label any figure from the connect page explicitly as ‘the connect page says/);
+    assert.match(step5, /never present page wording as an exact quote/i);
   });
 
   it("points at the connection brief as truth, bans P&R research, and handles link presence", () => {

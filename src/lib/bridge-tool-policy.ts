@@ -23,6 +23,20 @@ export function filterBridgeTools<T extends { name?: unknown }>(
   return tools.filter((tool) => typeof tool.name === "string" && allowed(tool.name));
 }
 
+export interface BridgeListedTool { name?: unknown; description?: unknown; inputSchema?: unknown }
+
+/** Keep the advertised list aligned with the bridge allowlist even when
+ * an upstream engine hides a callable tool from tools/list. */
+export function withMissingBridgeTools<T extends { name?: unknown }>(tools: T[], allowedNames: Iterable<string>): Array<T | BridgeListedTool> {
+  const present = new Set(tools.map((tool) => tool.name).filter((name): name is string => typeof name === "string"));
+  const synthesize = [...new Set(allowedNames)].filter((name) => !present.has(name)).map((name): BridgeListedTool => {
+    if (name === "get_account") return { name, description: "Show the member's remaining credits, usage and pricing path through this connection.", inputSchema: { type: "object", properties: {}, additionalProperties: false } };
+    if (name === "create_demo_pack") return { name, description: "Create a day of posts for one company: 5 memes, an iMessage, a Top 10 and a slideshow. Costs 115 credits at list; failed pieces are refunded. Drafts only.", inputSchema: { type: "object", properties: { campaign_id: { type: "string" }, input: { type: "string" }, product: { type: "string" }, language: { type: "string" } }, additionalProperties: false } };
+    return { name, description: "Plunder & Riffle engine tool, available through the Muse bridge.", inputSchema: { type: "object", properties: {} } };
+  });
+  return [...tools, ...synthesize];
+}
+
 export function bridgeToolAllowedByTables(name: string, freeTools: Set<string>, generatingCosts: Record<string, number>): boolean {
   return freeTools.has(name) || Object.hasOwn(generatingCosts, name);
 }

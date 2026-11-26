@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { isDesignatedOperator } from "@/lib/auth";
 import { EXPERIMENT_GENERATING_COSTS, codeTtlMsForScope } from "@/lib/experiment-scope";
 import { publicUpdateTokenStatus, tokenKind } from "@/lib/update-token-core";
-import { BRIDGE_FREE_TOOLS, bridgeToolAllowedByTables, filterBridgeTools } from "@/lib/bridge-tool-policy";
+import { BRIDGE_FREE_TOOLS, bridgeToolAllowedByTables, filterBridgeTools, withMissingBridgeTools } from "@/lib/bridge-tool-policy";
 export { BRIDGE_FREE_TOOLS } from "@/lib/bridge-tool-policy";
 import { byokViewFromUnlockPayload, type BridgeByokView } from "@/lib/bridge-byok";
 import { claimFreeDay, getFreeDay, getFreeDayForUser } from "@/lib/free-day-server";
@@ -855,19 +855,9 @@ export async function proxyToolsList(session: BridgeSession): Promise<unknown> {
     const reply = await mcpCall(member.key, "tools/list", {});
     return (reply.result as { tools?: Array<{ name?: string }> } | undefined)?.tools;
   })().catch(() => undefined);
-  if (!Array.isArray(tools)) {
-    // Upstream list unusable: synthesize the allowlist itself rather
-    // than handing the member's agent an empty tool list.
-    const names = [...BRIDGE_FREE_TOOLS, ...Object.keys(generatingCostsForScope(session.scope))];
-    return {
-      tools: [...names.filter(isEngineTool).map((name) => ({
-        name,
-        description: "Plunder & Riffle engine tool, available through the Muse bridge.",
-        inputSchema: { type: "object", properties: {} },
-      })), ...freeDayTools],
-    };
-  }
-  return { tools: [...filterBridgeTools(tools, isEngineTool), ...freeDayTools] };
+  const allowed = [...BRIDGE_FREE_TOOLS, ...Object.keys(generatingCostsForScope(session.scope))].filter(isEngineTool);
+  const filtered = Array.isArray(tools) ? filterBridgeTools(tools, isEngineTool) : [];
+  return { tools: [...withMissingBridgeTools(filtered, allowed), ...freeDayTools] };
 }
 
 // ─── Member-facing account view ─────────────────────────────────────
@@ -894,16 +884,17 @@ export interface BridgeAccountView {
   tokens: Array<{ id: string; budgetCredits: number; spentCredits: number; expiresAt: Date; active: boolean; scope: BridgeScope }>;
   weekBudgetCredits: number;
   offers: BridgeOffer[];
+  referral: { referrerName: string | null; ownRefCode: string | null };
   error: string | null;
   errorCode: string | null;
 }
 
 export async function getBridgeAccountView(user: User): Promise<BridgeAccountView> {
-  const brand = await db.brandProfile.findFirst({
+  const [brand, referrer] = await Promise.all([db.brandProfile.findFirst({
     where: { userId: user.id },
     orderBy: { createdAt: "asc" },
     select: { name: true, website: true },
-  });
+  }), user.referredById ? db.user.findUnique({ where: { id: user.referredById }, select: { name: true, whopUsername: true } }) : Promise.resolve(null)]);
   const tokens = await db.bridgeToken.findMany({
     where: { userId: user.id },
     orderBy: { createdAt: "desc" },
@@ -931,6 +922,7 @@ export async function getBridgeAccountView(user: User): Promise<BridgeAccountVie
     })),
     weekBudgetCredits: WEEK_BUDGET_CREDITS,
     offers: BRIDGE_OFFERS,
+    referral: { referrerName: referrer?.name?.trim() || referrer?.whopUsername?.trim() || null, ownRefCode: user.refCode ?? null },
     error: null,
     errorCode: null,
   };
