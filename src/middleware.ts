@@ -62,6 +62,11 @@ const PUBLIC_API_PREFIXES = [
   // a member read and stays behind the session floor.
   "/api/attribution/resolve",
   "/api/attribution/pending-referral",
+  // Whop intake (SITE-REDO-SPEC 2026-11-26 §4): POST /api/intake is the
+  // logged-out homepage claim — anonymous by design. The handler
+  // validates every field itself, serves no member data (no GET), and
+  // only stamps userId when a session happens to exist.
+  "/api/intake",
   "/api/showcase",
   // Whop Army 2.0 public agent profiles (Slice 2, 2026-11-21):
   // read-only directory/profile JSON. Handlers serve ONLY agents the

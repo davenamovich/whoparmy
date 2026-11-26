@@ -1625,3 +1625,27 @@ CREATE TABLE "SettlementLine" (
 
 -- CreateIndex
 CREATE INDEX "SettlementLine_settlementId_idx" ON "SettlementLine"("settlementId");
+
+-- CreateTable
+CREATE TABLE "Intake" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "businessName" TEXT NOT NULL,
+    "websiteUrl" TEXT,
+    "noWebsite" BOOLEAN NOT NULL DEFAULT false,
+    "intent" TEXT NOT NULL,
+    "refCode" TEXT,
+    "referrerId" TEXT,
+    "userId" TEXT,
+    "source" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- CreateIndex
+CREATE INDEX "Intake_createdAt_idx" ON "Intake"("createdAt");
+
+-- CreateIndex
+CREATE INDEX "Intake_referrerId_idx" ON "Intake"("referrerId");
+
+-- CreateIndex
+CREATE INDEX "Intake_userId_idx" ON "Intake"("userId");

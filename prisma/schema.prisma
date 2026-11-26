@@ -1751,3 +1751,28 @@ model BtcPayoutLine {
 
   @@index([batchId])
 }
+
+// ─── Homepage intake (SITE-REDO-SPEC-2026-11-26 §4) ──────────────────
+// One row per claim submitted on the logged-out whop homepage: the
+// visitor's name, business, website (or the no-website flag), what
+// they want first, and the referral code they arrived with (resolved
+// to referrerId when it matches a member's refCode). Plain id columns,
+// no relations — the intake is a claim record, not a member record;
+// onboarding itself happens later, in the member's own Muse.
+model Intake {
+  id           String   @id @default(cuid())
+  name         String
+  businessName String
+  websiteUrl   String?
+  noWebsite    Boolean  @default(false)
+  intent       String // content_pack | seo_audit | ceo_experience | just_agent
+  refCode      String?
+  referrerId   String?
+  userId       String?
+  source       String?
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([referrerId])
+  @@index([userId])
+}
