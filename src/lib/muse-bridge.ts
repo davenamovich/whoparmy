@@ -84,7 +84,7 @@ export interface BridgeOffer {
 }
 
 export const BRIDGE_OFFERS: BridgeOffer[] = [
-  { id: "taste", name: "The Taste", budgetCredits: 115, blurb: "One day-pack — run the whole flow once." },
+  { id: "taste", name: "The Taste", budgetCredits: 50, blurb: "One /before — Joe's video about your business, plus the starter pack." },
   { id: "week", name: "The Week", budgetCredits: WEEK_BUDGET_CREDITS, blurb: "Seven day-packs, one per day, seven angles." },
   { id: "opener", name: "Week + Opener", budgetCredits: WEEK_BUDGET_CREDITS + 50, blurb: "The Week, plus a personalized /before pitch for your business." },
 ];
