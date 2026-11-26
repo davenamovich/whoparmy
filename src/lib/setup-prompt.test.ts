@@ -17,6 +17,17 @@ describe("composeEnginePrompt v3", () => {
     assert.match(p, /for example Storm season: Demand spikes after storms/);
   });
 
+  it("wires Mnemos memory through research, setup capture, and standing rules", () => {
+    const p = composeEnginePrompt({ ...base, link: null });
+    const step1 = p.slice(p.indexOf("## Step 1"), p.indexOf("## Step 2"));
+    assert.match(step1, /Mnemos memory/);
+    const memory = p.slice(p.indexOf("## Your memory"), p.indexOf("## Step 6"));
+    assert.match(memory, /recall it first and work from it/i);
+    assert.match(memory, /confirmed goals, brand voice, offer and audience, the five unlock states, and my never-use list/i);
+    assert.match(memory, /never credentials, keys, codes, or tokens; those live in secure storage, never in memory/i);
+    assert.match(p, /Recall before you create: check my memory first, work from what it holds, and capture new durable facts back to it after each session\./);
+  });
+
   it("removes all retired connection and setup procedures from the starter", () => {
     const p = composeEnginePrompt({ ...base, link: null, updateToken: "pru_SHOULD_NOT_APPEAR", keyClaimLink: "https://example/key-claim/SHOULD_NOT_APPEAR" });
     for (const forbidden of ["pru_SHOULD_NOT_APPEAR", "key-claim", "GATE 1", "foundation/confirm", "Skillsync", "get_brand_default"]) assert.equal(p.includes(forbidden), false, forbidden);
