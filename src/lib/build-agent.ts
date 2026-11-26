@@ -387,7 +387,7 @@ export function composeBuildAgentAddendum(args: {
     `# YOUR AGENT — BUILT FROM YOUR RESEARCH + QUIZ`,
     ``,
     `Whop Army's Build-an-Agent flow designed ONE agent for me from deep research on my business and my quiz answers. Build THIS agent as the lead of the engine in the brief above.`,
-    `If Section 0 is present, complete its optional offer walkthrough before building; skipping or stopping it never blocks the build.`,
+    `Complete the Step 4 links walkthrough (unlock #1) before building; skipping or stopping it never blocks the build.`,
     ``,
     `## The agent`,
     `Name: ${design.name}`,
