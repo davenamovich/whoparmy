@@ -1649,3 +1649,29 @@ CREATE INDEX "Intake_referrerId_idx" ON "Intake"("referrerId");
 
 -- CreateIndex
 CREATE INDEX "Intake_userId_idx" ON "Intake"("userId");
+
+-- CreateTable
+CREATE TABLE "GiftInvite" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "code" TEXT NOT NULL,
+    "recipientName" TEXT NOT NULL,
+    "recipientEmail" TEXT,
+    "tier" TEXT NOT NULL,
+    "tokenCap" INTEGER NOT NULL,
+    "keyName" TEXT NOT NULL,
+    "accountLabel" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'draft',
+    "notes" TEXT,
+    "createdById" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateIndex
+CREATE INDEX "GiftInvite_status_idx" ON "GiftInvite"("status");
+
+-- CreateIndex
+CREATE INDEX "GiftInvite_createdAt_idx" ON "GiftInvite"("createdAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "GiftInvite_code_key" ON "GiftInvite"("code");

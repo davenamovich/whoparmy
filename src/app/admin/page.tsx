@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getGateState, getSessionOperator } from "@/lib/site-gate";
 import { getStacks, API_KEY_UNLOCKS } from "@/lib/stacks";
 import { AdminPanel } from "@/components/admin/admin-panel";
+import { GiftInvitesPanel } from "@/components/admin/gift-invites-panel";
 import { BtcRealPanel } from "@/components/admin/btc-real-panel";
 import { RotatorAdmin } from "@/components/bridge/rotator-admin";
 import { RotatorSummaryCard } from "@/components/admin/rotator-summary-card";
@@ -147,6 +148,13 @@ export default async function AdminPage() {
           links, turning the Ride door on /agent/btc-barry live. */}
       <div className="mt-10">
         <BarryRotatorCard />
+      </div>
+
+      {/* Gift-lane invites (Dave, 2026-11-27): Starimg token gift
+          records, admin-only, NOT LAUNCHED. Renders nothing unless
+          the operator-only gift-invites API answers. */}
+      <div className="mt-10">
+        <GiftInvitesPanel />
       </div>
 
       {/* Moved here from /bridge with the one-time-door overhaul

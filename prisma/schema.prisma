@@ -1776,3 +1776,30 @@ model Intake {
   @@index([referrerId])
   @@index([userId])
 }
+
+/// Gift-lane invites (Dave, 2026-11-27): admin-only records for the
+/// Starimg token gift lane (1M / 10M tiers). NOT LAUNCHED — drafts and
+/// manual status only; nothing sends or grants. KEY DESIGN: the invite
+/// records WHICH Starimg key serves it by REFERENCE ONLY (cabinet
+/// sub-key name + account label + cap). There is deliberately no column
+/// for a raw key value — the value lives in the Starimg cabinet /
+/// secure storage and lands in the recipient's own save_my_key at
+/// handover. See src/lib/gift-invite-core.ts.
+model GiftInvite {
+  id             String   @id @default(cuid())
+  code           String   @unique
+  recipientName  String
+  recipientEmail String?
+  tier           String // 1m | 10m
+  tokenCap       Int
+  keyName        String // Starimg cabinet sub-key NAME (reference only)
+  accountLabel   String // which Starimg account the sub-key lives on
+  status         String   @default("draft") // draft | ready | handed_over | exhausted | revoked
+  notes          String?
+  createdById    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
