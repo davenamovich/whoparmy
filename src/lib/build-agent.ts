@@ -265,6 +265,53 @@ export function noWebsiteProfile(brandName: string): BuildResearchProfile {
   return { name: brandName };
 }
 
+/**
+ * The starter's "one result I want first" for a no-website member.
+ * With no research to draw on, the goal is shaped from the member's
+ * own quiz answers — their first job, their audience, their business
+ * name — never from a blueprint or brand record already on the
+ * account, which may belong to a different business entirely.
+ */
+export function noWebsiteFirstResult(args: { brandName: string | null; quiz: BuildQuizAnswers }): string {
+  const business = (args.brandName ?? "").trim() || "my business";
+  const audience = (args.quiz.audience ?? "").trim();
+  switch (args.quiz.firstJob) {
+    case "leads":
+      return audience
+        ? `Find leads for ${business} — research ${audience} and the angle that fits each one`
+        : `Find leads for ${business} — research prospects and the angle that fits each one`;
+    case "research":
+      return audience
+        ? `Research ${business}'s market, competitors and next move — with ${audience} in mind — and report in plain language`
+        : `Research ${business}'s market, competitors and next move, and report in plain language`;
+    case "support":
+      return audience
+        ? `Answer questions from ${audience} for ${business}, drafted from my real facts — never invent an answer`
+        : `Answer customer questions for ${business}, drafted from my real facts — never invent an answer`;
+    case "content":
+    default:
+      return audience
+        ? `Make content — posts, memes and short videos in my voice — that brings ${audience} to ${business}`
+        : `Make content — posts, memes and short videos in my voice — that brings customers to ${business}`;
+  }
+}
+
+/**
+ * The one place the /build mint picks its starter goal: the
+ * no-website path always uses the quiz-derived goal above; every
+ * other path keeps the account blueprint's objective, unchanged.
+ */
+export function starterFirstResult(args: {
+  noWebsite: boolean;
+  brandName: string | null;
+  quiz: BuildQuizAnswers;
+  blueprintObjective: string;
+}): string {
+  return args.noWebsite
+    ? noWebsiteFirstResult({ brandName: args.brandName, quiz: args.quiz })
+    : args.blueprintObjective;
+}
+
 /** Plain-text digest of the deep research, for prompts + instructions. Empty string when there is nothing real to say. */
 export function researchSummaryText(research: BuildResearchSummary | null, profile: BuildResearchProfile | null): string {
   const lines: string[] = [];

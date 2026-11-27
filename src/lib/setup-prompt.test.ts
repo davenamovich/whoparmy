@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { composeEnginePrompt, EXPLAINER_VIDEO_URL } from "./setup-prompt-compose.ts";
+import { starterFirstResult, type BuildQuizAnswers } from "./build-agent.ts";
 import type { Blueprint } from "./blueprint.ts";
 
 const bp: Blueprint = {
@@ -29,11 +30,45 @@ describe("composeEnginePrompt v3", () => {
     assert.match(step1, /Save what you learned about my business to my own memory/);
   });
 
+  it("no-website mint: the goal slot is quiz-derived even when the account blueprint is another business's", () => {
+    // Reproduces the 2026-11-27 live defect: the test account's
+    // blueprint objective was the house business's goal, and the mint
+    // dropped it into a no-website bakery member's prompt.
+    const otherBusinessGoal = "Turn Plunder & Riffle's own website, ideas, and voice into a steady stream of memes and short content that earns signups through its referral links — no views, follower, or income promises attached.";
+    const otherBp: Blueprint = { ...bp, objective: otherBusinessGoal };
+    const bakeryQuiz: BuildQuizAnswers = {
+      promoting: "business",
+      audience: "Local customers in Raleigh who want fresh bread, pastries and cakes",
+      firstJob: "content",
+      cadence: "daily",
+      tone: "warm",
+      runsOn: "muse",
+      neverDo: "Never promise same-day delivery for custom cakes.",
+    };
+    const p = composeEnginePrompt({
+      ...base,
+      business: "Test Bakery Raleigh",
+      website: null,
+      blueprint: otherBp,
+      offer: "Test Bakery Raleigh Content Agent — built from its owner's answers",
+      audience: bakeryQuiz.audience,
+      firstResult: starterFirstResult({
+        noWebsite: true,
+        brandName: "Test Bakery Raleigh",
+        quiz: bakeryQuiz,
+        blueprintObjective: otherBp.objective,
+      }),
+      link: null,
+    });
+    assert.match(p, /- The one result I want first: Make content — posts, memes and short videos in my voice — that brings Local customers in Raleigh who want fresh bread, pastries and cakes to Test Bakery Raleigh/);
+    assert.equal(p.includes(otherBusinessGoal), false, "another business's goal must not appear anywhere in the prompt");
+  });
+
   it("wires Mnemos memory through research, setup capture, and standing rules", () => {
     const p = composeEnginePrompt({ ...base, link: null });
     const step1 = p.slice(p.indexOf("## Step 1"), p.indexOf("## Step 2"));
     assert.match(step1, /Mnemos memory/);
-    const memory = p.slice(p.indexOf("## Step 5 — Your memory"), p.indexOf("## Step 6"));
+    const memory = p.slice(p.indexOf("## Step 7 — Your memory"), p.indexOf("## Step 8"));
     assert.match(memory, /recall it first and work from it/i);
     assert.match(memory, /confirmed goals, brand voice, offer and audience, the five unlock states, and my never-use list/i);
     assert.match(memory, /never credentials, keys, codes, or tokens; those live in secure storage, never in memory/i);
@@ -42,7 +77,7 @@ describe("composeEnginePrompt v3", () => {
 
   it("removes all retired connection and setup procedures from the starter", () => {
     const p = composeEnginePrompt({ ...base, link: null, updateToken: "pru_SHOULD_NOT_APPEAR", keyClaimLink: "https://example/key-claim/SHOULD_NOT_APPEAR" });
-    for (const forbidden of ["pru_SHOULD_NOT_APPEAR", "key-claim", "GATE 1", "foundation/confirm", "Skillsync", "get_brand_default"]) assert.equal(p.includes(forbidden), false, forbidden);
+    for (const forbidden of ["pru_SHOULD_NOT_APPEAR", "key-claim", "GATE 1", "foundation/confirm", "get_brand_default"]) assert.equal(p.includes(forbidden), false, forbidden);
   });
 
   it("guides all five unlocks with say-first, drive, save, read-back, and skip", () => {
@@ -61,7 +96,22 @@ describe("composeEnginePrompt v3", () => {
 
   it("keeps Muse Mail and Gmail in Step 0 and explains LLM key choices plus existing keys", () => {
     const p = composeEnginePrompt({ ...base, link: null });
+    assert.match(p, /Muse Mail FIRST/);
+    assert.match(p, /1M tokens/);
+    assert.match(p, /10M bounty carve/);
+    assert.match(p, /Top up in Mission Control/);
     assert.ok(p.indexOf("## Step 0 — Your Muse email") < p.indexOf("## Step 1 — Learn my business"));
+    assert.match(p, /## Step 5 — Unlock the Panel \(Opus \+ Fable\)/);
+    assert.match(p, /claude-opus-5-5/);
+    assert.match(p, /claude-fable-5-2/);
+    assert.match(p, /hard critique/);
+    assert.match(p, /creative angle/);
+    assert.match(p, /Vercel board/);
+    assert.match(p, /P&R credits are engine fuel[\s\S]*different from Starimg API tokens[\s\S]*The Panel is NOT a currency/);
+    assert.match(p, /Panel calls burn MY tokens at premium-model rates/);
+    assert.ok(p.indexOf("## Step 5 — Unlock the Panel (Opus + Fable)") > p.indexOf("## Step 4 — I set up your five keys with you"));
+    assert.ok(p.indexOf("## Step 5 — Unlock the Panel (Opus + Fable)") < p.indexOf("## Step 7 — Your memory"));
+    assert.ok(p.includes("## Step 10 — Report, then stop"));
     const step0 = p.slice(p.indexOf("## Step 0 — Your Muse email"), p.indexOf("## Step 1 — Learn my business"));
     assert.match(step0, /Ask me what email I want to use/);
     assert.match(step0, /use my Gmail if I'd rather/);
@@ -127,7 +177,7 @@ describe("composeEnginePrompt v3", () => {
 
   it("labels connect-page figures when this connection has no balance tool", () => {
     const p = composeEnginePrompt({ ...base, link: null });
-    const step5 = p.slice(p.indexOf("## Step 7 — First proof"), p.indexOf("## Step 8"));
+    const step5 = p.slice(p.indexOf("## Step 9 — First proof"), p.indexOf("## Step 10"));
     assert.match(step5, /exact credit cost and balance only when a balance tool is present in THIS connection's tool list/i);
     assert.match(step5, /label any figure from the connect page explicitly as ‘the connect page says/);
     assert.match(step5, /never present page wording as an exact quote/i);
@@ -200,7 +250,7 @@ describe("composeEnginePrompt v3", () => {
     assert.ok(agentMail < step0.indexOf("Muse Mail setup card"), "Agent Mail precedes the Muse Mail path");
     assert.ok(agentMail < step0.indexOf("use my Gmail if I'd rather"), "Agent Mail precedes the Gmail fallback");
     // Dave's offer terms, verbatim — no other pricing/limit claims.
-    assert.match(step0, /it is free, with 80 emails a day and no credit card/);
+    assert.match(step0, /it is free, with 100 emails a day and no credit card/);
     // The documented AgentMail agent sign-up mechanics: human attached, exact-address yes, OTP verify.
     assert.match(step0, /AgentMail's agent sign-up/);
     assert.match(step0, /<username>@agentmail\.to/);
@@ -228,11 +278,29 @@ describe("composeEnginePrompt v3", () => {
     assert.match(fallback, /Agent37 signup: https:\/\/www\.agent37\.com\/\?via=riffle \(the house link\)/);
   });
 
-  it("numbers the steps without a gap (Step 5 is Your memory)", () => {
+  it("numbers the steps without a gap (Step 5 is the Panel, Step 6 is Core Skills)", () => {
     const p = composeEnginePrompt({ ...base, link: null });
-    const order = ["## Step 0", "## Step 1", "## Step 2", "## Step 3", "## Before any key", "## Step 4", "## Step 5 — Your memory", "## Step 6", "## Step 7", "## Step 8"];
+    const order = ["## Step 0", "## Step 1", "## Step 2", "## Step 3", "## Before any key", "## Step 4", "## Step 5 — Unlock the Panel", "## Step 6 — Upgrade my core skills", "## Step 7 — Your memory", "## Step 8", "## Step 9", "## Step 10"];
     let last = -1;
     for (const h of order) { const i = p.indexOf(h); assert.ok(i > last, h); last = i; }
+  });
+
+  it("adds the Core Skills upgrade step right after the Panel", () => {
+    const p = composeEnginePrompt({ ...base, link: null });
+    assert.match(p, /## Step 6 — Upgrade my core skills/);
+    assert.ok(p.indexOf("## Step 6 — Upgrade my core skills") > p.indexOf("## Step 5 — Unlock the Panel (Opus + Fable)"));
+    assert.ok(p.indexOf("## Step 6 — Upgrade my core skills") < p.indexOf("## Step 7 — Your memory"));
+    const step = p.slice(p.indexOf("## Step 6 — Upgrade my core skills"), p.indexOf("## Step 7 — Your memory"));
+    assert.match(step, /space-demo-and-replicate/);
+    assert.match(step, /Design Engine contract and kit patterns/);
+    assert.match(step, /taste finish gate/);
+    assert.match(step, /Skillsync one-click install/);
+    assert.match(step, /https:\/\/app\.skillsync\.com\/iammagicdave\/plunder-and-riffle/);
+    assert.match(step, /Skills are the install lane; Whop keeps the sales/);
+    assert.match(step, /version check yourself — I type nothing/);
+    assert.match(step, /never silently mid-task/);
+    assert.match(step, /turns a tester into a builder/);
+    assert.match(step, /here\.now replication kit/);
   });
 
   it("gives Step 1 the honest Mnemos fallback where the save is asked", () => {
