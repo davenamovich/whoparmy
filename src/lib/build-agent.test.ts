@@ -10,8 +10,10 @@ import {
   composeBuildAgentAddendum,
   designAgent,
   noWebsiteBrandName,
+  noWebsiteFirstResult,
   noWebsiteProfile,
   quizAnswerLines,
+  starterFirstResult,
   researchSummaryText,
   validateQuizAnswers,
   type BuildQuizAnswers,
@@ -284,6 +286,49 @@ describe("no-website path (P0-1)", () => {
     assert.match(text, /Acme Roofing Content Agent/);
     assert.match(text, /What are you promoting\? My business/);
     assert.match(text, /Homeowners in Raleigh/);
+  });
+
+  it("builds the starter goal from the member's own quiz answers — never the account blueprint's objective", () => {
+    // The live defect: this house goal sat in a bakery member's prompt
+    // because the mint took the account blueprint's objective as-is.
+    const otherBusinessGoal = "Turn Plunder & Riffle's own website, ideas, and voice into a steady stream of memes and short content that earns signups through its referral links — no views, follower, or income promises attached.";
+    const bakeryQuiz: BuildQuizAnswers = {
+      ...FULL_ANSWERS,
+      audience: "Local customers in Raleigh who want fresh bread, pastries and cakes",
+    };
+    const goal = starterFirstResult({
+      noWebsite: true,
+      brandName: "Test Bakery Raleigh",
+      quiz: bakeryQuiz,
+      blueprintObjective: otherBusinessGoal,
+    });
+    assert.equal(
+      goal,
+      "Make content — posts, memes and short videos in my voice — that brings Local customers in Raleigh who want fresh bread, pastries and cakes to Test Bakery Raleigh",
+    );
+    assert.doesNotMatch(goal, /Plunder & Riffle/);
+    // The website path keeps the blueprint objective, byte for byte.
+    assert.equal(
+      starterFirstResult({ noWebsite: false, brandName: "Test Bakery Raleigh", quiz: bakeryQuiz, blueprintObjective: otherBusinessGoal }),
+      otherBusinessGoal,
+    );
+  });
+
+  it("shapes the no-website goal from each first-job answer, with the member's audience + business", () => {
+    const cases: Record<string, RegExp> = {
+      content: /Make content — posts, memes and short videos in my voice — that brings Homeowners in Raleigh to Acme Roofing/,
+      leads: /Find leads for Acme Roofing — research Homeowners in Raleigh and the angle that fits each one/,
+      research: /Research Acme Roofing's market, competitors and next move — with Homeowners in Raleigh in mind — and report in plain language/,
+      support: /Answer questions from Homeowners in Raleigh for Acme Roofing, drafted from my real facts — never invent an answer/,
+    };
+    for (const [firstJob, want] of Object.entries(cases)) {
+      const goal = noWebsiteFirstResult({ brandName: "Acme Roofing", quiz: { ...FULL_ANSWERS, firstJob } });
+      assert.match(goal, want, firstJob);
+    }
+    // No audience on file: the goal still names the business and the job, inventing no audience.
+    const bare = noWebsiteFirstResult({ brandName: "Acme Roofing", quiz: { firstJob: "leads" } });
+    assert.match(bare, /Find leads for Acme Roofing/);
+    assert.doesNotMatch(bare, /Homeowners/);
   });
 
   it("quiz Q1 no longer assumes a website", () => {
