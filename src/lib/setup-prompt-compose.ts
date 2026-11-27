@@ -29,6 +29,16 @@ export function composeEnginePrompt(args: {
   const guarded = houseHost && !args.houseAccount;
   const business = guarded ? "no business website on file yet — ask me for mine in your first message" : (args.business || "my business");
   const website = guarded ? "no business website on file yet — ask me for mine in your first message" : (args.website ?? "no business website on file yet — ask me for mine in your first message");
+  const noSite = !guarded && !args.website;
+  const step1Research = noSite
+    ? "I have no website yet — there is no site to research. Learn my business from my business name and the answers in this prompt, and ask me in your first message about anything else you need. Do not claim you researched a website."
+    : `Research ${guarded ? "the website I give you in your first message" : website} and my public presence. Work only from what you actually find; invent nothing.`;
+  const step1Confirm = noSite
+    ? "Confirm what you understood in one short plain summary: what I sell, who buys it, my voice, and the result above. If a slot above is wrong, my answers win — fix your understanding and tell me in one line."
+    : "Confirm what you learned in one short plain summary: what I sell, who buys it, my voice, and the result above. If a slot above is wrong, the research wins — fix your understanding and tell me in one line.";
+  const step1Save = noSite
+    ? "Save what you learned about my business to my own memory — my Mnemos memory — on the Plunder & Riffle side. My whole team — Ralph, my bots, and my assessments — works from those same facts instead of re-deriving them. If no memory connection is available, say so in one line and continue — never fake a save; keep the findings in my home base instead."
+    : "Save the deep research on my business to my own memory — my Mnemos memory — on the Plunder & Riffle side. My whole team — Ralph, my bots, and my assessments — works from those same findings instead of re-deriving them. If no memory connection is available, say so in one line and continue — never fake a save; keep the findings in my home base instead.";
   const opportunity = guarded ? undefined : bp.opportunities[0];
   const example = opportunity ? `${opportunity.title}: ${opportunity.why}` : "a small app that solves the clearest pain you find in my research";
   const connect = args.link
@@ -80,10 +90,10 @@ export function composeEnginePrompt(args: {
     ...(explainerVideoUrl ? [`Before anything else, open this link and show me the short explainer video: ${explainerVideoUrl}. It walks through every step of this setup and how they build my system. The main point it makes is the one to repeat if I ask: everything happens right here in Muse — I never leave to work a website or fetch a key; you do the work, I approve. Play it, then start the email step below.`] : []),
     "Decide my email with me FIRST, before you create any account anywhere. Ask me what email I want to use, and offer me the choice: set up a Muse email address for me (my own mailbox at <handle>@muse.ai — propose the address from the name I choose, show me the exact address on the Muse Mail setup card, and create it only on my yes for that exact address; the address cannot change later, the display name can; then have me verify my own email address in Muse Mail settings — the code is emailed to me, I enter it, you never handle it) — or use my Gmail if I'd rather (confirm the address once, then use it throughout). Whichever I pick is the email you use to create my accounts in this setup — every one of them: my LLM provider, Giphy, Agent37, Fish Audio, and DH Media / my offers. Say that back to me in one line so I know it is locked in. Skip is a choice; setup continues either way, and I can create the address later from Muse Mail settings.",
     "## Step 1 — Learn my business (research MY site, not anyone else's)",
-    `Research ${guarded ? "the website I give you in my first message" : website} and my public presence. Work only from what you actually find; invent nothing.`,
+    step1Research,
     "Do NOT research plunderandriffle.com to learn my business — that is a tool I use, not my business, and its goals are not my goals.",
-    "Confirm what you learned in one short plain summary: what I sell, who buys it, my voice, and the result above. If a slot above is wrong, the research wins — fix your understanding and tell me in one line.",
-    "Save the deep research on my business to my own memory — my Mnemos memory — on the Plunder & Riffle side. My whole team — Ralph, my bots, and my assessments — works from those same findings instead of re-deriving them. If no memory connection is available, say so in one line and continue — never fake a save; keep the findings in my home base instead.",
+    step1Confirm,
+    step1Save,
     "## Step 2 — Inventory my stack",
     "List what I already have: my website, social accounts, how I book or sell today, my email or CRM if any, and the Spaces and skills already in my Muse. Report it as a short list. Build around what exists — do not replace a tool I already use, and do not sign me up for anything in this step.",
     "## Step 3 — Connect one background tool (only if I gave you a link)",

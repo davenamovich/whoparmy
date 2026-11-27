@@ -72,7 +72,7 @@ export const BUILD_QUIZ: BuildQuizQuestion[] = [
     required: true,
     maxLength: 40,
     options: [
-      { id: "business", label: "My business", hint: "I have a business — and a website for it" },
+      { id: "business", label: "My business", hint: "I have a business — website or not" },
       { id: "affiliate", label: "Products & offers", hint: "I promote other people's products for commission" },
       { id: "creator", label: "My content", hint: "I'm a creator — posts, videos, a channel" },
       { id: "clients", label: "Clients' businesses", hint: "I run marketing for other businesses" },
@@ -233,6 +233,38 @@ export interface BuildResearchProfile {
   differentiators?: string[];
 }
 
+// ─── No-website path (P0-1, Dave 2026-11-27) ──────────────────────
+
+/**
+ * Step 1 statuses. The website lane ends at "done" / "reused"; a
+ * member with no website ends at "no-website" — an explicit terminal
+ * status of its own, never dressed up as research.
+ */
+export type BuildStep1Status = "running" | "done" | "failed" | "reused" | "no-website";
+
+/** The one gate both the page and the create endpoint read: step 1 is complete only at a terminal status. */
+export function buildStep1Complete(status: string | null | undefined): boolean {
+  return status === "done" || status === "reused" || status === "no-website";
+}
+
+/** Honest label carried in flow state + shown on the page — never "research on file". */
+export const NO_WEBSITE_NOTE = "No website yet — profile from your answers";
+
+/** Business name is the no-website path's one required input (already a Step 1 field). Trimmed + clamped, or null. */
+export function noWebsiteBrandName(raw: string | null | undefined): string | null {
+  const trimmed = (raw ?? "").trim().slice(0, 120);
+  return trimmed ? trimmed : null;
+}
+
+/**
+ * The explicit no-website profile: the business name only. Offer and
+ * audience come from the quiz — researchSummaryText says nothing for
+ * a name-only profile, so no research content is ever implied.
+ */
+export function noWebsiteProfile(brandName: string): BuildResearchProfile {
+  return { name: brandName };
+}
+
 /** Plain-text digest of the deep research, for prompts + instructions. Empty string when there is nothing real to say. */
 export function researchSummaryText(research: BuildResearchSummary | null, profile: BuildResearchProfile | null): string {
   const lines: string[] = [];
@@ -321,7 +353,9 @@ export function designAgent(args: {
   const description = (
     offerLine
       ? `${name} — ${offerLine}`
-      : `${name} — built from deep research on ${brand}${args.website ? ` (${args.website})` : ""} and its owner's answers: it works to ${job.mission}, for ${audience}.`
+      : args.website
+        ? `${name} — built from deep research on ${brand} (${args.website}) and its owner's answers: it works to ${job.mission}, for ${audience}.`
+        : `${name} — built from its owner's answers: it works to ${job.mission}, for ${audience}.`
   ).slice(0, 300);
   return {
     name,
@@ -373,6 +407,7 @@ export function composeBuildAgentAddendum(args: {
   bridgeCode: string | null;
   updateToken?: string | null;
   keyClaimLink?: string | null;
+  noWebsite?: boolean;
 }): string {
   const { design } = args;
   const quizLines = quizAnswerLines(args.quiz)
@@ -386,7 +421,9 @@ export function composeBuildAgentAddendum(args: {
     ``,
     `# YOUR AGENT — BUILT FROM YOUR RESEARCH + QUIZ`,
     ``,
-    `Whop Army's Build-an-Agent flow designed ONE agent for me from deep research on my business and my quiz answers. Build THIS agent as the lead of the engine in the brief above.`,
+    args.noWebsite
+      ? `Whop Army's Build-an-Agent flow designed ONE agent for me from my business name and my quiz answers — I have no website yet, and no website research was run. Build THIS agent as the lead of the engine in the brief above.`
+      : `Whop Army's Build-an-Agent flow designed ONE agent for me from deep research on my business and my quiz answers. Build THIS agent as the lead of the engine in the brief above.`,
     `Complete the Step 4 links walkthrough (unlock #1) before building; skipping or stopping it never blocks the build.`,
     ``,
     `## The agent`,
@@ -395,8 +432,10 @@ export function composeBuildAgentAddendum(args: {
     `Category: ${design.category} · Capabilities: ${design.capabilities.join(", ")} · Schedule: ${design.schedule}`,
     args.website ? `Website: ${args.website}` : null,
     ``,
-    `## What the research found`,
-    args.researchText || "Deep research did not return a summary this time. Research my website yourself first and work only from what you actually find — invent nothing.",
+    args.noWebsite ? `## My starting profile (no website yet)` : `## What the research found`,
+    args.noWebsite
+      ? "I have no website yet. My starting profile is my business name plus my quiz answers below — work only from those, invent nothing, and do not claim any website research was done. When I have a website, research it then and deepen this profile."
+      : args.researchText || "Deep research did not return a summary this time. Research my website yourself first and work only from what you actually find — invent nothing.",
     ``,
     `## My quiz answers`,
     quizLines || "(none on file)",
@@ -408,8 +447,12 @@ export function composeBuildAgentAddendum(args: {
     `## Build out my Spaces — I hit the ground running`,
     `Do not hand me a blank scaffold. Build out my Spaces in my Muse, finished and pre-populated, so day one is running the system — not setting it up:`,
     `- The home base Space from the brief above, built to its design standard and pre-populated with Mission Control, Approvals Studio, Daily Brief, Content Engine, My Links & Rotator, my business-specific app, and Settings; bake in my brand voice, saved offer links and this agent's standing instructions.`,
-    `- ${design.name} stood up inside it: mission, schedule (${design.schedule}) and approval rules set from my quiz answers, its first work already queued from the research angles above.`,
-    `- My first day's work already done or drafted and waiting in the Approvals inbox — the research summary at the top, so I see what you worked from.`,
+    args.noWebsite
+      ? `- ${design.name} stood up inside it: mission, schedule (${design.schedule}) and approval rules set from my quiz answers, its first work already queued from those answers.`
+      : `- ${design.name} stood up inside it: mission, schedule (${design.schedule}) and approval rules set from my quiz answers, its first work already queued from the research angles above.`,
+    args.noWebsite
+      ? `- My first day's work already done or drafted and waiting in the Approvals inbox — my starting profile at the top, so I see what you worked from.`
+      : `- My first day's work already done or drafted and waiting in the Approvals inbox — the research summary at the top, so I see what you worked from.`,
     `If my answers call for another Space (a lead book for leads work, a research shelf for research work), build that too, the same way: populated, not empty.`,
     ``,
     `## Connect + manage through the bridge`,

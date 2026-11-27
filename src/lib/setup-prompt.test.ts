@@ -17,6 +17,18 @@ describe("composeEnginePrompt v3", () => {
     assert.match(p, /for example Storm season: Demand spikes after storms/);
   });
 
+  it("no-website member: Step 1 claims no website research (P0-1)", () => {
+    const p = composeEnginePrompt({ ...base, website: null, link: null });
+    const step1 = p.slice(p.indexOf("## Step 1"), p.indexOf("## Step 2"));
+    assert.match(step1, /no website yet/i);
+    assert.match(step1, /Do not claim you researched a website/);
+    assert.doesNotMatch(step1, /deep research on my business/);
+    assert.doesNotMatch(step1, /the research wins/);
+    assert.doesNotMatch(step1, /Research no business website/);
+    // Memory save is still asked for — of what was learned, not of "deep research".
+    assert.match(step1, /Save what you learned about my business to my own memory/);
+  });
+
   it("wires Mnemos memory through research, setup capture, and standing rules", () => {
     const p = composeEnginePrompt({ ...base, link: null });
     const step1 = p.slice(p.indexOf("## Step 1"), p.indexOf("## Step 2"));

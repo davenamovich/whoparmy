@@ -14,8 +14,8 @@ export const runtime = "nodejs";
 export async function POST(req: NextRequest) {
   try {
     const user = await getWhopUser();
-    const body = (await req.json()) as { website?: string; brandName?: string };
-    const out = await startBuildResearch(user, body.website ?? "", body.brandName);
+    const body = (await req.json()) as { website?: string; brandName?: string; noWebsite?: boolean };
+    const out = await startBuildResearch(user, body.website ?? "", body.brandName, { noWebsite: body.noWebsite === true });
     if ("error" in out) return NextResponse.json({ error: out.error }, { status: out.status });
     return NextResponse.json({ state: out.state });
   } catch (err) {

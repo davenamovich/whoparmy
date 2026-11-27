@@ -3,10 +3,14 @@ import assert from "node:assert/strict";
 import {
   BUILD_AGENT_CATEGORIES,
   BUILD_QUIZ,
+  NO_WEBSITE_NOTE,
   SUPER_MUSE_REPO_URL,
+  buildStep1Complete,
   composeAgentInstructions,
   composeBuildAgentAddendum,
   designAgent,
+  noWebsiteBrandName,
+  noWebsiteProfile,
   quizAnswerLines,
   researchSummaryText,
   validateQuizAnswers,
@@ -222,5 +226,69 @@ describe("composeBuildAgentAddendum", () => {
     const lines = quizAnswerLines(FULL_ANSWERS);
     assert.ok(lines.some((l) => l.answer === "Make content"));
     assert.ok(lines.some((l) => l.answer === "Never promise same-day delivery."));
+  });
+});
+
+describe("no-website path (P0-1)", () => {
+  it("completes step 1 on the business name alone — no research is faked", () => {
+    assert.equal(noWebsiteBrandName("  Acme Roofing  "), "Acme Roofing");
+    assert.equal(noWebsiteBrandName(""), null);
+    assert.equal(noWebsiteBrandName("   "), null);
+    assert.equal(noWebsiteBrandName(undefined), null);
+    const profile = noWebsiteProfile("Acme Roofing");
+    assert.deepEqual(profile, { name: "Acme Roofing" });
+    // A name-only profile yields NO research text — nothing for a prompt to dress up as findings.
+    assert.equal(researchSummaryText(null, profile), "");
+    assert.match(NO_WEBSITE_NOTE, /No website yet/);
+    assert.doesNotMatch(NO_WEBSITE_NOTE, /research on file/i);
+  });
+
+  it("opens the build gate: step 1 complete at no-website + quiz saved — website gate unchanged", () => {
+    assert.equal(buildStep1Complete("no-website"), true);
+    assert.equal(buildStep1Complete("done"), true);
+    assert.equal(buildStep1Complete("reused"), true);
+    // The website lane's gate is not weakened: non-terminal statuses still block the build.
+    assert.equal(buildStep1Complete("running"), false);
+    assert.equal(buildStep1Complete("failed"), false);
+    assert.equal(buildStep1Complete(undefined), false);
+    assert.equal(buildStep1Complete(null), false);
+    // The create gate's other half: a full valid quiz validates clean.
+    assert.ok("answers" in validateQuizAnswers(FULL_ANSWERS));
+  });
+
+  it("designs the agent from name + answers without claiming deep research", () => {
+    const design = designAgent({ brandName: "Acme Roofing", website: null, research: null, profile: noWebsiteProfile("Acme Roofing"), quiz: FULL_ANSWERS });
+    assert.equal(design.name, "Acme Roofing Content Agent");
+    assert.doesNotMatch(design.description, /deep research/i);
+    assert.match(design.description, /owner's answers/);
+  });
+
+  it("the prompt carries no fake research claim for a no-website member", () => {
+    const design = designAgent({ brandName: "Acme Roofing", website: null, research: null, profile: noWebsiteProfile("Acme Roofing"), quiz: FULL_ANSWERS });
+    const text = composeBuildAgentAddendum({
+      design,
+      website: null,
+      researchText: researchSummaryText(null, noWebsiteProfile("Acme Roofing")),
+      quiz: FULL_ANSWERS,
+      agentId: "agent_123",
+      connectLink: null,
+      bridgeCode: null,
+      noWebsite: true,
+    });
+    assert.match(text, /no website yet/i);
+    assert.match(text, /do not claim any website research was done/i);
+    assert.doesNotMatch(text, /deep research on my business/);
+    assert.doesNotMatch(text, /Research my website yourself/);
+    assert.doesNotMatch(text, /research angles above/);
+    // The brand block still comes through: name + quiz answers.
+    assert.match(text, /Acme Roofing Content Agent/);
+    assert.match(text, /What are you promoting\? My business/);
+    assert.match(text, /Homeowners in Raleigh/);
+  });
+
+  it("quiz Q1 no longer assumes a website", () => {
+    const promoting = BUILD_QUIZ.find((q) => q.id === "promoting")!;
+    const business = promoting.options!.find((o) => o.id === "business")!;
+    assert.doesNotMatch(business.hint ?? "", /a website for it/);
   });
 });
