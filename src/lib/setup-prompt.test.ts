@@ -59,7 +59,7 @@ describe("composeEnginePrompt v3", () => {
     assert.match(p, /BotFather/);
   });
 
-  it("puts Muse Mail first and explains LLM key choices plus existing keys", () => {
+  it("keeps Muse Mail and Gmail in Step 0 and explains LLM key choices plus existing keys", () => {
     const p = composeEnginePrompt({ ...base, link: null });
     assert.ok(p.indexOf("## Step 0 — Your Muse email") < p.indexOf("## Step 1 — Learn my business"));
     const step0 = p.slice(p.indexOf("## Step 0 — Your Muse email"), p.indexOf("## Step 1 — Learn my business"));
@@ -189,6 +189,31 @@ describe("composeEnginePrompt v3", () => {
     const intro = p.slice(p.indexOf("## Step 4 — I set up your five keys with you"), p.indexOf("### 1. Your links"));
     assert.match(intro, /Create every account below with the email I chose in Step 0/);
     assert.match(intro, /that same email for every account in this setup/);
+  });
+
+  it("builds Agent Mail into Step 0 as the default email offer, Muse Mail and Gmail kept as fallbacks", () => {
+    const p = composeEnginePrompt({ ...base, link: null });
+    const step0 = p.slice(p.indexOf("## Step 0 — Your Muse email"), p.indexOf("## Step 1 — Learn my business"));
+    // Agent Mail is offered first — before the Muse Mail card and before Gmail.
+    const agentMail = step0.indexOf("Agent Mail");
+    assert.ok(agentMail >= 0, "Agent Mail offered in Step 0");
+    assert.ok(agentMail < step0.indexOf("Muse Mail setup card"), "Agent Mail precedes the Muse Mail path");
+    assert.ok(agentMail < step0.indexOf("use my Gmail if I'd rather"), "Agent Mail precedes the Gmail fallback");
+    // Dave's offer terms, verbatim — no other pricing/limit claims.
+    assert.match(step0, /it is free, with 80 emails a day and no credit card/);
+    // The documented AgentMail agent sign-up mechanics: human attached, exact-address yes, OTP verify.
+    assert.match(step0, /AgentMail's agent sign-up/);
+    assert.match(step0, /<username>@agentmail\.to/);
+    assert.match(step0, /create it only on my yes for that exact address/);
+    assert.match(step0, /6-digit code to my own email; I read the code to you, you verify it/);
+    // The issued key goes to secure storage only; the inbox address is the saved reference.
+    assert.match(step0, /capture it straight into secure storage through secure entry/);
+    assert.match(step0, /never into chat, a file, my memory, or Mnemos/);
+    assert.match(step0, /record only the inbox address in my home base as the reference/);
+    // The fallbacks and the every-account rule survive the addition.
+    assert.match(step0, /Muse Mail setup card/);
+    assert.match(step0, /use my Gmail if I'd rather/);
+    assert.match(step0, /Whichever I pick is the email you use to create my accounts in this setup/);
   });
 
   it("prints the resolved Agent37 signup link inside its own unlock step", () => {
