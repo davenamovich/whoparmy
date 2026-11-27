@@ -32,6 +32,7 @@ import {
   noWebsiteBrandName,
   noWebsiteProfile,
   researchSummaryText,
+  starterFirstResult,
   type BuildQuizAnswers,
   type BuildResearchProfile,
   type BuildResearchSummary,
@@ -442,6 +443,7 @@ export async function createBuildAgent(user: User, options: { walkthrough?: bool
   const walkthroughOffers = options.walkthrough
     ? selectWalkthroughOffers((await getBridgeState(user.id)).partners)
     : undefined;
+  const isNoWebsite = state.noWebsite === true || state.researchStatus === "no-website";
   const base = composeSetupPrompt({
     business: state.brandName ?? state.profile?.name ?? design.name,
     website: state.website ?? null,
@@ -453,7 +455,16 @@ export async function createBuildAgent(user: User, options: { walkthrough?: bool
     houseAccount: user.email?.toLowerCase() === HOUSE_ACCOUNT_EMAIL,
     offer: state.research?.offer ?? design.description,
     audience: quiz.audience ?? state.research?.audience,
-    firstResult: blueprint.objective,
+    // No-website members get a goal built from their own quiz
+    // answers — the account blueprint may carry another business's
+    // objective (e.g. a pre-existing brand record) and must never
+    // leak into this member's prompt. Website path unchanged.
+    firstResult: starterFirstResult({
+      noWebsite: isNoWebsite,
+      brandName: state.brandName ?? state.profile?.name ?? design.name,
+      quiz,
+      blueprintObjective: blueprint.objective,
+    }),
     neverDo: quiz.neverDo,
   });
   const websiteHost = (() => { try { return new URL(state.website ?? "").hostname.toLowerCase(); } catch { return ""; } })();
@@ -466,7 +477,7 @@ export async function createBuildAgent(user: User, options: { walkthrough?: bool
     agentId: agent.id,
     connectLink: link,
     bridgeCode: code,
-    noWebsite: state.noWebsite === true || state.researchStatus === "no-website",
+    noWebsite: isNoWebsite,
   });
   const prompt = addendum ? `${base}\n\n${addendum}` : base;
 

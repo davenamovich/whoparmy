@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { composeEnginePrompt, EXPLAINER_VIDEO_URL } from "./setup-prompt-compose.ts";
+import { starterFirstResult, type BuildQuizAnswers } from "./build-agent.ts";
 import type { Blueprint } from "./blueprint.ts";
 
 const bp: Blueprint = {
@@ -27,6 +28,40 @@ describe("composeEnginePrompt v3", () => {
     assert.doesNotMatch(step1, /Research no business website/);
     // Memory save is still asked for — of what was learned, not of "deep research".
     assert.match(step1, /Save what you learned about my business to my own memory/);
+  });
+
+  it("no-website mint: the goal slot is quiz-derived even when the account blueprint is another business's", () => {
+    // Reproduces the 2026-11-27 live defect: the test account's
+    // blueprint objective was the house business's goal, and the mint
+    // dropped it into a no-website bakery member's prompt.
+    const otherBusinessGoal = "Turn Plunder & Riffle's own website, ideas, and voice into a steady stream of memes and short content that earns signups through its referral links — no views, follower, or income promises attached.";
+    const otherBp: Blueprint = { ...bp, objective: otherBusinessGoal };
+    const bakeryQuiz: BuildQuizAnswers = {
+      promoting: "business",
+      audience: "Local customers in Raleigh who want fresh bread, pastries and cakes",
+      firstJob: "content",
+      cadence: "daily",
+      tone: "warm",
+      runsOn: "muse",
+      neverDo: "Never promise same-day delivery for custom cakes.",
+    };
+    const p = composeEnginePrompt({
+      ...base,
+      business: "Test Bakery Raleigh",
+      website: null,
+      blueprint: otherBp,
+      offer: "Test Bakery Raleigh Content Agent — built from its owner's answers",
+      audience: bakeryQuiz.audience,
+      firstResult: starterFirstResult({
+        noWebsite: true,
+        brandName: "Test Bakery Raleigh",
+        quiz: bakeryQuiz,
+        blueprintObjective: otherBp.objective,
+      }),
+      link: null,
+    });
+    assert.match(p, /- The one result I want first: Make content — posts, memes and short videos in my voice — that brings Local customers in Raleigh who want fresh bread, pastries and cakes to Test Bakery Raleigh/);
+    assert.equal(p.includes(otherBusinessGoal), false, "another business's goal must not appear anywhere in the prompt");
   });
 
   it("wires Mnemos memory through research, setup capture, and standing rules", () => {
