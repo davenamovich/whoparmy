@@ -536,14 +536,6 @@ function AgentCard({ agent }: { agent: MarketAgent }) {
             <div className="h-full rounded-full bg-primary" style={{ width: `${spots.active ? pct : 0}%` }} />
           </div>
         </div>
-        {agent.rotatorUrl && (
-          <a
-            href={agent.rotatorUrl}
-            className="relative z-10 mt-4 block rounded-xl border border-border py-2 text-center text-sm font-bold transition hover:border-primary hover:text-primary"
-          >
-            Ride {agent.name}&rsquo;s rotator →
-          </a>
-        )}
       </div>
     </li>
   );
