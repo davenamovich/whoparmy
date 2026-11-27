@@ -241,45 +241,57 @@ describe("composeEnginePrompt v3", () => {
     assert.match(intro, /that same email for every account in this setup/);
   });
 
-  it("builds Agent Mail into Step 0 as the default email offer, Muse Mail and Gmail kept as fallbacks", () => {
+  it("builds Agent Mail into Step 0 on the Muse Mail anchor, personal-email and Gmail alternatives kept", () => {
     const p = composeEnginePrompt({ ...base, link: null });
     const step0 = p.slice(p.indexOf("## Step 0 — Your Muse email"), p.indexOf("## Step 1 — Learn my business"));
-    // Agent Mail is offered first — before the Muse Mail card and before Gmail.
-    const agentMail = step0.indexOf("Agent Mail");
+    // Dave's amendment (2026-11-27): Muse Mail is created FIRST and anchors the Agent Mail sign-up.
+    const museMailCreate = step0.indexOf("Muse Mail setup card");
+    const agentMail = step0.indexOf("Then set up my Agent Mail on that anchor");
+    assert.ok(museMailCreate >= 0, "Muse Mail creation present in Step 0");
     assert.ok(agentMail >= 0, "Agent Mail offered in Step 0");
-    assert.ok(agentMail < step0.indexOf("Muse Mail setup card"), "Agent Mail precedes the Muse Mail path");
-    assert.ok(agentMail < step0.indexOf("use my Gmail if I'd rather"), "Agent Mail precedes the Gmail fallback");
+    assert.ok(museMailCreate < agentMail, "Muse Mail is created before the Agent Mail offer");
+    assert.ok(agentMail < step0.indexOf("use my Gmail if I'd rather"), "Agent Mail precedes the Gmail alternative");
     // Dave's offer terms, verbatim — no other pricing/limit claims.
     assert.match(step0, /it is free, with 100 emails a day and no credit card/);
-    // The documented AgentMail agent sign-up mechanics: human attached, exact-address yes, OTP verify.
+    // The documented AgentMail agent sign-up mechanics: the Muse Mail address is the human attached,
+    // exact-address yes, and the code lands in Muse Mail where the agent reads it itself.
     assert.match(step0, /AgentMail's agent sign-up/);
+    assert.match(step0, /with my Muse Mail address as the human attached to the account/);
     assert.match(step0, /<username>@agentmail\.to/);
     assert.match(step0, /create it only on my yes for that exact address/);
-    assert.match(step0, /6-digit code to the personal email I confirmed at the top of this step; I read the code to you, you verify it/);
+    assert.match(step0, /AgentMail emails a 6-digit code to my Muse Mail/);
+    assert.match(step0, /the code lands in my Muse Mail, which I read myself/);
     // The issued key goes to secure storage only; the inbox address is the saved reference.
     assert.match(step0, /capture it straight into secure storage through secure entry/);
     assert.match(step0, /never into chat, a file, my memory, or Mnemos/);
     assert.match(step0, /record only the inbox address in my home base as the reference/);
-    // The fallbacks and the every-account rule survive the addition.
-    assert.match(step0, /Muse Mail setup card/);
+    // The alternatives and the every-account rule survive the amendment.
     assert.match(step0, /use my Gmail if I'd rather/);
     assert.match(step0, /Whichever I pick is the email you use to create my accounts in this setup/);
   });
 
-  it("Step 0 confirms the existing personal email before any agent-inbox offer, and gates on having one inbox (Opus findings 1-2)", () => {
+  it("Step 0 anchors Agent Mail on Muse Mail, keeps the confirmed-personal-email alternative, and gates on having one inbox (Opus findings 1-2 + Dave's Muse Mail anchor amendment)", () => {
     const p = composeEnginePrompt({ ...base, link: null });
     const step0 = p.slice(p.indexOf("## Step 0 — Your Muse email"), p.indexOf("## Step 1 — Learn my business"));
-    // Sequence: personal-email confirmation precedes the Agent Mail offer in the composed text.
-    const confirmIdx = step0.indexOf("confirm the email I already have");
-    const offerIdx = step0.indexOf("Agent Mail first, because it is built into this setup");
-    assert.ok(confirmIdx >= 0, "personal-email confirmation present in Step 0");
+    // Sequence: Muse Mail creation precedes the Agent Mail offer in the composed text.
+    const createIdx = step0.indexOf("First, create my Muse Mail");
+    const offerIdx = step0.indexOf("Then set up my Agent Mail on that anchor");
+    assert.ok(createIdx >= 0, "Muse Mail creation present in Step 0");
     assert.ok(offerIdx >= 0, "Agent Mail offer present in Step 0");
-    assert.ok(confirmIdx < offerIdx, "personal email is confirmed before the agent-inbox choice is offered");
-    assert.match(step0, /read new mail in it right now/);
-    // Every verification path routes its code to the confirmed personal inbox.
-    assert.match(step0, /6-digit code to the personal email I confirmed at the top of this step/);
-    assert.match(step0, /with the personal email I just confirmed as the human attached to the account/);
-    assert.match(step0, /the code is emailed to the personal email I confirmed at the top of this step, I enter it, you never handle it/);
+    assert.ok(createIdx < offerIdx, "Muse Mail is created before Agent Mail is set up");
+    // The Agent Mail sign-up names the Muse Mail address as the human email, and its code
+    // is routed to Muse Mail, where the agent reads it itself.
+    assert.match(step0, /with my Muse Mail address as the human attached to the account/);
+    assert.match(step0, /AgentMail emails a 6-digit code to my Muse Mail/);
+    assert.match(step0, /the code lands in my Muse Mail, which I read myself/);
+    // The existing-personal-email alternative (Opus finding 1) still stands: the email is
+    // confirmed readable before it serves as the Agent Mail sign-up's human email.
+    assert.match(step0, /If I would rather anchor on an email I already have instead/);
+    assert.match(step0, /confirm I can open it and read new mail in it right now/);
+    assert.match(step0, /only once it is confirmed does it serve as the human email for the Agent Mail sign-up/);
+    // The superseded routing (code to a personal email confirmed before any inbox existed) is gone.
+    assert.doesNotMatch(step0, /6-digit code to the personal email I confirmed/);
+    assert.doesNotMatch(step0, /with the personal email I just confirmed as the human attached/);
     // Hard gate: the provider is skippable, the inbox is not; no skip-and-create-later wording remains for Step 0.
     assert.match(step0, /hard gate: setup does not move on to any account, purchase, or build until I have ONE working agent inbox/);
     assert.match(step0, /a provider is skippable, the inbox is not/);
