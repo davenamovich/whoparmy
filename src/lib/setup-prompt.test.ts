@@ -68,7 +68,7 @@ describe("composeEnginePrompt v3", () => {
     const p = composeEnginePrompt({ ...base, link: null });
     const step1 = p.slice(p.indexOf("## Step 1"), p.indexOf("## Step 2"));
     assert.match(step1, /Mnemos memory/);
-    const memory = p.slice(p.indexOf("## Step 5 — Your memory"), p.indexOf("## Step 6"));
+    const memory = p.slice(p.indexOf("## Step 6 — Your memory"), p.indexOf("## Step 7"));
     assert.match(memory, /recall it first and work from it/i);
     assert.match(memory, /confirmed goals, brand voice, offer and audience, the five unlock states, and my never-use list/i);
     assert.match(memory, /never credentials, keys, codes, or tokens; those live in secure storage, never in memory/i);
@@ -101,6 +101,17 @@ describe("composeEnginePrompt v3", () => {
     assert.match(p, /10M bounty carve/);
     assert.match(p, /Top up in Mission Control/);
     assert.ok(p.indexOf("## Step 0 — Your Muse email") < p.indexOf("## Step 1 — Learn my business"));
+    assert.match(p, /## Step 5 — Unlock the Panel \(Opus \+ Fable\)/);
+    assert.match(p, /claude-opus-5-5/);
+    assert.match(p, /claude-fable-5-2/);
+    assert.match(p, /hard critique/);
+    assert.match(p, /creative angle/);
+    assert.match(p, /Vercel board/);
+    assert.match(p, /P&R credits are engine fuel[\s\S]*different from Starimg API tokens[\s\S]*The Panel is NOT a currency/);
+    assert.match(p, /Panel calls burn MY tokens at premium-model rates/);
+    assert.ok(p.indexOf("## Step 5 — Unlock the Panel (Opus + Fable)") > p.indexOf("## Step 4 — I set up your five keys with you"));
+    assert.ok(p.indexOf("## Step 5 — Unlock the Panel (Opus + Fable)") < p.indexOf("## Step 6 — Your memory"));
+    assert.ok(p.includes("## Step 9 — Report, then stop"));
     const step0 = p.slice(p.indexOf("## Step 0 — Your Muse email"), p.indexOf("## Step 1 — Learn my business"));
     assert.match(step0, /Ask me what email I want to use/);
     assert.match(step0, /use my Gmail if I'd rather/);
@@ -166,7 +177,7 @@ describe("composeEnginePrompt v3", () => {
 
   it("labels connect-page figures when this connection has no balance tool", () => {
     const p = composeEnginePrompt({ ...base, link: null });
-    const step5 = p.slice(p.indexOf("## Step 7 — First proof"), p.indexOf("## Step 8"));
+    const step5 = p.slice(p.indexOf("## Step 8 — First proof"), p.indexOf("## Step 9"));
     assert.match(step5, /exact credit cost and balance only when a balance tool is present in THIS connection's tool list/i);
     assert.match(step5, /label any figure from the connect page explicitly as ‘the connect page says/);
     assert.match(step5, /never present page wording as an exact quote/i);
@@ -242,9 +253,9 @@ describe("composeEnginePrompt v3", () => {
     assert.match(fallback, /Agent37 signup: https:\/\/www\.agent37\.com\/\?via=riffle \(the house link\)/);
   });
 
-  it("numbers the steps without a gap (Step 5 is Your memory)", () => {
+  it("numbers the steps without a gap (Step 5 is the Panel)", () => {
     const p = composeEnginePrompt({ ...base, link: null });
-    const order = ["## Step 0", "## Step 1", "## Step 2", "## Step 3", "## Before any key", "## Step 4", "## Step 5 — Your memory", "## Step 6", "## Step 7", "## Step 8"];
+    const order = ["## Step 0", "## Step 1", "## Step 2", "## Step 3", "## Before any key", "## Step 4", "## Step 5 — Unlock the Panel", "## Step 6 — Your memory", "## Step 7", "## Step 8", "## Step 9"];
     let last = -1;
     for (const h of order) { const i = p.indexOf(h); assert.ok(i > last, h); last = i; }
   });
