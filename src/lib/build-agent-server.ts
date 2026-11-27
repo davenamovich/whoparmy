@@ -24,13 +24,18 @@ import { awardXp } from "@/lib/game";
 import { ensureAgentRotatorRow } from "@/lib/rotator-v2";
 import { recordConversion } from "@/lib/referrals";
 import {
+  NO_WEBSITE_NOTE,
+  buildStep1Complete,
   composeAgentInstructions,
   composeBuildAgentAddendum,
   designAgent,
+  noWebsiteBrandName,
+  noWebsiteProfile,
   researchSummaryText,
   type BuildQuizAnswers,
   type BuildResearchProfile,
   type BuildResearchSummary,
+  type BuildStep1Status,
 } from "@/lib/build-agent";
 import type { ProfileDTO, ResearchSummary } from "@/lib/types";
 
@@ -60,7 +65,9 @@ export interface BuildFlowState {
   brandName?: string;
   brandId?: string | null;
   researchJobId?: string;
-  researchStatus?: "running" | "done" | "failed" | "reused";
+  researchStatus?: BuildStep1Status;
+  /** True when step 1 completed via the no-website path — the profile is the owner's name + quiz answers, never research. */
+  noWebsite?: boolean;
   researchNote?: string;
   research?: BuildResearchSummary | null;
   profile?: BuildResearchProfile | null;
@@ -175,11 +182,37 @@ export async function startBuildResearch(
   user: User,
   websiteRaw: string,
   brandNameRaw?: string,
+  options?: { noWebsite?: boolean },
 ): Promise<{ state: BuildFlowState } | { error: string; status: number }> {
+  const prev = (await getBuildFlow(user.id)) ?? { updatedAt: "" };
+
+  // No-website path (P0-1): no research job is started and none is
+  // faked — step 1 completes on the owner's business name, the
+  // profile stays explicitly name-only, and the quiz supplies the
+  // rest at create time. The name edit persists in the flow state.
+  if (options?.noWebsite) {
+    const brandName = noWebsiteBrandName(brandNameRaw);
+    if (!brandName) {
+      return { error: "Add your business name — with no website, your agent is built from your name and your quiz answers.", status: 400 };
+    }
+    const state = await saveBuildFlow(user.id, {
+      ...prev,
+      website: undefined,
+      brandName,
+      brandId: undefined,
+      researchJobId: undefined,
+      researchStatus: "no-website",
+      noWebsite: true,
+      researchNote: NO_WEBSITE_NOTE,
+      research: null,
+      profile: noWebsiteProfile(brandName),
+    });
+    return { state };
+  }
+
   const website = normalizeWebsite(websiteRaw);
   if (!website) return { error: "Enter your website — a full URL like https://yourbusiness.com.", status: 400 };
   const host = hostOf(website);
-  const prev = (await getBuildFlow(user.id)) ?? { updatedAt: "" };
 
   const brands = await db.brandProfile.findMany({ where: { userId: user.id }, orderBy: { createdAt: "asc" } });
   const researched = brands.find((b) => hostOf(b.website) === host && b.researchJson);
@@ -197,6 +230,7 @@ export async function startBuildResearch(
       brandId: researched.id,
       researchJobId: undefined,
       researchStatus: "reused",
+      noWebsite: false,
       researchNote: "Reused the deep research already on file for this site — no need to run it again.",
       research: summary,
       profile: {
@@ -217,6 +251,7 @@ export async function startBuildResearch(
     brandName,
     researchJobId: job.id,
     researchStatus: "running",
+    noWebsite: false,
     researchNote: undefined,
     research: undefined,
     profile: undefined,
@@ -331,8 +366,8 @@ export interface BuildCreateResult {
 export async function createBuildAgent(user: User, options: { walkthrough?: boolean } = {}): Promise<{ result: BuildCreateResult } | { error: string; status: number }> {
   let state = await refreshBuildResearch(user);
   state = state ?? (await getBuildFlow(user.id));
-  if (!state || (state.researchStatus !== "done" && state.researchStatus !== "reused")) {
-    return { error: "Run the deep research first — your agent is designed from what it finds.", status: 400 };
+  if (!state || !buildStep1Complete(state.researchStatus)) {
+    return { error: "Finish step 1 first — run the deep research, or continue without a website. Your agent is designed from what step 1 holds.", status: 400 };
   }
   if (!state.quizAnswers) {
     return { error: "Answer the short quiz first — the design needs your answers.", status: 400 };
@@ -431,6 +466,7 @@ export async function createBuildAgent(user: User, options: { walkthrough?: bool
     agentId: agent.id,
     connectLink: link,
     bridgeCode: code,
+    noWebsite: state.noWebsite === true || state.researchStatus === "no-website",
   });
   const prompt = addendum ? `${base}\n\n${addendum}` : base;
 

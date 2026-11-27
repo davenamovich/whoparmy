@@ -7,7 +7,9 @@ import { Input } from "@/components/ui/input";
 import { ArrowRight, Check, Copy, Loader2 } from "lucide-react";
 import { SiteHeader } from "@/components/shell/site-header";
 import { SiteFooter } from "@/components/shell/site-footer";
-import { BUILD_QUIZ, type BuildQuizAnswers } from "@/lib/build-agent";
+import { BUILD_QUIZ, buildStep1Complete, type BuildQuizAnswers, type BuildStep1Status } from "@/lib/build-agent";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { clearStashedRef, readStashedRef, stashRefFromUrl } from "@/lib/ref-stash";
 
 /**
@@ -38,7 +40,8 @@ interface FlowResearch {
 interface FlowState {
   website?: string;
   brandName?: string;
-  researchStatus?: "running" | "done" | "failed" | "reused";
+  researchStatus?: BuildStep1Status;
+  noWebsite?: boolean;
   researchNote?: string;
   research?: FlowResearch | null;
   quizAnswers?: BuildQuizAnswers;
@@ -195,6 +198,7 @@ export default function BuildPage() {
   const [walkthroughTouched, setWalkthroughTouched] = useState(false);
   const [website, setWebsite] = useState("");
   const [brandName, setBrandName] = useState("");
+  const [noWebsite, setNoWebsite] = useState(false);
   const [answers, setAnswers] = useState<BuildQuizAnswers>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -210,6 +214,7 @@ export default function BuildPage() {
       setState(data.state);
       if (data.state.website) setWebsite(data.state.website);
       if (data.state.brandName) setBrandName(data.state.brandName);
+      if (data.state.noWebsite || data.state.researchStatus === "no-website") setNoWebsite(true);
       if (data.state.quizAnswers) setAnswers(data.state.quizAnswers);
     }
     return data.state;
@@ -270,7 +275,11 @@ export default function BuildPage() {
   }
 
   async function startResearch() {
-    const data = await call("/api/build-agent/research", { method: "POST", body: JSON.stringify({ website, brandName }) }, "research");
+    const data = await call(
+      "/api/build-agent/research",
+      { method: "POST", body: JSON.stringify({ website: noWebsite ? "" : website, brandName, noWebsite }) },
+      "research",
+    );
     if (data?.state) setState(data.state as FlowState);
   }
 
@@ -287,7 +296,7 @@ export default function BuildPage() {
     }
   }
 
-  const researchDone = state?.researchStatus === "done" || state?.researchStatus === "reused";
+  const researchDone = buildStep1Complete(state?.researchStatus);
   const quizSaved = Boolean(state?.quizAnswers);
   const prompt = created?.prompt ?? state?.prompt ?? null;
   const agentName = created?.agent.name ?? null;
@@ -350,15 +359,37 @@ export default function BuildPage() {
               <p className={label}>1 · Deep research</p>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 Your website is the starting point — the same deep research every Whop Army agent works from. It
-                takes about two minutes.
+                takes about two minutes. No website yet? Tick the box — your agent starts from your business name
+                and your quiz answers instead.
               </p>
               <div className="flex flex-col gap-2 sm:flex-row">
-                <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://yourbusiness.com" aria-label="Your website" />
-                <Input value={brandName} onChange={(e) => setBrandName(e.target.value)} placeholder="Business name (optional)" aria-label="Business name" className="sm:max-w-52" />
-                <Button onClick={() => void startResearch()} disabled={busy !== null || !website.trim()}>
-                  {busy === "research" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Research my business"}
+                <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://yourbusiness.com" aria-label="Your website" disabled={noWebsite} />
+                <Input value={brandName} onChange={(e) => setBrandName(e.target.value)} placeholder={noWebsite ? "Business name" : "Business name (optional)"} aria-label="Business name" className="sm:max-w-52" />
+                <Button
+                  onClick={() => void startResearch()}
+                  disabled={busy !== null || (noWebsite ? !brandName.trim() : !website.trim())}
+                >
+                  {busy === "research" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : noWebsite ? (
+                    "Continue without a website"
+                  ) : (
+                    "Research my business"
+                  )}
                 </Button>
               </div>
+              <div className="flex items-center gap-2">
+                <Checkbox id="build-no-website" checked={noWebsite} onCheckedChange={(v) => setNoWebsite(v === true)} />
+                <Label htmlFor="build-no-website" className="font-normal">
+                  No website yet
+                </Label>
+              </div>
+              {noWebsite ? (
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  We&apos;ll build your starting profile from your business name and your quiz answers. Add a
+                  website any time and the research deepens it.
+                </p>
+              ) : null}
               {state?.researchStatus === "running" ? (
                 <p className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" /> Researching — this page checks back on its own.
@@ -370,7 +401,9 @@ export default function BuildPage() {
               {researchDone ? (
                 <Card>
                   <CardContent className="space-y-2 pt-5 text-sm leading-relaxed">
-                    <p className="font-semibold">{state?.brandName ?? "Your business"} — research on file</p>
+                    <p className="font-semibold">
+                      {state?.brandName ?? "Your business"} — {state?.researchStatus === "no-website" ? "no website yet" : "research on file"}
+                    </p>
                     {state?.research?.analysisSummary ? <p>{state.research.analysisSummary}</p> : null}
                     {state?.research?.offer ? (
                       <p>
@@ -427,14 +460,20 @@ export default function BuildPage() {
               <Button onClick={() => void saveQuiz()} disabled={busy !== null} variant={quizSaved ? "outline" : "default"}>
                 {busy === "quiz" ? <Loader2 className="h-4 w-4 animate-spin" /> : quizSaved ? "Quiz saved — update it" : "Save my answers"}
               </Button>
-              {quizSaved ? <p className="text-sm text-muted-foreground">Saved. Your agent is designed from these answers plus the research.</p> : null}
+              {quizSaved ? (
+                <p className="text-sm text-muted-foreground">
+                  {state?.researchStatus === "no-website"
+                    ? "Saved. Your agent is designed from these answers plus your business name — no website research was run."
+                    : "Saved. Your agent is designed from these answers plus the research."}
+                </p>
+              ) : null}
             </section>
 
             {/* ─── Step 3 · Build + delivery ─────────────────────── */}
             <section className={step} aria-label="Step 3: build your agent">
               <p className={label}>3 · Build your agent</p>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                One tap designs your agent from the research + quiz, creates it on your account (its public profile
+                One tap designs your agent from the {state?.researchStatus === "no-website" ? "name + quiz" : "research + quiz"}, creates it on your account (its public profile
                 stays off until you publish it), writes your personalized build prompt, and mints your bridge code.
               </p>
               <label className="flex items-start gap-3 rounded-xl border border-border p-4 cursor-pointer">
@@ -449,7 +488,7 @@ export default function BuildPage() {
               </Button>
               {!researchDone || !quizSaved ? (
                 <p className="text-sm text-muted-foreground">
-                  {!researchDone ? "Finish step 1 (research) " : ""}
+                  {!researchDone ? "Finish step 1 (research, or continue without a website) " : ""}
                   {!researchDone && !quizSaved ? "and " : ""}
                   {!quizSaved ? "step 2 (save the quiz) " : ""}
                   first.
