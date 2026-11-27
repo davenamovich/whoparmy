@@ -82,6 +82,7 @@ export default function BetaPage() {
           </header>
           <section className="py-16">
             <p className="font-mono text-[11px] font-semibold tracking-[0.18em] text-primary uppercase">Plunder &amp; Riffle — Open Beta</p>
+            <p className="mt-5 max-w-2xl text-lg leading-relaxed">New to Muse? Muse is Meta&apos;s personal AI agent — your own assistant that lives in the apps you already use, learns your business, and does real work with you: research, pages, posts, and content.</p>
             <h1 className="mt-4 max-w-3xl text-5xl font-extrabold leading-tight">Your Muse, creating on Day 0.</h1>
             <p className="mt-5 max-w-2xl text-lg leading-relaxed text-muted-foreground">We are the test: Plunder &amp; Riffle itself is the offer under test.</p>
             <div className={`mt-8 ${card}`}>
@@ -89,7 +90,15 @@ export default function BetaPage() {
               <p className={note}>Bounty is seeded token fuel, not cash. Revenue confirmed to date is $0.</p>
               <p className={note}>Set up Muse Mail first. Your bridge creates the key; no API key is collected here. Sign in with Whop — we never ask for your name or email here; Whop already knows you.</p>
             </div>
-            <Button asChild size="lg" className="mt-8"><a href={CONNECT}>Continue with Whop</a></Button>
+            <div className={`mt-4 ${card}`}>
+              <h2 className={h2}>Where Muse is available</h2>
+              <p className={note}>Muse is live in 7 countries: the United States, Canada, the United Kingdom, Japan, Singapore, Mexico, and Australia.</p>
+              <p className={note}>Outside those countries? You&apos;re not shut out — the beta has an Agent37 lane for you: same beta, same tasks, on an agent platform that isn&apos;t limited to those countries. Sign in with Whop the same way and we&apos;ll route you to the lane that works where you live.</p>
+            </div>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Button asChild size="lg"><a href={CONNECT}>Continue with Whop</a></Button>
+              <Button asChild size="lg" variant="outline"><a href={CONNECT}>Outside those countries? Join via Agent37</a></Button>
+            </div>
           </section>
           <SiteFooter />
         </div>
