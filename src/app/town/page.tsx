@@ -25,13 +25,12 @@ const plotNumber = (number: number) => String(number).padStart(3, "0");
 const navItems = [
   { href: "/town", text: "Town", icon: "▦" },
   { href: "/spaces", text: "Spaces", icon: "▣" },
-  { href: "/rotator", text: "Rotator", icon: "↻" },
   { href: "/build", text: "Build", icon: "＋" },
 ];
 
 function TownNav() {
   return (
-    <nav aria-label="App navigation" className="sticky bottom-0 z-20 mt-auto grid grid-cols-4 border-t border-border bg-[#0B0E11] pb-[env(safe-area-inset-bottom)]">
+    <nav aria-label="App navigation" className="sticky bottom-0 z-20 mt-auto grid grid-cols-3 border-t border-border bg-[#0B0E11] pb-[env(safe-area-inset-bottom)]">
       {navItems.map(({ href, text, icon }) => (
         <Link key={href} href={href} aria-current={href === "/town" ? "page" : undefined} className="py-2.5 text-center text-[11px] font-semibold text-muted-foreground hover:text-foreground aria-[current=page]:text-primary">
           <span aria-hidden="true" className="block text-base leading-5">{icon}</span>
@@ -56,7 +55,6 @@ export default async function Town() {
     select: { id: true, category: true },
   }).catch(() => [])).map(({ id, category }) => [id, category] as const) : []);
   const { freePlot, viewerDistrict } = town;
-  const placements = town.billboard.placements.slice(0, 2);
 
   return (
     <main className="min-h-screen bg-[#0B0E11] text-foreground">
@@ -123,17 +121,6 @@ export default async function Town() {
                 <p className="mt-0.5 text-[11px] text-muted-foreground">{freePlot.mode === "HOUSE" ? "Full kit · $0 · Keep it forever" : "A 24-hour visit from its agent"}</p>
               </div>
               <Link href={`/spaces/${freePlot.slug}`} className="shrink-0 rounded-[10px] bg-primary px-3.5 py-2.5 text-sm font-bold text-primary-foreground hover:bg-primary/90">Claim</Link>
-            </section>
-          ) : null}
-
-          {placements.length > 0 ? (
-            <section id="billboard" aria-label="Billboard" className="divide-y divide-border rounded-lg border border-border bg-card px-3">
-              {placements.map((placement) => (
-                <div key={`${placement.partner}-${placement.source}`} className="flex items-center justify-between gap-2 py-2">
-                  <p title={placement.partnerName} className="min-w-0 truncate text-xs"><span className={label}>ON THE BILLBOARD</span> — {placement.partnerName}</p>
-                  <a href={`/api/rotator/launch?partner=${encodeURIComponent(placement.partner)}`} className="shrink-0 py-1 text-xs font-bold text-primary hover:underline">TRY IT</a>
-                </div>
-              ))}
             </section>
           ) : null}
 

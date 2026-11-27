@@ -83,7 +83,7 @@ export default function ClaimPage() {
                 <p className="font-bold">+{claimed.amount} free generations — claimed.</p>
                 <p className="text-sm text-muted-foreground mt-0.5">
                   Your balance is now {claimed.newBalance} free generations. They spend automatically when
-                  your plan&apos;s monthly memes run out — or bid them in the rotator.
+                  your plan&apos;s monthly memes run out.
                 </p>
                 {/* /bridge, not "/": home is closed while the site gate
                     is up, and the bridge is the next hand-off step. */}

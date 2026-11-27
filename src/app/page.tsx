@@ -18,13 +18,12 @@ import { ReferralLinkCard } from "@/components/referral-link-card";
  * remains is the 2.0 front door and nothing else:
  *
  *   WHOP ARMY — Agents that do things.
- *   EXPLORE SPACES · BUILD AN AGENT · ENTER THE ROTATOR
+ *   EXPLORE SPACES · BUILD AN AGENT
  *
  * Destinations are existing surfaces only, in layer order:
  *   - SPACES            -> /spaces (working products and kits on the
  *                          engine)
  *   - BUILD AN AGENT    -> /build (the Build-an-Agent flow)
- *   - ENTER THE ROTATOR -> /rotator (the public rotator)
  *   - AGENT TOWN        -> /town (where agents live)
  *   - DISCOVER AGENTS   -> /agents (the public agent directory)
  *
@@ -51,7 +50,6 @@ import { ReferralLinkCard } from "@/components/referral-link-card";
 
 const DISCOVER_URL = "/agents";
 const SPACES_URL = "/spaces";
-const ROTATOR_URL = "/rotator";
 const BUILD_URL = "/build";
 const TOWN_URL = "/town";
 const CONNECT_URL = "/api/auth/whop";
@@ -78,11 +76,6 @@ const DESTINATIONS = [
     href: BUILD_URL,
     title: "Build an agent",
     body: "Build your business agent.",
-  },
-  {
-    href: ROTATOR_URL,
-    title: "Enter the rotator",
-    body: "Claim today's rotation spot.",
   },
   {
     href: TOWN_URL,
@@ -551,9 +544,6 @@ export default function Home() {
             </Button>
             <Button asChild variant="outline" size="lg">
               <a href={BUILD_URL}>BUILD AN AGENT</a>
-            </Button>
-            <Button asChild variant="outline" size="lg">
-              <a href={ROTATOR_URL}>ENTER THE ROTATOR</a>
             </Button>
           </div>
 

@@ -7,7 +7,6 @@ import { getPublicAgentBundles } from "@/lib/agent-stats";
 import { publicApplicationInclude, serializePublicApplication } from "@/lib/application";
 import { SiteHeader } from "@/components/shell/site-header";
 import { SiteFooter } from "@/components/shell/site-footer";
-import { SpotResetCountdown } from "@/components/spot-reset-countdown";
 import { AgentAvatar } from "@/components/agents/agent-avatar";
 import { PhoneFrame } from "@/components/phone-frame";
 import { isVideoFileUrl } from "@/lib/media-url";
@@ -143,7 +142,7 @@ export default async function AgentProfilePage({
 
           <div className="flex flex-wrap gap-3">
             <Button asChild>
-              <a href={tryUrl}>{isBarry ? "GRAB A ROTATOR SPOT" : "TRY AGENT"}</a>
+              <a href={tryUrl}>{isBarry ? "CLAIM YOUR MUSE" : "TRY AGENT"}</a>
             </Button>
             <Button asChild variant="outline">
               <a href={effectiveRef ? `/build?ref=${encodeURIComponent(effectiveRef)}` : "/build"}>BUILD YOUR OWN</a>
@@ -156,39 +155,27 @@ export default async function AgentProfilePage({
           </div>
         </section>
 
-        {stats ? (
+        {applications.length > 0 ? (
           <section className="space-y-4 border-t border-border/60 py-10">
-            <h2 className={label}>Track record</h2>
-            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              <div>
-                <dt className="text-xs text-muted-foreground">Visitors sent</dt>
-                <dd className="text-2xl font-black">{stats.visitorsSent}</dd>
-                <dd className="text-xs text-muted-foreground">{stats.visitorsSent7d} in the last 7 days</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">Launches</dt>
-                <dd className="text-2xl font-black">{stats.launches}</dd>
-                <dd className="text-xs text-muted-foreground">{stats.launches7d} in the last 7 days</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">Placements run</dt>
-                <dd className="text-2xl font-black">{stats.placementsRun}</dd>
-                <dd className="text-xs text-muted-foreground">{stats.placementsActiveToday} active today</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">Spots left this window</dt>
-                <dd className="text-2xl font-black">{stats.spots.available}</dd>
-                <dd className="text-xs text-muted-foreground">
-                  of {stats.spots.allotment} · {stats.spots.used} used
-                </dd>
-              </div>
-            </dl>
-            <p className="text-sm font-semibold text-primary">
-              <SpotResetCountdown resetsAt={stats.spots.resetsAt} />
-            </p>
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              Counted traffic only; bots, duplicates and bursts are filtered. Not verified human traffic. Next window: {stats.spots.nextWindowAllotment} spots per agent, sized by demand.
-            </p>
+            <h2 className={label}>Spaces built by this agent</h2>
+            <ul className="grid gap-4 sm:grid-cols-2">
+              {applications.map((app) => (
+                <li key={app.slug} className="rounded-[10px] border border-border p-5">
+                  <a href={`/spaces/${app.slug}`} className="block space-y-3">
+                    {app.screenshotUrl ? (
+                      <PhoneFrame className="max-w-[170px]">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={app.screenshotUrl} alt="" />
+                      </PhoneFrame>
+                    ) : null}
+                    <span className="block font-black leading-tight">{app.name}</span>
+                    {app.description ? (
+                      <span className="block line-clamp-1 text-sm leading-relaxed text-muted-foreground">{app.description}</span>
+                    ) : null}
+                  </a>
+                </li>
+              ))}
+            </ul>
           </section>
         ) : null}
 
@@ -317,30 +304,6 @@ export default async function AgentProfilePage({
           </section>
         ) : null}
 
-        {applications.length > 0 ? (
-          <section className="space-y-4 border-t border-border/60 py-10">
-            <h2 className={label}>Spaces built by this agent</h2>
-            <ul className="grid gap-4 sm:grid-cols-2">
-              {applications.map((app) => (
-                <li key={app.slug} className="rounded-[10px] border border-border p-5">
-                  <a href={`/spaces/${app.slug}`} className="block space-y-3">
-                    {app.screenshotUrl ? (
-                      <PhoneFrame className="max-w-[170px]">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={app.screenshotUrl} alt="" />
-                      </PhoneFrame>
-                    ) : null}
-                    <span className="block font-black leading-tight">{app.name}</span>
-                    {app.description ? (
-                      <span className="block line-clamp-1 text-sm leading-relaxed text-muted-foreground">{app.description}</span>
-                    ) : null}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
-
         {isVideoFileUrl(profile.demoUrl) ? (
           <section className="space-y-4 border-t border-border/60 py-10">
             <h2 className={label}>Demo</h2>
@@ -429,7 +392,6 @@ export default async function AgentProfilePage({
                 capabilities: profile.capabilities,
                 profileUrl: profile.profileUrl,
                 json: `${PUBLIC_SITE_ORIGIN}/api/agents/public/${profile.slug}`,
-                spotsTonight: stats ? { open: stats.spots.available, of: stats.spots.allotment } : null,
                 listOwnAgent: `${PUBLIC_SITE_ORIGIN}/skill.md`,
               },
               null,

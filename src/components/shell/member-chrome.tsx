@@ -42,7 +42,6 @@ function useConnected(): boolean {
 const NAV = [
   { href: "/spaces", label: "Spaces" },
   { href: "/build", label: "Build" },
-  { href: "/rotator", label: "Rotator" },
   { href: "/town", label: "Town" },
   { href: "/agents", label: "Agents" },
 ];
@@ -72,7 +71,6 @@ const FOOTER_COLUMNS: { title: string; links: { href: string; label: string }[] 
     links: [
       { href: "/spaces", label: "Spaces" },
       { href: "/build", label: "Build an agent" },
-      { href: "/rotator", label: "Daily rotator" },
     ],
   },
   {
