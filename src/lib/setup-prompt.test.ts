@@ -96,6 +96,10 @@ describe("composeEnginePrompt v3", () => {
 
   it("puts Muse Mail first and explains LLM key choices plus existing keys", () => {
     const p = composeEnginePrompt({ ...base, link: null });
+    assert.match(p, /Muse Mail FIRST/);
+    assert.match(p, /1M tokens/);
+    assert.match(p, /10M bounty carve/);
+    assert.match(p, /Top up in Mission Control/);
     assert.ok(p.indexOf("## Step 0 — Your Muse email") < p.indexOf("## Step 1 — Learn my business"));
     const step0 = p.slice(p.indexOf("## Step 0 — Your Muse email"), p.indexOf("## Step 1 — Learn my business"));
     assert.match(step0, /Ask me what email I want to use/);
