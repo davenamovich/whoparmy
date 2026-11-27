@@ -21,7 +21,7 @@ describe("composeEnginePrompt v3", () => {
     const p = composeEnginePrompt({ ...base, link: null });
     const step1 = p.slice(p.indexOf("## Step 1"), p.indexOf("## Step 2"));
     assert.match(step1, /Mnemos memory/);
-    const memory = p.slice(p.indexOf("## Your memory"), p.indexOf("## Step 6"));
+    const memory = p.slice(p.indexOf("## Step 5 — Your memory"), p.indexOf("## Step 6"));
     assert.match(memory, /recall it first and work from it/i);
     assert.match(memory, /confirmed goals, brand voice, offer and audience, the five unlock states, and my never-use list/i);
     assert.match(memory, /never credentials, keys, codes, or tokens; those live in secure storage, never in memory/i);
@@ -35,12 +35,12 @@ describe("composeEnginePrompt v3", () => {
 
   it("guides all five unlocks with say-first, drive, save, read-back, and skip", () => {
     const p = composeEnginePrompt({ ...base, link: null });
-    for (const item of ["Your links", "Your thinking key (LLM)", "Giphy", "Agent37 renderer", "Fish Audio"]) {
-      const start = p.lastIndexOf("### ", p.indexOf(item));
+    for (const [i, item] of ["Your links", "Your thinking key (LLM)", "Giphy", "Agent37 renderer", "Fish Audio"].entries()) {
+      const start = p.indexOf(`### ${i + 1}. ${item}`);
       assert.ok(start >= 0, item);
       const end = p.indexOf("\n### ", start + 4);
       const section = p.slice(start, end < 0 ? undefined : end);
-      for (const marker of ["Say first:", "Drive:", "Save:", "Read-back:", "Skip:"]) assert.ok(section.includes(marker), `${item}: ${marker}`);
+      for (const marker of ["Learn first:", "Say first:", "Drive:", "Save:", "Read-back:", "Skip:"]) assert.ok(section.includes(marker), `${item}: ${marker}`);
     }
     assert.match(p, /Five quick setups[\s\S]*about seven taps total/);
     assert.match(p, /one unlock at a time/i);
@@ -56,7 +56,7 @@ describe("composeEnginePrompt v3", () => {
     assert.match(step0, /Whichever I pick is the email you use to create my accounts in this setup/);
     assert.match(p, /address cannot change later/);
     const step4 = p.slice(p.indexOf("## Step 4 — I set up your five keys with you"), p.indexOf("### 1. Your links"));
-    assert.ok(step4.indexOf("Secure entry is the secure entry card") < step4.indexOf("Create every account below with the email I chose in Step 0."));
+    assert.ok(step4.indexOf("Secure entry is the secure entry card") < step4.indexOf("Create every account below with the email I chose in Step 0"));
     const llm = p.slice(p.indexOf("### 2. Your thinking key (LLM)"), p.indexOf("### 3. Giphy"));
     assert.match(llm, /OpenAI-compatible/);
     assert.match(llm, /I have a key/);
@@ -138,4 +138,70 @@ describe("composeEnginePrompt v3", () => {
     const house = composeEnginePrompt({ ...base, website: "https://plunderandriffle.com", link: null, houseAccount: true });
     assert.match(house, /https:\/\/plunderandriffle\.com/);
   });
+
+  it("educates before acting: a Learn first line at every unlock", () => {
+    const p = composeEnginePrompt({ ...base, link: null });
+    for (const n of [1, 2, 3, 4, 5]) {
+      const start = p.indexOf(`### ${n}. `);
+      const end = p.indexOf("\n### ", start + 5);
+      const section = p.slice(start, end < 0 ? p.indexOf("After all five") : end);
+      assert.match(section, /Learn first: What this is:/, `unlock ${n}`);
+      assert.match(section, /Why you need it:/, `unlock ${n}`);
+      assert.match(section, /What happens next:/, `unlock ${n}`);
+      assert.ok(section.indexOf("Learn first:") < section.indexOf("Drive:"), `unlock ${n} learns before driving`);
+    }
+  });
+
+  it("explains credential storage before the first key is ever asked for", () => {
+    const p = composeEnginePrompt({ ...base, link: null });
+    const beat = p.indexOf("## Before any key — how your credentials are stored");
+    assert.ok(beat >= 0, "credential beat present");
+    assert.ok(beat < p.indexOf("### 1. Your links"), "beat precedes the first unlock");
+    assert.ok(beat < p.indexOf("save_my_key"), "beat precedes the first key-save instruction");
+    const section = p.slice(beat, p.indexOf("## Step 4"));
+    assert.match(section, /secure entry card/);
+    assert.match(section, /never into chat, never into a file/);
+    assert.match(section, /secure BYOK store/);
+    assert.match(section, /not in Mnemos/);
+    assert.match(section, /check_my_unlock show only saved or not-saved, never the key itself/);
+    assert.match(section, /delete_my_key/);
+  });
+
+  it("gets the email decision at Step 0 and repeats it at the unlocks intro", () => {
+    const p = composeEnginePrompt({ ...base, link: null });
+    const step0 = p.slice(p.indexOf("## Step 0 — Your Muse email"), p.indexOf("## Step 1 — Learn my business"));
+    assert.match(step0, /Decide my email with me FIRST, before you create any account anywhere/);
+    assert.match(step0, /Muse Mail setup card/);
+    assert.match(step0, /confirm the address once, then use it throughout/);
+    assert.match(step0, /my LLM provider, Giphy, Agent37, Fish Audio, and DH Media \/ my offers/);
+    const intro = p.slice(p.indexOf("## Step 4 — I set up your five keys with you"), p.indexOf("### 1. Your links"));
+    assert.match(intro, /Create every account below with the email I chose in Step 0/);
+    assert.match(intro, /that same email for every account in this setup/);
+  });
+
+  it("prints the resolved Agent37 signup link inside its own unlock step", () => {
+    const a37 = "https://www.agent37.com/?via=member";
+    const p = composeEnginePrompt({ ...base, link: null, walkthroughOffers: [
+      { step: "agent37_ref", name: "Agent 37", signupUrl: a37, signupSource: "referrer" },
+    ] });
+    const section = p.slice(p.indexOf("### 4. Agent37 renderer"), p.indexOf("### 5. Fish Audio"));
+    assert.ok(section.includes(`Agent37 signup link for me: ${a37} (your referrer's link) — use this exact link to create my account.`));
+    const noOffers = composeEnginePrompt({ ...base, link: null });
+    const fallback = noOffers.slice(noOffers.indexOf("### 4. Agent37 renderer"), noOffers.indexOf("### 5. Fish Audio"));
+    assert.match(fallback, /Agent37 signup: https:\/\/www\.agent37\.com\/\?via=riffle \(the house link\)/);
+  });
+
+  it("numbers the steps without a gap (Step 5 is Your memory)", () => {
+    const p = composeEnginePrompt({ ...base, link: null });
+    const order = ["## Step 0", "## Step 1", "## Step 2", "## Step 3", "## Before any key", "## Step 4", "## Step 5 — Your memory", "## Step 6", "## Step 7", "## Step 8"];
+    let last = -1;
+    for (const h of order) { const i = p.indexOf(h); assert.ok(i > last, h); last = i; }
+  });
+
+  it("gives Step 1 the honest Mnemos fallback where the save is asked", () => {
+    const p = composeEnginePrompt({ ...base, link: null });
+    const step1 = p.slice(p.indexOf("## Step 1"), p.indexOf("## Step 2"));
+    assert.match(step1, /If no memory connection is available, say so in one line and continue — never fake a save/);
+  });
+
 });
