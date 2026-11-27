@@ -68,7 +68,7 @@ describe("composeEnginePrompt v3", () => {
     const p = composeEnginePrompt({ ...base, link: null });
     const step1 = p.slice(p.indexOf("## Step 1"), p.indexOf("## Step 2"));
     assert.match(step1, /Mnemos memory/);
-    const memory = p.slice(p.indexOf("## Step 6 — Your memory"), p.indexOf("## Step 7"));
+    const memory = p.slice(p.indexOf("## Step 7 — Your memory"), p.indexOf("## Step 8"));
     assert.match(memory, /recall it first and work from it/i);
     assert.match(memory, /confirmed goals, brand voice, offer and audience, the five unlock states, and my never-use list/i);
     assert.match(memory, /never credentials, keys, codes, or tokens; those live in secure storage, never in memory/i);
@@ -77,7 +77,7 @@ describe("composeEnginePrompt v3", () => {
 
   it("removes all retired connection and setup procedures from the starter", () => {
     const p = composeEnginePrompt({ ...base, link: null, updateToken: "pru_SHOULD_NOT_APPEAR", keyClaimLink: "https://example/key-claim/SHOULD_NOT_APPEAR" });
-    for (const forbidden of ["pru_SHOULD_NOT_APPEAR", "key-claim", "GATE 1", "foundation/confirm", "Skillsync", "get_brand_default"]) assert.equal(p.includes(forbidden), false, forbidden);
+    for (const forbidden of ["pru_SHOULD_NOT_APPEAR", "key-claim", "GATE 1", "foundation/confirm", "get_brand_default"]) assert.equal(p.includes(forbidden), false, forbidden);
   });
 
   it("guides all five unlocks with say-first, drive, save, read-back, and skip", () => {
@@ -110,8 +110,8 @@ describe("composeEnginePrompt v3", () => {
     assert.match(p, /P&R credits are engine fuel[\s\S]*different from Starimg API tokens[\s\S]*The Panel is NOT a currency/);
     assert.match(p, /Panel calls burn MY tokens at premium-model rates/);
     assert.ok(p.indexOf("## Step 5 — Unlock the Panel (Opus + Fable)") > p.indexOf("## Step 4 — I set up your five keys with you"));
-    assert.ok(p.indexOf("## Step 5 — Unlock the Panel (Opus + Fable)") < p.indexOf("## Step 6 — Your memory"));
-    assert.ok(p.includes("## Step 9 — Report, then stop"));
+    assert.ok(p.indexOf("## Step 5 — Unlock the Panel (Opus + Fable)") < p.indexOf("## Step 7 — Your memory"));
+    assert.ok(p.includes("## Step 10 — Report, then stop"));
     const step0 = p.slice(p.indexOf("## Step 0 — Your Muse email"), p.indexOf("## Step 1 — Learn my business"));
     assert.match(step0, /Ask me what email I want to use/);
     assert.match(step0, /use my Gmail if I'd rather/);
@@ -177,7 +177,7 @@ describe("composeEnginePrompt v3", () => {
 
   it("labels connect-page figures when this connection has no balance tool", () => {
     const p = composeEnginePrompt({ ...base, link: null });
-    const step5 = p.slice(p.indexOf("## Step 8 — First proof"), p.indexOf("## Step 9"));
+    const step5 = p.slice(p.indexOf("## Step 9 — First proof"), p.indexOf("## Step 10"));
     assert.match(step5, /exact credit cost and balance only when a balance tool is present in THIS connection's tool list/i);
     assert.match(step5, /label any figure from the connect page explicitly as ‘the connect page says/);
     assert.match(step5, /never present page wording as an exact quote/i);
@@ -253,11 +253,29 @@ describe("composeEnginePrompt v3", () => {
     assert.match(fallback, /Agent37 signup: https:\/\/www\.agent37\.com\/\?via=riffle \(the house link\)/);
   });
 
-  it("numbers the steps without a gap (Step 5 is the Panel)", () => {
+  it("numbers the steps without a gap (Step 5 is the Panel, Step 6 is Core Skills)", () => {
     const p = composeEnginePrompt({ ...base, link: null });
-    const order = ["## Step 0", "## Step 1", "## Step 2", "## Step 3", "## Before any key", "## Step 4", "## Step 5 — Unlock the Panel", "## Step 6 — Your memory", "## Step 7", "## Step 8", "## Step 9"];
+    const order = ["## Step 0", "## Step 1", "## Step 2", "## Step 3", "## Before any key", "## Step 4", "## Step 5 — Unlock the Panel", "## Step 6 — Upgrade my core skills", "## Step 7 — Your memory", "## Step 8", "## Step 9", "## Step 10"];
     let last = -1;
     for (const h of order) { const i = p.indexOf(h); assert.ok(i > last, h); last = i; }
+  });
+
+  it("adds the Core Skills upgrade step right after the Panel", () => {
+    const p = composeEnginePrompt({ ...base, link: null });
+    assert.match(p, /## Step 6 — Upgrade my core skills/);
+    assert.ok(p.indexOf("## Step 6 — Upgrade my core skills") > p.indexOf("## Step 5 — Unlock the Panel (Opus + Fable)"));
+    assert.ok(p.indexOf("## Step 6 — Upgrade my core skills") < p.indexOf("## Step 7 — Your memory"));
+    const step = p.slice(p.indexOf("## Step 6 — Upgrade my core skills"), p.indexOf("## Step 7 — Your memory"));
+    assert.match(step, /space-demo-and-replicate/);
+    assert.match(step, /Design Engine contract and kit patterns/);
+    assert.match(step, /taste finish gate/);
+    assert.match(step, /Skillsync one-click install/);
+    assert.match(step, /https:\/\/app\.skillsync\.com\/iammagicdave\/plunder-and-riffle/);
+    assert.match(step, /Skills are the install lane; Whop keeps the sales/);
+    assert.match(step, /version check yourself — I type nothing/);
+    assert.match(step, /never silently mid-task/);
+    assert.match(step, /turns a tester into a builder/);
+    assert.match(step, /here\.now replication kit/);
   });
 
   it("gives Step 1 the honest Mnemos fallback where the save is asked", () => {
