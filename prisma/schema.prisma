@@ -81,6 +81,8 @@ model User {
   listingCheckedAt     DateTime?
   marketplaceBundleAt  DateTime?
   freeAgentListingUsed Boolean           @default(false)
+  betaCampaigns        BetaCampaign[]
+  betaTester           BetaTester?
   creditGrants         CreditGrant[]
   referredBy           User?             @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
   referrals            User[]            @relation("Referrals")
@@ -1802,4 +1804,167 @@ model GiftInvite {
 
   @@index([status])
   @@index([createdAt])
+}
+
+model BetaCampaign {
+  id String @id @default(cuid())
+  ownerId String
+  company String
+  product String
+  brandName String
+  tagline String @default("")
+  brief String @default("")
+  accent String @default("#b45309")
+  fundedCents Int @default(0)
+  defaultBountyCents Int @default(20)
+  status String @default("active")
+  createdAt DateTime @default(now())
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  tasks BetaTask[]
+  ledger BetaLedgerLine[]
+  memes BetaMeme[]
+  panelRuns BetaPanelRun[]
+  @@index([ownerId, createdAt])
+}
+
+model BetaTask {
+  id String @id @default(cuid())
+  campaignId String
+  title String
+  instructions String @default("")
+  bountyCents Int
+  slots Int @default(1)
+  status String @default("open")
+  createdAt DateTime @default(now())
+  campaign BetaCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  claims BetaClaim[]
+  @@index([campaignId, status])
+}
+
+model BetaTester {
+  id String @id @default(cuid())
+  userId String @unique
+  lane String @default("muse")
+  museMail String @default("")
+  niche String @default("")
+  pageName String @default("")
+  businessName String @default("")
+  businessWebsite String?
+  researchJobId String?
+  researchStatus String @default("none")
+  facebookPageRecorded Boolean @default(false)
+  facebookPageUrl String?
+  postsPosted Int @default(0)
+  boardHandle String @default("")
+  fuelGranted Int @default(1000000)
+  fuelUsed Int @default(0)
+  bountyGranted Int @default(10000000)
+  bountyUnlocked Boolean @default(false)
+  bountyUsed Int @default(0)
+  panelCostAckAt DateTime?
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  claims BetaClaim[]
+  reports BetaReport[]
+  spends BetaTokenSpend[]
+  panelRuns BetaPanelRun[]
+  skills BetaSkillCheck[]
+  memes BetaMeme[]
+  posts BetaPagePost[]
+  ledger BetaLedgerLine[]
+}
+
+model BetaClaim {
+  id String @id @default(cuid())
+  taskId String
+  testerId String
+  status String @default("claimed")
+  createdAt DateTime @default(now())
+  task BetaTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tester BetaTester @relation(fields: [testerId], references: [id], onDelete: Cascade)
+  report BetaReport?
+  @@unique([taskId, testerId])
+}
+
+model BetaReport {
+  id String @id @default(cuid())
+  claimId String @unique
+  testerId String
+  built String @default("")
+  purpose String @default("")
+  needsFromOwner String @default("")
+  tokensSpent String @default("")
+  cannotDo String @default("")
+  reviewStatus String @default("pending")
+  createdAt DateTime @default(now())
+  claim BetaClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  tester BetaTester @relation(fields: [testerId], references: [id], onDelete: Cascade)
+}
+
+model BetaLedgerLine {
+  id String @id @default(cuid())
+  campaignId String
+  testerId String
+  amountCents Int
+  kind String
+  memo String @default("")
+  createdAt DateTime @default(now())
+  campaign BetaCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  tester BetaTester @relation(fields: [testerId], references: [id], onDelete: Cascade)
+  @@index([campaignId, createdAt])
+}
+
+model BetaTokenSpend {
+  id String @id @default(cuid())
+  testerId String
+  kind String
+  amount Int
+  memo String @default("")
+  createdAt DateTime @default(now())
+  tester BetaTester @relation(fields: [testerId], references: [id], onDelete: Cascade)
+}
+
+model BetaPanelRun {
+  id String @id @default(cuid())
+  testerId String
+  campaignId String?
+  topic String
+  opusVerdict String @default("")
+  fableAngle String @default("")
+  status String @default("recorded")
+  createdAt DateTime @default(now())
+  tester BetaTester @relation(fields: [testerId], references: [id], onDelete: Cascade)
+  campaign BetaCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+}
+
+model BetaSkillCheck {
+  id String @id @default(cuid())
+  testerId String
+  skillKey String
+  checkedAt DateTime @default(now())
+  version String @default("")
+  tester BetaTester @relation(fields: [testerId], references: [id], onDelete: Cascade)
+  @@unique([testerId, skillKey])
+}
+
+model BetaMeme {
+  id String @id @default(cuid())
+  testerId String
+  campaignId String?
+  imageUrl String @default("")
+  caption String @default("")
+  status String @default("submitted")
+  createdAt DateTime @default(now())
+  tester BetaTester @relation(fields: [testerId], references: [id], onDelete: Cascade)
+  campaign BetaCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+}
+
+model BetaPagePost {
+  id String @id @default(cuid())
+  testerId String
+  caption String @default("")
+  link String?
+  status String @default("queued")
+  createdAt DateTime @default(now())
+  tester BetaTester @relation(fields: [testerId], references: [id], onDelete: Cascade)
 }

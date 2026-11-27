@@ -1,0 +1,7 @@
+import test from "node:test"; import assert from "node:assert/strict"; import { validateBountyCents, evaluateUnlock, validateSpend, approveReport } from "./beta-core.ts";
+const tester = (x: Partial<Parameters<typeof evaluateUnlock>[0]> = {}) => ({ facebookPageRecorded:false, postsPosted:0, bountyUnlocked:false, boardHandle:"", fuelGranted:100, fuelUsed:0, bountyGranted:100, bountyUsed:0, ...x });
+test("bounty floor", () => assert.throws(() => validateBountyCents(19))); test("unlock requires page and post", () => { assert.equal(evaluateUnlock(tester({facebookPageRecorded:true})), false); assert.equal(evaluateUnlock(tester({facebookPageRecorded:true,postsPosted:1})), true); });
+test("bounty spend requires unlock and handle", () => { assert.throws(() => validateSpend(tester(),"bounty",1)); assert.throws(() => validateSpend(tester({bountyUnlocked:true}),"bounty",1)); });
+test("fuel overspend blocked", () => assert.throws(() => validateSpend(tester({fuelGranted:1}),"fuel",2)));
+test("approval pays and writes ledger", () => { const r=approveReport({campaign:{fundedCents:50},tester:tester(),bountyCents:20,ledger:{amountCents:20,kind:"",memo:"ok"}}); assert.equal(r.campaign.fundedCents,30); assert.equal(r.ledger.amountCents,20); });
+test("approval fails on insufficient pool", () => assert.throws(() => approveReport({campaign:{fundedCents:19},tester:tester(),bountyCents:20,ledger:{amountCents:20,kind:"",memo:""}})));
