@@ -6,8 +6,27 @@ export type BetaLane = "muse" | "agent37";
 export function validLane(value: unknown): BetaLane | null {
   return value === "muse" || value === "agent37" ? value : null;
 }
-export function enrollLane(param: string | null): BetaLane {
-  return param === "agent37" ? "agent37" : "muse";
+export function enrollLane(param: string | null): BetaLane | null {
+  // Exact match only — anything else is NO lane, never a silent Muse
+  // default (Joe's fix-first review, item 1: "muse" for null/"other"/
+  // "Agent37" at the client layer defeated the API's lane-less refusal).
+  return validLane(param);
+}
+export function validEmailShape(value: unknown): boolean {
+  // Basic shape only (local@domain.tld, no spaces) — the delivery address
+  // is where the tester's key and accounts land, so a typo must not pass.
+  return typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+export function agent37SwitchAction(storedDeliveryEmail: unknown): "commit" | "collect-email" {
+  // Switching to Agent37 may commit in one click ONLY with an address the
+  // tester already stored; the Whop login email is never written as the
+  // delivery address automatically (Joe's fix-first review, item 2b).
+  return typeof storedDeliveryEmail === "string" && storedDeliveryEmail.trim() ? "commit" : "collect-email";
+}
+export function day0Verifiable(lane: unknown): boolean {
+  // Only the Agent37 lane unlocks by house verification; the Muse lane
+  // unlocks by recording its Facebook Page + posts (the day0 action).
+  return lane === "agent37";
 }
 export function enrollmentLaneWrite(value: unknown, existing: boolean): { create: BetaLane | null; update: BetaLane | undefined } {
   const lane = validLane(value);

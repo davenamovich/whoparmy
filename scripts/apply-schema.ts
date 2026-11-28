@@ -39,6 +39,8 @@ try {
 // on every boot and never touches existing data.
 const ADDITIVE_COLUMNS: Array<{ table: string; column: string; ddl: string }> = [
   { table: "BetaTester", column: "deliveryEmail", ddl: 'ALTER TABLE "BetaTester" ADD COLUMN "deliveryEmail" TEXT NOT NULL DEFAULT \'\'' },
+  { table: "BetaTester", column: "day0VerifiedBy", ddl: 'ALTER TABLE "BetaTester" ADD COLUMN "day0VerifiedBy" TEXT NOT NULL DEFAULT \'\'' },
+  { table: "BetaTester", column: "day0VerifiedAt", ddl: 'ALTER TABLE "BetaTester" ADD COLUMN "day0VerifiedAt" DATETIME' },
   { table: "BetaTester", column: "offerText", ddl: 'ALTER TABLE "BetaTester" ADD COLUMN "offerText" TEXT NOT NULL DEFAULT \'\'' },
   { table: "Application", column: "handoutOptIn", ddl: 'ALTER TABLE "Application" ADD COLUMN "handoutOptIn" BOOLEAN NOT NULL DEFAULT false' },
   { table: "MarketplaceSale", column: "source", ddl: 'ALTER TABLE "MarketplaceSale" ADD COLUMN "source" TEXT' },

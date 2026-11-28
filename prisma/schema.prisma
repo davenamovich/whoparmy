@@ -1864,6 +1864,8 @@ model BetaTester {
   bountyUnlocked Boolean @default(false)
   bountyUsed Int @default(0)
   panelCostAckAt DateTime?
+  day0VerifiedBy String @default("")
+  day0VerifiedAt DateTime?
   createdAt DateTime @default(now())
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   claims BetaClaim[]

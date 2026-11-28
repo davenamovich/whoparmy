@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SiteFooter } from "@/components/shell/site-footer";
-import { enrollLane, type BetaLane } from "@/lib/beta-core";
+import { agent37SwitchAction, enrollLane, type BetaLane } from "@/lib/beta-core";
 import { stashRefFromUrl } from "@/lib/ref-stash";
 
 const CONNECT = "/api/auth/whop?next=" + encodeURIComponent("/beta?lane=muse");
@@ -13,7 +13,7 @@ const AGENT37_CONNECT = "/api/auth/whop?next=" + encodeURIComponent("/beta?lane=
 type Task = { id: string; title: string; instructions: string; bountyCents: number; slots: number; campaignId: string; campaign?: { brandName: string; product: string } };
 type Campaign = { id: string; company: string; product: string; brandName: string; fundedCents: number; defaultBountyCents: number; tasks: Task[] };
 type Tester = {
-  lane: string; museMail: string; niche: string; boardHandle: string;
+  lane: string; museMail: string; deliveryEmail: string; day0VerifiedBy: string; day0VerifiedAt: string | null; niche: string; boardHandle: string;
   businessName: string; businessWebsite: string | null; offerText: string;
   researchStatus: string; researchJobId: string | null;
   facebookPageRecorded: boolean; facebookPageUrl: string | null; pageName: string; postsPosted: number;
@@ -52,7 +52,8 @@ export default function BetaPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [prompt, setPrompt] = useState("");
-  const [entryLane, setEntryLane] = useState<BetaLane>("muse");
+  const [entryLane, setEntryLane] = useState<BetaLane | null>(null);
+  const [switchCollect, setSwitchCollect] = useState(false);
   const [f, setF] = useState<Record<string, string>>({});
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setF((s) => ({ ...s, [k]: e.target.value }));
 
@@ -87,8 +88,7 @@ export default function BetaPage() {
 
           <section className="py-14 md:py-20">
             <p className="font-mono text-[11px] font-semibold tracking-[0.18em] text-primary uppercase">Plunder &amp; Riffle — Open Beta</p>
-            <p className="mt-6 max-w-3xl text-xl leading-relaxed font-medium md:text-2xl">New to Muse? Muse is Meta&apos;s personal AI agent — your own assistant that lives in the apps you already use, learns your business, and does real work with you: research, pages, posts, and content.</p>
-            <h1 className="mt-6 max-w-4xl font-display text-5xl font-extrabold leading-[1.02] tracking-tight md:text-7xl">Two doors. Work starts on <span className="text-primary">Day 0.</span></h1>
+            <h1 className="mt-6 max-w-4xl font-display text-5xl font-extrabold leading-[1.02] tracking-tight md:text-7xl">Your business, worked on from <span className="text-primary">Day 0.</span></h1>
             <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground">We are the test: Plunder &amp; Riffle itself is the offer under test. Bring a business. Choose Muse for a Day 0 build, or Agent37 to have your business researched and your standing brief loaded when your instance is provisioned.</p>
             <div className="mt-9 flex flex-wrap items-center gap-3">
               <Button asChild size="lg"><a href={CONNECT}>Continue with Whop</a></Button>
@@ -115,9 +115,19 @@ export default function BetaPage() {
               <div className="rounded-[10px] border border-border bg-card p-5">
                 <p className="font-mono text-xs font-medium tracking-[0.14em] text-primary">OUT</p>
                 <ul className="mt-3 space-y-1.5 text-sm text-muted-foreground">
-                  <li>A Facebook Page, live</li>
-                  <li>Your first posts</li>
-                  <li>Real beta tasks, done and reported</li>
+                  {entryLane === "agent37" ? (
+                    <>
+                      <li>A Day 0 preview of your page</li>
+                      <li>Posts drafted — nothing published</li>
+                      <li>Real beta tasks, done and reported</li>
+                    </>
+                  ) : (
+                    <>
+                      <li>A Facebook Page, live</li>
+                      <li>Your first posts</li>
+                      <li>Real beta tasks, done and reported</li>
+                    </>
+                  )}
                 </ul>
               </div>
             </div>
@@ -167,6 +177,8 @@ export default function BetaPage() {
               </div>
             </div>
 
+            <p className="mt-8 max-w-3xl text-xl leading-relaxed font-medium md:text-2xl">New to Muse? Muse is Meta&apos;s personal AI agent — your own assistant that lives in the apps you already use, learns your business, and does real work with you: research, pages, posts, and content.</p>
+
             <div className={`mt-4 ${card}`}>
               <h2 className={h2}>The deal, plainly</h2>
               <p className={note}>Muse lane: email is set up inside Muse (Muse Mail first, then Agent Mail); it is never collected on this page.</p>
@@ -210,27 +222,50 @@ export default function BetaPage() {
 
           <div className="mt-8 grid gap-4 md:grid-cols-2">
             <section className={card}>
-              <h2 className={h2}>{t?.lane === "agent37" ? "Step 0 · Your existing email address" : "Step 0 · Your email is set up in Muse"}</h2>
-              <p className={note}>{t?.lane === "agent37"
+              <h2 className={h2}>{(t?.lane ?? entryLane) === "agent37" ? "Step 0 · Your existing email address" : (t?.lane ?? entryLane) === "muse" ? "Step 0 · Your email is set up in Muse" : "Step 0 · Pick your door"}</h2>
+              <p className={note}>{(t?.lane ?? entryLane) === "agent37"
                 ? "Your existing email address is the address everything is created for. No new inbox is needed."
-                : "No email is collected on this page — and you don’t need a Muse account yet. Your starter prompt does the email setup inside Muse, first thing: your Muse creates your Muse Mail inbox, then Agent Mail on top of it, and reads the verification code itself. That happens in Muse, before any account, purchase, or build."}</p>
+                : (t?.lane ?? entryLane) === "muse"
+                ? "No email is collected on this page — and you don’t need a Muse account yet. Your starter prompt does the email setup inside Muse, first thing: your Muse creates your Muse Mail inbox, then Agent Mail on top of it, and reads the verification code itself. That happens in Muse, before any account, purchase, or build."
+                : "Two doors, one beta — pick yours below. Nothing is preselected."}</p>
               {t ? (
                 <>
-                <p className={note}>Your lane: {t.lane === "agent37" ? "Agent37" : "Muse"}. <Button size="sm" variant="outline" disabled={busy === "enroll"} onClick={() => run("enroll", () => api("enroll", { lane: t.lane === "agent37" ? "muse" : "agent37", deliveryEmail: f.deliveryEmail ?? data.deliveryEmail, niche: t.niche, boardHandle: t.boardHandle }))}>Switch to {t.lane === "agent37" ? "Muse" : "Agent37"}</Button></p>
-                {t.lane === "agent37" ? <><Input className="mt-3" type="email" placeholder="Your existing email address" value={f.deliveryEmail ?? data.deliveryEmail ?? ""} onChange={set("deliveryEmail")} /><Button className="mt-2" size="sm" variant="outline" disabled={busy === "save-email"} onClick={() => run("save-email", () => api("enroll", { lane: "agent37", deliveryEmail: f.deliveryEmail ?? data.deliveryEmail, niche: t.niche, boardHandle: t.boardHandle }))}>Save delivery email</Button><p className={note}>A 1M seed to start; your own P&amp;R key when you buy your first pack. The 10M bounty unlocks on a human-verified Day 0 build.</p><p className={note}>Next: enrolled → we research your business → your standing brief is written → it loads as your agent&apos;s first instruction when your instance is provisioned.</p></> : null}
+                <p className={note}>Your lane: {t.lane === "agent37" ? "Agent37" : "Muse"}. {t.lane === "agent37" ? (
+                  <Button size="sm" variant="outline" disabled={busy === "enroll"} onClick={() => run("enroll", () => api("enroll", { lane: "muse", niche: t.niche, boardHandle: t.boardHandle }))}>Switch to Muse</Button>
+                ) : agent37SwitchAction(t.deliveryEmail) === "commit" ? (
+                  <Button size="sm" variant="outline" disabled={busy === "enroll"} onClick={() => run("enroll", () => api("enroll", { lane: "agent37", deliveryEmail: t.deliveryEmail, niche: t.niche, boardHandle: t.boardHandle }))}>Switch to Agent37</Button>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => setSwitchCollect(true)}>Switch to Agent37</Button>
+                )}</p>
+                {t.lane !== "agent37" && switchCollect ? (
+                  <div className="mt-3">
+                    <Input type="email" placeholder="Your existing email address" value={f.deliveryEmail ?? data.userEmail ?? ""} onChange={set("deliveryEmail")} />
+                    <p className={note}>Filled in from your Whop login — not saved yet. Check it: your key and accounts are created for this address. The switch happens when you save.</p>
+                    <Button className="mt-2" size="sm" disabled={busy === "enroll"} onClick={() => run("enroll", async () => { await api("enroll", { lane: "agent37", deliveryEmail: f.deliveryEmail ?? data.userEmail ?? "", niche: t.niche, boardHandle: t.boardHandle }); setSwitchCollect(false); })}>Save &amp; switch to Agent37</Button>
+                  </div>
+                ) : null}
+                {t.lane === "agent37" ? <><Input className="mt-3" type="email" placeholder="Your existing email address" value={f.deliveryEmail ?? data.deliveryEmail ?? ""} onChange={set("deliveryEmail")} /><Button className="mt-2" size="sm" variant="outline" disabled={busy === "save-email"} onClick={() => run("save-email", () => api("enroll", { lane: "agent37", deliveryEmail: f.deliveryEmail ?? data.deliveryEmail, niche: t.niche, boardHandle: t.boardHandle }))}>Save delivery email</Button><p className={note}>A 1M seed to start; your own P&amp;R key when you buy your first pack. The 10M bounty unlocks on a human-verified Day 0 build.</p><p className={note}>Next: enrolled → we research your business → your standing brief is written → it loads as your agent&apos;s first instruction when your instance is provisioned.</p>{t.day0VerifiedAt ? <p className={note}>Day 0 verified by the house on {new Date(t.day0VerifiedAt).toLocaleDateString("en-US")} — the 10M bounty is unlocked.</p> : null}</> : null}
                 <p className={note}>{t.lane === "agent37"
                   ? "Enrollment seeds 1M fuel. Deep research on your business becomes your agent’s standing brief on your own Agent37 instance."
                   : `${t.museMail ? `${t.museMail} · ` : ""}Lane: Muse first, Agent37 second. Enrollment seeds 1M fuel. Your starter prompt is in the Deep research card below — its Step 0 is the email setup.`}</p>
                 </>
               ) : (
                 <div className="mt-4 space-y-3">
+                  {entryLane === null ? (
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="outline" onClick={() => setEntryLane("muse")}>Have your own Muse</Button>
+                      <Button variant="outline" onClick={() => setEntryLane("agent37")}>No Muse of your own — Agent37</Button>
+                    </div>
+                  ) : null}
                   <Input placeholder="Your test niche (optional)" value={f.niche ?? ""} onChange={set("niche")} />
                   <Input placeholder="Board handle (optional)" value={f.board ?? ""} onChange={set("board")} />
                   {entryLane === "agent37" ? <Input type="email" placeholder="Your existing email address" value={f.deliveryEmail ?? data.deliveryEmail ?? data.userEmail ?? ""} onChange={set("deliveryEmail")} /> : null}
-                  <Button disabled={busy === "enroll"} onClick={() => run("enroll", () => api("enroll", { lane: entryLane, deliveryEmail: f.deliveryEmail ?? data.deliveryEmail ?? data.userEmail, niche: f.niche ?? "", boardHandle: f.board ?? "" }))}>Enroll and seed 1M fuel</Button>
+                  <Button disabled={busy === "enroll" || entryLane === null} onClick={() => run("enroll", () => api("enroll", { lane: entryLane, deliveryEmail: f.deliveryEmail ?? data.deliveryEmail ?? data.userEmail, niche: f.niche ?? "", boardHandle: f.board ?? "" }))}>Enroll and seed 1M fuel</Button>
                   <p className="text-sm text-muted-foreground">{entryLane === "agent37"
                     ? "Your existing email address is the address everything is created for. Enrolling does not ask for a new email address."
-                    : "Enrolling never asks for an email. After you enroll, craft your starter prompt below and paste it into your Muse — the prompt sets up your email first."}</p>
+                    : entryLane === "muse"
+                    ? "Enrolling never asks for an email. After you enroll, craft your starter prompt below and paste it into your Muse — the prompt sets up your email first."
+                    : "Pick your door first — enroll unlocks once a lane is chosen. Nothing is preselected."}</p>
                 </div>
               )}
             </section>

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUserId } from "@/lib/session";
-import { approveReport, deliveryEmailRequired, enrollmentLaneWrite, evaluateUnlock, validateBountyCents, validateSpend } from "@/lib/beta-core";
+import { approveReport, day0Verifiable, deliveryEmailRequired, enrollmentLaneWrite, evaluateUnlock, validEmailShape, validateBountyCents, validateSpend } from "@/lib/beta-core";
+import { getSessionOperator } from "@/lib/site-gate";
 import { startResearchJob, getResearchJob } from "@/lib/research-jobs";
 import { getPlan } from "@/lib/plans";
 
@@ -153,6 +154,8 @@ export async function POST(req: NextRequest) {
       const effectiveLane = lane.update ?? lane.create ?? c.tester?.lane;
       const deliveryEmail = typeof b.deliveryEmail === "string" ? b.deliveryEmail.trim() : "";
       if (deliveryEmailRequired(effectiveLane, deliveryEmail)) return json({ error: "The Agent37 lane needs your email address — everything is created for it. Add it and enroll again." }, 400);
+      if (effectiveLane === "agent37" && deliveryEmail && !validEmailShape(deliveryEmail)) return json({ error: "That email address doesn't look right — check it and try again. Everything on this lane is created for that address." }, 400);
+      // Lane switching is ungated after research/claims — acceptable for beta (Joe review, A2 note).
       const t = await db.betaTester.upsert({
         where: { userId: c.userId },
         create: {
@@ -243,6 +246,24 @@ export async function POST(req: NextRequest) {
           postsPosted: posts,
           bountyUnlocked: evaluateUnlock({ ...c.tester, facebookPageRecorded: page, postsPosted: posts }),
         },
+      });
+      return json({ tester: t });
+    }
+    if (action === "verifyDay0") {
+      // House verification of an Agent37 tester's Day 0 build — the ONLY
+      // writer of bountyUnlocked for that lane (the day0 action preserves
+      // the flag there; Joe's fix-first review, item 3). Gated exactly
+      // like the /api/admin routes: designated-operator session only
+      // (getSessionOperator), everyone else gets a 404 — a tester can
+      // never verify themselves.
+      const operator = await getSessionOperator();
+      if (!operator) return json({ error: "Not found" }, 404);
+      const target = await db.betaTester.findUnique({ where: { id: String(b.testerId || "") } });
+      if (!target) return json({ error: "Not found" }, 404);
+      if (!day0Verifiable(target.lane)) return json({ error: "Day 0 verification is for the Agent37 lane only — the Muse lane unlocks by recording its Facebook Page and posts." }, 400);
+      const t = await db.betaTester.update({
+        where: { id: target.id },
+        data: { bountyUnlocked: true, day0VerifiedBy: operator.id, day0VerifiedAt: new Date() },
       });
       return json({ tester: t });
     }
