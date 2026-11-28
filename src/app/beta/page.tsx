@@ -159,7 +159,7 @@ export default function BetaPage() {
 
             <div className={`mt-4 ${card}`}>
               <h2 className={h2}>The deal, plainly</h2>
-              <p className={note}>The bounty is seeded token fuel, not cash — the 10M-token bounty ledger unlocks on a verified Day 0, and revenue confirmed to date is $0. Set up Muse Mail first: your bridge creates the key, and no API key is ever collected here. Nothing goes out without your say-so.</p>
+              <p className={note}>The bounty is seeded token fuel, not cash — the 10M-token bounty ledger unlocks on a verified Day 0, and revenue confirmed to date is $0. Your email is set up inside Muse by your starter prompt — Muse Mail first, then Agent Mail — never collected on this page, and no API key is ever collected here. Nothing goes out without your say-so.</p>
             </div>
           </section>
           <SiteFooter />
@@ -198,15 +198,16 @@ export default function BetaPage() {
 
           <div className="mt-8 grid gap-4 md:grid-cols-2">
             <section className={card}>
-              <h2 className={h2}>Step 0 · Muse Mail first</h2>
+              <h2 className={h2}>Step 0 · Your email is set up in Muse</h2>
+              <p className={note}>No email is collected on this page — and you don&apos;t need a Muse account yet. Your starter prompt does the email setup inside Muse, first thing: your Muse creates your Muse Mail inbox, then Agent Mail on top of it, and reads the verification code itself. That happens in Muse, before any account, purchase, or build.</p>
               {t ? (
-                <p className={note}>{t.museMail || "No address recorded yet."} · Lane: Muse first, Agent37 second. Enrollment seeds 1M fuel.</p>
+                <p className={note}>{t.museMail ? `${t.museMail} · ` : ""}Lane: Muse first, Agent37 second. Enrollment seeds 1M fuel. Your starter prompt is in the Deep research card below — its Step 0 is the email setup.</p>
               ) : (
                 <div className="mt-4 space-y-3">
-                  <Input placeholder="Muse Mail address" value={f.mail ?? ""} onChange={set("mail")} />
                   <Input placeholder="Your test niche (optional)" value={f.niche ?? ""} onChange={set("niche")} />
                   <Input placeholder="Board handle (optional)" value={f.board ?? ""} onChange={set("board")} />
-                  <Button disabled={busy === "enroll"} onClick={() => run("enroll", () => api("enroll", { museMail: f.mail ?? "", niche: f.niche ?? "", boardHandle: f.board ?? "" }))}>Enroll and seed 1M fuel</Button>
+                  <Button disabled={busy === "enroll"} onClick={() => run("enroll", () => api("enroll", { niche: f.niche ?? "", boardHandle: f.board ?? "" }))}>Enroll and seed 1M fuel</Button>
+                  <p className="text-sm text-muted-foreground">Enrolling never asks for an email. After you enroll, craft your starter prompt below and paste it into your Muse — the prompt sets up your email first.</p>
                 </div>
               )}
             </section>
