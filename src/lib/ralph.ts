@@ -385,6 +385,18 @@ export async function ralphAction(userId: string, locale: string, actionId: Ralp
         select: { plan: true, whopId: true },
       });
       const s = await craftSetupPrompt({ id: userId, plan: user?.plan ?? "FREE", whopId: user?.whopId ?? null });
+      if (s.researchRequired) {
+        const statusLine = s.researchState === "running"
+          ? "Your deep research is still running; the prompt unlocks when it lands."
+          : s.researchState === "failed"
+            ? "The last deep-research run failed; run it again from Brand Profiles."
+            : "Deep research has not run yet; start it from Brand Profiles first.";
+        return {
+          text: `Your Day-1 setup prompt comes after deep research on your business. ${statusLine}`,
+          actions: ["build_system"],
+          nav: { view: "system" },
+        };
+      }
       const lines = [
         "Your Day-1 setup prompt is crafted — it's in My AI System, ready to copy.",
         "Paste it to your Muse (or any agent you run): it connects through your bridge link, researches your business, builds your agent management UI in your own stack, and wires the workforce from your blueprint. Operating from day 1.",

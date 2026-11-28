@@ -65,12 +65,21 @@ interface Briefing {
   recommendation: string;
 }
 
+type ResearchState = "done" | "running" | "failed" | "none" | null;
+
 export function MySystemView() {
   const [blueprint, setBlueprint] = useState<Bp | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [report, setReport] = useState<Report | null>(null);
   const [briefing, setBriefing] = useState<Briefing | null>(null);
-  const [setup, setSetup] = useState<{ eligible: boolean; link: string | null; prompt: string } | null>(null);
+  const [researchState, setResearchState] = useState<ResearchState>(null);
+  const [setup, setSetup] = useState<{
+    eligible: boolean;
+    link: string | null;
+    prompt: string;
+    researchRequired: boolean;
+    researchState: "none" | "running" | "failed" | null;
+  } | null>(null);
   const [busySetup, setBusySetup] = useState(false);
   const [panel, setPanel] = useState<{
     status: string;
@@ -101,6 +110,7 @@ export function MySystemView() {
         report?: Report | null;
         briefing?: Briefing;
         team?: typeof team;
+        researchState?: ResearchState;
       };
       if (res.ok) {
         setBlueprint(data.blueprint ?? null);
@@ -108,6 +118,7 @@ export function MySystemView() {
         setReport(data.report ?? null);
         if (data.briefing) setBriefing(data.briefing);
         if (data.team) setTeam(data.team);
+        setResearchState(data.researchState ?? null);
       }
     } catch {
       // leave the empty state; the buttons still work
@@ -132,10 +143,18 @@ export function MySystemView() {
         eligible?: boolean;
         link?: string | null;
         prompt?: string;
+        researchRequired?: boolean;
+        researchState?: "none" | "running" | "failed" | null;
         error?: string;
       };
-      if (!res.ok || !data.prompt) throw new Error(data.error ?? "Setup failed");
-      setSetup({ eligible: Boolean(data.eligible), link: data.link ?? null, prompt: data.prompt });
+      if (!res.ok || (!data.prompt && !data.researchRequired)) throw new Error(data.error ?? "Setup failed");
+      setSetup({
+        eligible: Boolean(data.eligible),
+        link: data.link ?? null,
+        prompt: data.prompt ?? "",
+        researchRequired: Boolean(data.researchRequired),
+        researchState: data.researchState ?? null,
+      });
       void load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Setup failed");
@@ -202,6 +221,24 @@ export function MySystemView() {
     }
   }
 
+  function renderResearchStep(state: Exclude<ResearchState, "done" | null>) {
+    return (
+      <div className="space-y-3">
+        <p className="text-sm font-medium">Your prompt comes after deep research on your business.</p>
+        <p className="text-sm text-muted-foreground">
+          {state === "running"
+            ? "Research is running; your prompt unlocks when it lands."
+            : state === "failed"
+              ? "The last run failed; run it again."
+              : "Research has not run yet."}
+        </p>
+        <Button asChild>
+          <a href="/build">Start deep research</a>
+        </Button>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -234,7 +271,11 @@ export function MySystemView() {
           content engine as a Space in your own Muse, connects it through the bridge, and turns on
           daily autopilot generation inside your budget. The bridge link rides inside the prompt.
         </p>
-        {setup ? (
+        {researchState !== null && researchState !== "done" ? (
+          renderResearchStep(researchState)
+        ) : setup?.researchRequired ? (
+          renderResearchStep(setup.researchState ?? "none")
+        ) : setup ? (
           <div className="space-y-3">
             {setup.link ? (
               <p className="text-sm">

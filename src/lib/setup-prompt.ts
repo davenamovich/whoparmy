@@ -15,6 +15,7 @@ import type { SavedOfferLink } from "@/lib/muse-week-command";
 import { composeEnginePrompt } from "@/lib/setup-prompt-compose";
 import type { WalkthroughOffer } from "@/lib/build-walkthrough-core";
 import { HOUSE_ACCOUNT_EMAIL } from "@/lib/upload-post";
+import { researchGateState, type ResearchGateState } from "@/lib/research-gate";
 
 /**
  * ─── THE ONE AGENT-CREATION PROMPT (Dave, 2026-11-19; consolidated
@@ -34,6 +35,7 @@ import { HOUSE_ACCOUNT_EMAIL } from "@/lib/upload-post";
  * in their own factory (their Upload-Post, their key in their
  * Muse's secure storage). The bridge stays content-only.
  *
+ * Dave, 2026-11-27: the dashboard prompt only appears after deep research.
  * The pure text composition lives in setup-prompt-compose.ts
  * (unit-tested); this module is the server wrapper that gathers
  * the blueprint, mints the link, and injects the team board.
@@ -46,6 +48,29 @@ export interface SetupPromptResult {
   link: string | null;
   prompt: string;
   blueprintStatus: string;
+  researchRequired: boolean;
+  researchState: Exclude<ResearchGateState, "done"> | null;
+}
+
+export async function getResearchGateState(userId: string): Promise<ResearchGateState> {
+  const [doneJobs, latestJob, profiles] = await Promise.all([
+    db.researchJob.findMany({
+      where: { userId, status: "done", resultJson: { not: null } },
+      select: { resultJson: true },
+    }),
+    db.researchJob.findFirst({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      select: { status: true },
+    }),
+    db.brandProfile.findMany({ where: { userId }, select: { researchJson: true } }),
+  ]);
+  return researchGateState({
+    hasDoneResearch: doneJobs.some((j) => typeof j.resultJson === "string" && j.resultJson.trim().length > 0) ||
+      profiles.some((p) => typeof p.researchJson === "string" && p.researchJson.trim().length > 0),
+    hasRunningResearch: latestJob?.status === "running",
+    hasFailedResearch: latestJob?.status === "failed",
+  });
 }
 
 export function composeSetupPrompt(args: {
@@ -72,6 +97,10 @@ export function composeSetupPrompt(args: {
 }
 
 export async function craftSetupPrompt(user: Actor): Promise<SetupPromptResult> {
+  const researchState = await getResearchGateState(user.id);
+  if (researchState !== "done") {
+    return { eligible: false, link: null, prompt: "", blueprintStatus: "none", researchRequired: true, researchState };
+  }
   let bp = await getBlueprint(user.id);
   if (!bp) bp = await draftBlueprint(user);
   const brand = await db.brandProfile.findFirst({
@@ -113,5 +142,7 @@ export async function craftSetupPrompt(user: Actor): Promise<SetupPromptResult> 
       houseAccount,
     }),
     blueprintStatus: bp.status,
+    researchRequired: false,
+    researchState: null,
   };
 }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getWhopUser } from "@/lib/auth";
 import { getBlueprint, draftBlueprint, approveBlueprint, systemSummary, systemContext } from "@/lib/blueprint";
 import { launchReport, dailyBriefing } from "@/lib/briefing";
-import { craftSetupPrompt } from "@/lib/setup-prompt";
+import { craftSetupPrompt, getResearchGateState } from "@/lib/setup-prompt";
 import { composeTeamPrompt, getTeamConfirmedAt, confirmTeamBoard, boardNameFor } from "@/lib/team-board";
 
 export const runtime = "nodejs";
@@ -17,13 +17,14 @@ export const runtime = "nodejs";
 export async function GET() {
   try {
     const user = await getWhopUser();
-    const [blueprint, summary, report, briefing, teamConfirmedAt, ctx] = await Promise.all([
+    const [blueprint, summary, report, briefing, teamConfirmedAt, ctx, researchState] = await Promise.all([
       getBlueprint(user.id),
       systemSummary(user),
       launchReport(user),
       dailyBriefing(user),
       getTeamConfirmedAt(user.id),
       systemContext(user),
+      getResearchGateState(user.id),
     ]);
     // Your Team (Dave, 2026-11-19): the standalone board prompt is
     // pure composition from the blueprint — no minting, safe on GET.
@@ -37,7 +38,7 @@ export async function GET() {
             seated: a.seated !== false,
           }))
         : [],
-      prompt: blueprint
+      prompt: blueprint && researchState === "done"
         ? composeTeamPrompt({
             business: ctx.brandName ?? "your business",
             website: ctx.brandWebsite,
@@ -45,7 +46,7 @@ export async function GET() {
           })
         : null,
     };
-    return NextResponse.json({ blueprint, summary, report, briefing, team });
+    return NextResponse.json({ blueprint, summary, report, briefing, team, researchState });
   } catch (err) {
     if (err instanceof Error && err.name === "UnauthorizedError") {
       return NextResponse.json({ error: "Sign in required" }, { status: 401 });
