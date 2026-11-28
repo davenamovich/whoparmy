@@ -1846,6 +1846,7 @@ model BetaTester {
   userId String @unique
   lane String @default("muse")
   museMail String @default("")
+  deliveryEmail String @default("")
   niche String @default("")
   pageName String @default("")
   businessName String @default("")

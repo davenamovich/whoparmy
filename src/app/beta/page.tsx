@@ -4,14 +4,16 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SiteFooter } from "@/components/shell/site-footer";
+import { enrollLane, type BetaLane } from "@/lib/beta-core";
 import { stashRefFromUrl } from "@/lib/ref-stash";
 
-const CONNECT = "/api/auth/whop?next=/beta";
+const CONNECT = "/api/auth/whop?next=" + encodeURIComponent("/beta?lane=muse");
+const AGENT37_CONNECT = "/api/auth/whop?next=" + encodeURIComponent("/beta?lane=agent37");
 
 type Task = { id: string; title: string; instructions: string; bountyCents: number; slots: number; campaignId: string; campaign?: { brandName: string; product: string } };
 type Campaign = { id: string; company: string; product: string; brandName: string; fundedCents: number; defaultBountyCents: number; tasks: Task[] };
 type Tester = {
-  museMail: string; niche: string; boardHandle: string;
+  lane: string; museMail: string; niche: string; boardHandle: string;
   businessName: string; businessWebsite: string | null; offerText: string;
   researchStatus: string; researchJobId: string | null;
   facebookPageRecorded: boolean; facebookPageUrl: string | null; pageName: string; postsPosted: number;
@@ -20,7 +22,7 @@ type Tester = {
 } | null;
 type Claim = { id: string; status: string; task: Task & { campaign: { brandName: string } }; report: { id: string; reviewStatus: string } | null };
 type Data = {
-  campaigns: Campaign[]; board: Task[]; tester: Tester;
+  campaigns: Campaign[]; board: Task[]; tester: Tester; userEmail: string; deliveryEmail: string;
   skills: Array<{ skillKey: string; version: string }>;
   claims: Claim[];
   memes: Array<{ id: string; caption: string; imageUrl: string; status: string }>;
@@ -50,6 +52,7 @@ export default function BetaPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [prompt, setPrompt] = useState("");
+  const [entryLane, setEntryLane] = useState<BetaLane>("muse");
   const [f, setF] = useState<Record<string, string>>({});
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setF((s) => ({ ...s, [k]: e.target.value }));
 
@@ -62,6 +65,7 @@ export default function BetaPage() {
 
   useEffect(() => {
     stashRefFromUrl();
+    setEntryLane(enrollLane(new URLSearchParams(window.location.search).get("lane")));
     load().catch((e) => setError(e.message));
   }, [load]);
 
@@ -84,13 +88,13 @@ export default function BetaPage() {
           <section className="py-14 md:py-20">
             <p className="font-mono text-[11px] font-semibold tracking-[0.18em] text-primary uppercase">Plunder &amp; Riffle — Open Beta</p>
             <p className="mt-6 max-w-3xl text-xl leading-relaxed font-medium md:text-2xl">New to Muse? Muse is Meta&apos;s personal AI agent — your own assistant that lives in the apps you already use, learns your business, and does real work with you: research, pages, posts, and content.</p>
-            <h1 className="mt-6 max-w-4xl font-display text-5xl font-extrabold leading-[1.02] tracking-tight md:text-7xl">Your Muse, creating on <span className="text-primary">Day 0.</span></h1>
-            <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground">We are the test: Plunder &amp; Riffle itself is the offer under test. You bring a business. Your agent starts building the day you arrive — not someday, Day 0.</p>
+            <h1 className="mt-6 max-w-4xl font-display text-5xl font-extrabold leading-[1.02] tracking-tight md:text-7xl">Two doors. Work starts on <span className="text-primary">Day 0.</span></h1>
+            <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground">We are the test: Plunder &amp; Riffle itself is the offer under test. Bring a business. Choose Muse for a Day 0 build, or Agent37 to have your business researched and your standing brief loaded when your instance is provisioned.</p>
             <div className="mt-9 flex flex-wrap items-center gap-3">
               <Button asChild size="lg"><a href={CONNECT}>Continue with Whop</a></Button>
-              <Button asChild size="lg" variant="outline"><a href={CONNECT}>Outside the Muse countries? Join via Agent37</a></Button>
+              <Button asChild size="lg" variant="outline"><a href={AGENT37_CONNECT}>No Muse of your own? Start on Agent37</a></Button>
             </div>
-            <p className="mt-4 max-w-2xl text-sm text-muted-foreground">One sign-in for both doors. We never ask for your name or email here — Whop already knows you. No API key is collected on this page.</p>
+            <p className="mt-4 max-w-2xl text-sm text-muted-foreground">Muse door: sign in with Whop; no email is collected on this page. Agent37 door: sign in with Whop, then enter your existing email address because everything is created for it. No API key is collected here.</p>
 
             <div className="mt-14 grid items-stretch gap-3 md:grid-cols-[1fr_auto_1.3fr_auto_1fr]" aria-label="How the beta works: your business in, real work out">
               <div className="rounded-[10px] border border-border bg-card p-5">
@@ -104,7 +108,7 @@ export default function BetaPage() {
               <div aria-hidden="true" className="hidden items-center text-xl text-primary md:flex">→</div>
               <div className="rounded-[10px] border border-accent bg-card p-5 text-center">
                 <p className="font-mono text-xs font-medium tracking-[0.14em] text-accent">ENGINE</p>
-                <p className="mt-3 font-display text-lg font-bold">Your Muse</p>
+                <p className="mt-3 font-display text-lg font-bold">Your agent</p>
                 <p className="mt-1 text-sm leading-relaxed text-muted-foreground">backed by the Plunder &amp; Riffle crew — Lead · Scout · Maker · Promoter · Analyst</p>
               </div>
               <div aria-hidden="true" className="hidden items-center text-xl text-primary md:flex">→</div>
@@ -149,17 +153,25 @@ export default function BetaPage() {
                 <p className="mt-5"><a href={CONNECT} className="font-semibold text-accent underline">Continue with Whop →</a></p>
               </div>
               <div className="rounded-[10px] border border-accent bg-card p-5">
-                <span className="inline-block rounded-full border border-accent px-3 py-1 font-mono text-[11px] font-medium tracking-[0.12em] text-accent">AGENT37 — EVERYWHERE ELSE</span>
-                <h3 className="mt-4 text-2xl font-bold">Start with Agent37</h3>
-                <p className={note}>Outside the seven? You&apos;re not shut out. The beta runs on Agent37 too — same beta, same tasks, same bounty, on an agent platform that isn&apos;t limited to those countries.</p>
-                <p className={note}>Sign in with Whop the same way — after sign-in, we route you to the lane that works where you live.</p>
-                <p className="mt-5"><a href={CONNECT} className="font-semibold text-accent underline">Join via Agent37 →</a></p>
+                <span className="inline-block rounded-full border border-accent px-3 py-1 font-mono text-[11px] font-medium tracking-[0.12em] text-accent">NO MUSE OF YOUR OWN?</span>
+                <h3 className="mt-4 text-2xl font-bold">Start on Agent37</h3>
+                <p className={note}>Your own agent on Agent37, running where you live.</p>
+                <p className={note}>No Muse account and no Muse Mail — your existing email address is the address everything is created for.</p>
+                <p className={note}>Deep research on your business becomes your agent&apos;s standing brief on your own Agent37 instance — nothing to paste anywhere.</p>
+                <p className={note}>A 1M seed to start; your own P&amp;R key when you buy your first pack.</p>
+                <p className={note}>Your agent reports back as a Day Log in its own chat.</p>
+                <p className={note}>Same beta and tasks. The 10M bounty unlocks on a human-verified Day 0 build; it is token fuel, not cash.</p>
+                <p className={note}>Next: enrolled → we research your business → your standing brief is written → it loads as your agent&apos;s first instruction when your instance is provisioned.</p>
+                <p className={note}>This door enrolls you in the Agent37 lane.</p>
+                <p className="mt-5"><a href={AGENT37_CONNECT} className="font-semibold text-accent underline">Join via Agent37 →</a></p>
               </div>
             </div>
 
             <div className={`mt-4 ${card}`}>
               <h2 className={h2}>The deal, plainly</h2>
-              <p className={note}>The bounty is seeded token fuel, not cash — the 10M-token bounty ledger unlocks on a verified Day 0, and revenue confirmed to date is $0. Your email is set up inside Muse by your starter prompt — Muse Mail first, then Agent Mail — never collected on this page, and no API key is ever collected here. Nothing goes out without your say-so.</p>
+              <p className={note}>Muse lane: email is set up inside Muse (Muse Mail first, then Agent Mail); it is never collected on this page.</p>
+              <p className={note}>Agent37 lane: no new inbox — your existing email address is used and accounts are created for it.</p>
+              <p className={note}>The bounty is seeded token fuel, not cash — the 10M-token bounty ledger unlocks on a verified Day 0, and revenue confirmed to date is $0. No API key is ever collected here. Nothing goes out without your say-so.</p>
             </div>
           </section>
           <SiteFooter />
@@ -198,16 +210,27 @@ export default function BetaPage() {
 
           <div className="mt-8 grid gap-4 md:grid-cols-2">
             <section className={card}>
-              <h2 className={h2}>Step 0 · Your email is set up in Muse</h2>
-              <p className={note}>No email is collected on this page — and you don&apos;t need a Muse account yet. Your starter prompt does the email setup inside Muse, first thing: your Muse creates your Muse Mail inbox, then Agent Mail on top of it, and reads the verification code itself. That happens in Muse, before any account, purchase, or build.</p>
+              <h2 className={h2}>{t?.lane === "agent37" ? "Step 0 · Your existing email address" : "Step 0 · Your email is set up in Muse"}</h2>
+              <p className={note}>{t?.lane === "agent37"
+                ? "Your existing email address is the address everything is created for. No new inbox is needed."
+                : "No email is collected on this page — and you don’t need a Muse account yet. Your starter prompt does the email setup inside Muse, first thing: your Muse creates your Muse Mail inbox, then Agent Mail on top of it, and reads the verification code itself. That happens in Muse, before any account, purchase, or build."}</p>
               {t ? (
-                <p className={note}>{t.museMail ? `${t.museMail} · ` : ""}Lane: Muse first, Agent37 second. Enrollment seeds 1M fuel. Your starter prompt is in the Deep research card below — its Step 0 is the email setup.</p>
+                <>
+                <p className={note}>Your lane: {t.lane === "agent37" ? "Agent37" : "Muse"}. <Button size="sm" variant="outline" disabled={busy === "enroll"} onClick={() => run("enroll", () => api("enroll", { lane: t.lane === "agent37" ? "muse" : "agent37", deliveryEmail: f.deliveryEmail ?? data.deliveryEmail, niche: t.niche, boardHandle: t.boardHandle }))}>Switch to {t.lane === "agent37" ? "Muse" : "Agent37"}</Button></p>
+                {t.lane === "agent37" ? <><Input className="mt-3" type="email" placeholder="Your existing email address" value={f.deliveryEmail ?? data.deliveryEmail ?? ""} onChange={set("deliveryEmail")} /><Button className="mt-2" size="sm" variant="outline" disabled={busy === "save-email"} onClick={() => run("save-email", () => api("enroll", { lane: "agent37", deliveryEmail: f.deliveryEmail ?? data.deliveryEmail, niche: t.niche, boardHandle: t.boardHandle }))}>Save delivery email</Button><p className={note}>A 1M seed to start; your own P&amp;R key when you buy your first pack. The 10M bounty unlocks on a human-verified Day 0 build.</p><p className={note}>Next: enrolled → we research your business → your standing brief is written → it loads as your agent&apos;s first instruction when your instance is provisioned.</p></> : null}
+                <p className={note}>{t.lane === "agent37"
+                  ? "Enrollment seeds 1M fuel. Deep research on your business becomes your agent’s standing brief on your own Agent37 instance."
+                  : `${t.museMail ? `${t.museMail} · ` : ""}Lane: Muse first, Agent37 second. Enrollment seeds 1M fuel. Your starter prompt is in the Deep research card below — its Step 0 is the email setup.`}</p>
+                </>
               ) : (
                 <div className="mt-4 space-y-3">
                   <Input placeholder="Your test niche (optional)" value={f.niche ?? ""} onChange={set("niche")} />
                   <Input placeholder="Board handle (optional)" value={f.board ?? ""} onChange={set("board")} />
-                  <Button disabled={busy === "enroll"} onClick={() => run("enroll", () => api("enroll", { niche: f.niche ?? "", boardHandle: f.board ?? "" }))}>Enroll and seed 1M fuel</Button>
-                  <p className="text-sm text-muted-foreground">Enrolling never asks for an email. After you enroll, craft your starter prompt below and paste it into your Muse — the prompt sets up your email first.</p>
+                  {entryLane === "agent37" ? <Input type="email" placeholder="Your existing email address" value={f.deliveryEmail ?? data.deliveryEmail ?? data.userEmail ?? ""} onChange={set("deliveryEmail")} /> : null}
+                  <Button disabled={busy === "enroll"} onClick={() => run("enroll", () => api("enroll", { lane: entryLane, deliveryEmail: f.deliveryEmail ?? data.deliveryEmail ?? data.userEmail, niche: f.niche ?? "", boardHandle: f.board ?? "" }))}>Enroll and seed 1M fuel</Button>
+                  <p className="text-sm text-muted-foreground">{entryLane === "agent37"
+                    ? "Your existing email address is the address everything is created for. Enrolling does not ask for a new email address."
+                    : "Enrolling never asks for an email. After you enroll, craft your starter prompt below and paste it into your Muse — the prompt sets up your email first."}</p>
                 </div>
               )}
             </section>
@@ -217,7 +240,7 @@ export default function BetaPage() {
               {t ? (
                 <>
                   <p className={note}>Fuel: {t.fuelUsed.toLocaleString()} / {t.fuelGranted.toLocaleString()} used · Bounty: {t.bountyUsed.toLocaleString()} / {t.bountyGranted.toLocaleString()} used</p>
-                  <p className="mt-2 text-sm">Bounty unlock: {t.bountyUnlocked ? "Day 0 verified — 10M unlocked" : "Record a Facebook Page and at least one post"}</p>
+                  <p className="mt-2 text-sm">Bounty unlock: {t.bountyUnlocked ? "Day 0 verified — 10M unlocked" : t.lane === "agent37" ? "The 10M bounty unlocks on a human-verified Day 0 build" : "Record a Facebook Page and at least one post"}</p>
                   <p className="mt-2 text-sm">Panel: {panelOpen ? "Unlocked" : t.bountyUnlocked ? "Acknowledge the panel cost to unlock" : "Locked until bounty unlock"} · Core Skills: {panelOpen ? "Unlocked" : "Locked until Panel"}</p>
                   <div className="mt-4 flex flex-wrap gap-2">
                     {!t.bountyUnlocked ? null : !t.panelCostAckAt ? (
@@ -237,7 +260,9 @@ export default function BetaPage() {
           {t ? (
             <section className={`mt-4 ${card}`}>
               <h2 className={h2}>Your business — website or offer</h2>
-              <p className={note}>Your Muse builds from one of two things: your website, or the offer you want to promote. With a website, beta runs the exact deep research /build runs (research_brand via the bridge) and the results land on your brand profile. No website? Give the offer instead — your profile is built from it, and no website research is claimed. One of the two is required: with neither, there is nothing to build from.</p>
+              <p className={note}>{t.lane === "agent37"
+                ? "Your agent builds from your website or the offer you want to promote. Deep research on your business becomes its standing brief on your own Agent37 instance. One of the two is required: with neither, there is nothing to build from."
+                : "Your Muse builds from one of two things: your website, or the offer you want to promote. With a website, beta runs the exact deep research /build runs (research_brand via the bridge) and the results land on your brand profile. No website? Give the offer instead — your profile is built from it, and no website research is claimed. One of the two is required: with neither, there is nothing to build from."}</p>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 <Input placeholder="Business name" value={f.biz ?? t.businessName ?? ""} onChange={set("biz")} />
                 <Input placeholder="Business website (optional if you give an offer)" value={f.site ?? t.businessWebsite ?? ""} onChange={set("site")} />
@@ -250,7 +275,7 @@ export default function BetaPage() {
                 <Button variant="outline" disabled={busy === "refresh" || !t.researchJobId} onClick={() => run("refresh", () => api("research-refresh"))}>Check research status</Button>
                 <span className="text-sm text-muted-foreground">Status: {t.researchStatus === "offer" ? "Built from your offer — no website research run" : t.researchStatus}</span>
               </div>
-              <div className="mt-4">
+              {t.lane !== "agent37" ? <div className="mt-4">
                 <Button variant="outline" disabled={busy === "prompt"} onClick={() => run("prompt", async () => {
                   const r = await fetch("/api/blueprint", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "setup" }) });
                   const j = await r.json().catch(() => ({}));
@@ -258,11 +283,11 @@ export default function BetaPage() {
                   setPrompt(j.prompt || "");
                 })}>Craft my starter prompt (from my research)</Button>
                 {prompt ? <textarea readOnly value={prompt} className="mt-3 h-48 w-full rounded-md border border-border bg-background p-3 text-xs" /> : null}
-              </div>
+              </div> : <p className={note}>Deep research on your business becomes your agent&apos;s standing brief on your own Agent37 instance, alongside its research file.</p>}
             </section>
           ) : null}
 
-          {t ? (
+          {t && t.lane !== "agent37" ? (
             <section className={`mt-4 ${card}`}>
               <h2 className={h2}>Day 0 · Your niche Facebook Page</h2>
               <p className={note}>The universal deliverable: a Facebook Page for your niche, with first posts live. Recording it here (with at least one post) unlocks the 10M bounty.</p>

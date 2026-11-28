@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUserId } from "@/lib/session";
-import { approveReport, evaluateUnlock, validateBountyCents, validateSpend } from "@/lib/beta-core";
+import { approveReport, deliveryEmailRequired, enrollmentLaneWrite, evaluateUnlock, validateBountyCents, validateSpend } from "@/lib/beta-core";
 import { startResearchJob, getResearchJob } from "@/lib/research-jobs";
 import { getPlan } from "@/lib/plans";
 
@@ -17,7 +17,8 @@ async function context() {
   const userId = await getSessionUserId();
   if (!userId) return null;
   const tester = await db.betaTester.findUnique({ where: { userId } });
-  return { userId, tester };
+  const user = await db.user.findUnique({ where: { id: userId }, select: { email: true } });
+  return { userId, tester, userEmail: user?.email ?? "" };
 }
 
 function hostOf(value: string | null | undefined): string {
@@ -137,7 +138,7 @@ export async function GET() {
         }),
       ])
     : [[], [], [], [], [], []];
-  return json({ campaigns, board, tester: t, skills, claims, memes, posts, ledger, pendingReports });
+  return json({ campaigns, board, tester: t, userEmail: c.userEmail, deliveryEmail: t?.deliveryEmail || c.userEmail, skills, claims, memes, posts, ledger, pendingReports });
 }
 
 export async function POST(req: NextRequest) {
@@ -147,18 +148,26 @@ export async function POST(req: NextRequest) {
   const action = String(b.action || "");
   try {
     if (action === "enroll") {
+      const lane = enrollmentLaneWrite(b.lane, Boolean(c.tester));
+      if (!c.tester && !lane.create) return json({ error: "Please enter through the Muse or Agent37 door to choose your beta lane." }, 400);
+      const effectiveLane = lane.update ?? lane.create ?? c.tester?.lane;
+      const deliveryEmail = typeof b.deliveryEmail === "string" ? b.deliveryEmail.trim() : "";
+      if (deliveryEmailRequired(effectiveLane, deliveryEmail)) return json({ error: "The Agent37 lane needs your email address — everything is created for it. Add it and enroll again." }, 400);
       const t = await db.betaTester.upsert({
         where: { userId: c.userId },
         create: {
           userId: c.userId,
-          lane: typeof b.lane === "string" ? b.lane : "muse",
+          lane: lane.create as string,
           museMail: typeof b.museMail === "string" ? b.museMail : "",
+          deliveryEmail: effectiveLane === "agent37" ? deliveryEmail : "",
           niche: typeof b.niche === "string" ? b.niche : "",
           boardHandle: typeof b.boardHandle === "string" ? b.boardHandle : "",
           businessName: typeof b.businessName === "string" ? b.businessName : "",
           businessWebsite: typeof b.businessWebsite === "string" ? b.businessWebsite : undefined,
         },
         update: {
+          ...(lane.update ? { lane: lane.update } : {}),
+          ...(effectiveLane === "agent37" && deliveryEmail ? { deliveryEmail } : {}),
           museMail: typeof b.museMail === "string" ? b.museMail : undefined,
           niche: typeof b.niche === "string" ? b.niche : undefined,
           boardHandle: typeof b.boardHandle === "string" ? b.boardHandle : undefined,
