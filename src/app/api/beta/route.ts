@@ -68,6 +68,42 @@ async function persistResearchToBrand(userId: string, brandName: string, website
   return brand.id;
 }
 
+/**
+ * Offer-only path (Dave, 2026-11-27): a member with no website gives
+ * the offer they want to promote instead. The brand profile is built
+ * from that stated offer ONLY — researchJson says so plainly, and no
+ * website research is run or claimed (mirrors /build's no-website
+ * honesty rule).
+ */
+async function persistOfferToBrand(userId: string, brandName: string, offer: string) {
+  const researchJson = JSON.stringify({
+    offer,
+    source: "member-stated offer",
+    note: "No website — this profile is built from the member's stated offer only. No website research was run.",
+  }).slice(0, 60_000);
+  const all = await db.brandProfile.findMany({ where: { userId }, orderBy: { createdAt: "asc" } });
+  const existing = all.find((b) => !b.website && b.name === brandName) ?? null;
+  if (existing) {
+    await db.brandProfile.update({ where: { id: existing.id }, data: { description: offer, products: offer, researchJson } });
+    return existing.id;
+  }
+  const user = await db.user.findUnique({ where: { id: userId }, select: { plan: true } });
+  const plan = getPlan(user?.plan ?? "FREE");
+  if (all.length >= plan.maxBrands) return null;
+  const brand = await db.brandProfile.create({
+    data: {
+      userId,
+      name: brandName.slice(0, 120),
+      website: null,
+      description: offer,
+      products: offer,
+      languages: JSON.stringify(["en"]),
+      researchJson,
+    },
+  });
+  return brand.id;
+}
+
 export async function GET() {
   const c = await context();
   if (!c) return json({ error: "Unauthorized" }, 401);
@@ -141,13 +177,27 @@ export async function POST(req: NextRequest) {
       if (!c.tester) return json({ error: "Enroll first" }, 400);
       const brandName = (typeof b.businessName === "string" ? b.businessName : c.tester.businessName).trim();
       const website = (typeof b.businessWebsite === "string" ? b.businessWebsite : c.tester.businessWebsite ?? "").trim();
-      if (!brandName || !website) {
-        return json({ error: "Business name and website are both required for deep research." }, 400);
+      const offer = (typeof b.offerText === "string" ? b.offerText : c.tester.offerText ?? "").trim();
+      if (!brandName) {
+        return json({ error: "Business name is required." }, 400);
+      }
+      if (!website && !offer) {
+        return json({ error: "Give us your website or the offer you want to promote — your Muse needs one of the two to build from." }, 400);
+      }
+      if (!website) {
+        // Offer-only: no website research is run or claimed; the
+        // profile is built from the stated offer (see helper above).
+        const brandId = await persistOfferToBrand(c.userId, brandName, offer);
+        const t = await db.betaTester.update({
+          where: { id: c.tester.id },
+          data: { businessName: brandName, businessWebsite: null, offerText: offer, researchJobId: null, researchStatus: "offer" },
+        });
+        return json({ tester: t, brandId, offerOnly: true }, 201);
       }
       const job = await startResearchJob({ userId: c.userId, brandName, website });
       const t = await db.betaTester.update({
         where: { id: c.tester.id },
-        data: { businessName: brandName, businessWebsite: website, researchJobId: job.id, researchStatus: job.status },
+        data: { businessName: brandName, businessWebsite: website, offerText: offer, researchJobId: job.id, researchStatus: job.status },
       });
       return json({ job, tester: t }, 201);
     }

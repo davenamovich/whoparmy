@@ -1850,6 +1850,7 @@ model BetaTester {
   pageName String @default("")
   businessName String @default("")
   businessWebsite String?
+  offerText String @default("")
   researchJobId String?
   researchStatus String @default("none")
   facebookPageRecorded Boolean @default(false)

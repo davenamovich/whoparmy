@@ -38,6 +38,7 @@ try {
 // each entry is applied only when the column is absent, so it is safe
 // on every boot and never touches existing data.
 const ADDITIVE_COLUMNS: Array<{ table: string; column: string; ddl: string }> = [
+  { table: "BetaTester", column: "offerText", ddl: 'ALTER TABLE "BetaTester" ADD COLUMN "offerText" TEXT NOT NULL DEFAULT \'\'' },
   { table: "Application", column: "handoutOptIn", ddl: 'ALTER TABLE "Application" ADD COLUMN "handoutOptIn" BOOLEAN NOT NULL DEFAULT false' },
   { table: "MarketplaceSale", column: "source", ddl: 'ALTER TABLE "MarketplaceSale" ADD COLUMN "source" TEXT' },
   { table: "PaidRotatorSlot", column: "source", ddl: 'ALTER TABLE "PaidRotatorSlot" ADD COLUMN "source" TEXT NOT NULL DEFAULT \'paid\'' },

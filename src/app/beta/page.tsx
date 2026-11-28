@@ -12,7 +12,7 @@ type Task = { id: string; title: string; instructions: string; bountyCents: numb
 type Campaign = { id: string; company: string; product: string; brandName: string; fundedCents: number; defaultBountyCents: number; tasks: Task[] };
 type Tester = {
   museMail: string; niche: string; boardHandle: string;
-  businessName: string; businessWebsite: string | null;
+  businessName: string; businessWebsite: string | null; offerText: string;
   researchStatus: string; researchJobId: string | null;
   facebookPageRecorded: boolean; facebookPageUrl: string | null; pageName: string; postsPosted: number;
   fuelGranted: number; fuelUsed: number; bountyGranted: number; bountyUsed: number; bountyUnlocked: boolean;
@@ -236,16 +236,19 @@ export default function BetaPage() {
 
           {t ? (
             <section className={`mt-4 ${card}`}>
-              <h2 className={h2}>Deep research — same engine as /build</h2>
-              <p className={note}>Your business is the test subject. Beta signup runs the exact deep research /build runs (research_brand via the bridge), and the results land on your brand profile — the same research your blueprint and starter prompt are composed from.</p>
+              <h2 className={h2}>Your business — website or offer</h2>
+              <p className={note}>Your Muse builds from one of two things: your website, or the offer you want to promote. With a website, beta runs the exact deep research /build runs (research_brand via the bridge) and the results land on your brand profile. No website? Give the offer instead — your profile is built from it, and no website research is claimed. One of the two is required: with neither, there is nothing to build from.</p>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 <Input placeholder="Business name" value={f.biz ?? t.businessName ?? ""} onChange={set("biz")} />
-                <Input placeholder="Business website" value={f.site ?? t.businessWebsite ?? ""} onChange={set("site")} />
+                <Input placeholder="Business website (optional if you give an offer)" value={f.site ?? t.businessWebsite ?? ""} onChange={set("site")} />
+              </div>
+              <div className="mt-3">
+                <Input placeholder="No website? The offer you want to promote — e.g. 'My $497 roof-inspection package for homeowners'" value={f.offer ?? t.offerText ?? ""} onChange={set("offer")} />
               </div>
               <div className="mt-4 flex flex-wrap items-center gap-3">
-                <Button disabled={busy === "research"} onClick={() => run("research", () => api("research", { businessName: f.biz ?? t.businessName, businessWebsite: f.site ?? t.businessWebsite }))}>Run deep research</Button>
+                <Button disabled={busy === "research"} onClick={() => run("research", () => api("research", { businessName: f.biz ?? t.businessName, businessWebsite: f.site ?? t.businessWebsite ?? "", offerText: f.offer ?? t.offerText ?? "" }))}>Run deep research</Button>
                 <Button variant="outline" disabled={busy === "refresh" || !t.researchJobId} onClick={() => run("refresh", () => api("research-refresh"))}>Check research status</Button>
-                <span className="text-sm text-muted-foreground">Status: {t.researchStatus}</span>
+                <span className="text-sm text-muted-foreground">Status: {t.researchStatus === "offer" ? "Built from your offer — no website research run" : t.researchStatus}</span>
               </div>
               <div className="mt-4">
                 <Button variant="outline" disabled={busy === "prompt"} onClick={() => run("prompt", async () => {
