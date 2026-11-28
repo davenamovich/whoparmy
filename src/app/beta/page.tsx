@@ -76,28 +76,90 @@ export default function BetaPage() {
     return (
       <main className="min-h-screen bg-background text-foreground">
         <div className="mx-auto max-w-6xl px-5 py-8">
-          <header className="flex justify-between">
+          <header className="flex items-center justify-between border-b border-border pb-5">
             <a href="/" className="font-display text-xs font-extrabold tracking-[0.14em]">PLUNDER <span className="text-primary">&amp;</span> RIFFLE</a>
-            <a href={CONNECT} className="font-semibold text-primary underline">Continue with Whop</a>
+            <a href={CONNECT} className="font-semibold text-accent underline">Continue with Whop</a>
           </header>
-          <section className="py-16">
+
+          <section className="py-14 md:py-20">
             <p className="font-mono text-[11px] font-semibold tracking-[0.18em] text-primary uppercase">Plunder &amp; Riffle — Open Beta</p>
-            <p className="mt-5 max-w-2xl text-lg leading-relaxed">New to Muse? Muse is Meta&apos;s personal AI agent — your own assistant that lives in the apps you already use, learns your business, and does real work with you: research, pages, posts, and content.</p>
-            <h1 className="mt-4 max-w-3xl text-5xl font-extrabold leading-tight">Your Muse, creating on Day 0.</h1>
-            <p className="mt-5 max-w-2xl text-lg leading-relaxed text-muted-foreground">We are the test: Plunder &amp; Riffle itself is the offer under test.</p>
-            <div className={`mt-8 ${card}`}>
-              <h2 className={h2}>10M-token bounty ledger</h2>
-              <p className={note}>Bounty is seeded token fuel, not cash. Revenue confirmed to date is $0.</p>
-              <p className={note}>Set up Muse Mail first. Your bridge creates the key; no API key is collected here. Sign in with Whop — we never ask for your name or email here; Whop already knows you.</p>
-            </div>
-            <div className={`mt-4 ${card}`}>
-              <h2 className={h2}>Where Muse is available</h2>
-              <p className={note}>Muse is live in 7 countries: the United States, Canada, the United Kingdom, Japan, Singapore, Mexico, and Australia.</p>
-              <p className={note}>Outside those countries? You&apos;re not shut out — the beta has an Agent37 lane for you: same beta, same tasks, on an agent platform that isn&apos;t limited to those countries. Sign in with Whop the same way and we&apos;ll route you to the lane that works where you live.</p>
-            </div>
-            <div className="mt-8 flex flex-wrap items-center gap-3">
+            <p className="mt-6 max-w-3xl text-xl leading-relaxed font-medium md:text-2xl">New to Muse? Muse is Meta&apos;s personal AI agent — your own assistant that lives in the apps you already use, learns your business, and does real work with you: research, pages, posts, and content.</p>
+            <h1 className="mt-6 max-w-4xl font-display text-5xl font-extrabold leading-[1.02] tracking-tight md:text-7xl">Your Muse, creating on <span className="text-primary">Day 0.</span></h1>
+            <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground">We are the test: Plunder &amp; Riffle itself is the offer under test. You bring a business. Your agent starts building the day you arrive — not someday, Day 0.</p>
+            <div className="mt-9 flex flex-wrap items-center gap-3">
               <Button asChild size="lg"><a href={CONNECT}>Continue with Whop</a></Button>
-              <Button asChild size="lg" variant="outline"><a href={CONNECT}>Outside those countries? Join via Agent37</a></Button>
+              <Button asChild size="lg" variant="outline"><a href={CONNECT}>Outside the Muse countries? Join via Agent37</a></Button>
+            </div>
+            <p className="mt-4 max-w-2xl text-sm text-muted-foreground">One sign-in for both doors. We never ask for your name or email here — Whop already knows you. No API key is collected on this page.</p>
+
+            <div className="mt-14 grid items-stretch gap-3 md:grid-cols-[1fr_auto_1.3fr_auto_1fr]" aria-label="How the beta works: your business in, real work out">
+              <div className="rounded-[10px] border border-border bg-card p-5">
+                <p className="font-mono text-xs font-medium tracking-[0.14em] text-primary">IN</p>
+                <ul className="mt-3 space-y-1.5 text-sm text-muted-foreground">
+                  <li>Your business</li>
+                  <li>Your niche</li>
+                  <li>Twenty minutes</li>
+                </ul>
+              </div>
+              <div aria-hidden="true" className="hidden items-center text-xl text-primary md:flex">→</div>
+              <div className="rounded-[10px] border border-accent bg-card p-5 text-center">
+                <p className="font-mono text-xs font-medium tracking-[0.14em] text-accent">ENGINE</p>
+                <p className="mt-3 font-display text-lg font-bold">Your Muse</p>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">backed by the Plunder &amp; Riffle crew — Lead · Scout · Maker · Promoter · Analyst</p>
+              </div>
+              <div aria-hidden="true" className="hidden items-center text-xl text-primary md:flex">→</div>
+              <div className="rounded-[10px] border border-border bg-card p-5">
+                <p className="font-mono text-xs font-medium tracking-[0.14em] text-primary">OUT</p>
+                <ul className="mt-3 space-y-1.5 text-sm text-muted-foreground">
+                  <li>A Facebook Page, live</li>
+                  <li>Your first posts</li>
+                  <li>Real beta tasks, done and reported</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+              {[
+                ["1M", "token fuel seeded when you enroll"],
+                ["10M", "bounty unlocked by a verified Day 0"],
+                ["$0.20", "smallest task worth doing — your agent does the work"],
+                ["$0", "revenue so far. The test stays honest."],
+              ].map(([num, label]) => (
+                <div key={label} className="rounded-[10px] border border-border bg-card p-5">
+                  <p className="font-mono text-3xl font-semibold text-foreground">{num}</p>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{label}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="pb-4">
+            <h2 className="font-display text-3xl font-extrabold tracking-tight md:text-4xl">Two doors. One beta.</h2>
+            <p className="mt-3 max-w-2xl leading-relaxed text-muted-foreground">Muse isn&apos;t everywhere yet. That doesn&apos;t shut you out — it just picks your door.</p>
+            <div className="mt-8 grid gap-4 md:grid-cols-2">
+              <div className={card}>
+                <span className="inline-block rounded-full border border-primary px-3 py-1 font-mono text-[11px] font-medium tracking-[0.12em] text-primary">MUSE — 7 COUNTRIES</span>
+                <h3 className="mt-4 text-2xl font-bold">Start with Muse</h3>
+                <p className={note}>If Muse is live where you live, this is your door: your own Muse, set up on Day 0 through the bridge. Muse is live in:</p>
+                <ul className="mt-4 flex flex-wrap gap-2" aria-label="Countries where Muse is available">
+                  {["United States", "Canada", "United Kingdom", "Japan", "Singapore", "Mexico", "Australia"].map((c) => (
+                    <li key={c} className="rounded-full border border-border px-3 py-1 text-sm">{c}</li>
+                  ))}
+                </ul>
+                <p className="mt-5"><a href={CONNECT} className="font-semibold text-accent underline">Continue with Whop →</a></p>
+              </div>
+              <div className="rounded-[10px] border border-accent bg-card p-5">
+                <span className="inline-block rounded-full border border-accent px-3 py-1 font-mono text-[11px] font-medium tracking-[0.12em] text-accent">AGENT37 — EVERYWHERE ELSE</span>
+                <h3 className="mt-4 text-2xl font-bold">Start with Agent37</h3>
+                <p className={note}>Outside the seven? You&apos;re not shut out. The beta runs on Agent37 too — same beta, same tasks, same bounty, on an agent platform that isn&apos;t limited to those countries.</p>
+                <p className={note}>Sign in with Whop the same way — after sign-in, we route you to the lane that works where you live.</p>
+                <p className="mt-5"><a href={CONNECT} className="font-semibold text-accent underline">Join via Agent37 →</a></p>
+              </div>
+            </div>
+
+            <div className={`mt-4 ${card}`}>
+              <h2 className={h2}>The deal, plainly</h2>
+              <p className={note}>The bounty is seeded token fuel, not cash — the 10M-token bounty ledger unlocks on a verified Day 0, and revenue confirmed to date is $0. Set up Muse Mail first: your bridge creates the key, and no API key is ever collected here. Nothing goes out without your say-so.</p>
             </div>
           </section>
           <SiteFooter />
